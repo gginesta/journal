@@ -19,6 +19,7 @@ The app should feel like opening a private, warm photo album at the end of the d
 - Emotionally optimistic.
 - Low guilt.
 - Family-memory friendly.
+- Flexible enough for self-reflection and personal milestones.
 
 ## Visual Direction
 
@@ -52,6 +53,7 @@ The existing Timeline tab should become Memories during the design pass.
 - Secondary prompts are lower priority and can be compact.
 - Mood picker should not compete with the photo or main prompt.
 - People tagging should sit near the photo area as optional chips, not as a required form.
+- Little Details should feel like an optional memory helper, not a parenting-only tracker.
 - Completion should feel saved and reassuring, not like a chore checklist.
 - Memory Lane appears as a signature moment after the daily entry area.
 
@@ -60,6 +62,7 @@ The existing Timeline tab should become Memories during the design pass.
 - Photo grid or feed leads the experience.
 - Person filters should make it easy to browse memories by each child.
 - People chips should feel like private labels, not social tags.
+- Little Details should surface as short, warm snippets in entry detail and future search.
 - Text excerpts are short.
 - Tapping opens the full entry.
 - Empty state should encourage today's first photo.
@@ -96,6 +99,8 @@ Build or refine these reusable components:
 - `MoodSelector`
 - `PeopleTagPicker`
 - `PersonFilterChips`
+- `LittleDetailsEditor`
+- `LittleDetailsSummary`
 - `CompletionBanner`
 - `CalendarMonthGrid`
 - `EntryPreviewCard`
@@ -109,6 +114,7 @@ Build or refine these reusable components:
 - Prompt editing should preserve historical prompt text.
 - People tags should be editable after the entry is saved.
 - Person filters should preserve the photo-first archive layout.
+- Little Details should support neutral categories such as phrase, favorite, routine, milestone, and quote.
 - Memory cards should use exact labels when exact and softer labels when near dates, such as "Around this day in 2025."
 - Reminder setup should be optional and reversible.
 
@@ -118,6 +124,7 @@ Build or refine these reusable components:
 - Maintain high text contrast.
 - Add useful VoiceOver labels for photos, mood buttons, completion state, and calendar days.
 - Add useful VoiceOver labels for selected people tags and person filters.
+- Little Details fields should have clear labels that make sense outside a family context.
 - Hit targets should be at least 44 by 44 points.
 - Do not communicate state through color only.
 

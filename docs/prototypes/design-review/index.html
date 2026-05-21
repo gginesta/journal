@@ -723,6 +723,35 @@
       font-weight: 800;
     }
 
+    .detail-grid {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .detail-row {
+      display: grid;
+      gap: 6px;
+      padding: 12px;
+      border-radius: var(--radius-md);
+      background: #faf8f2;
+    }
+
+    .detail-row label {
+      color: var(--soft-ink);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .detail-row input {
+      width: 100%;
+      border: 0;
+      outline: 0;
+      color: var(--ink);
+      background: transparent;
+      line-height: 1.35;
+    }
+
     @media (max-width: 860px) {
       .review-shell {
         display: block;
@@ -791,6 +820,25 @@
               </div>
               <p class="hint">These are private memory tags, not contacts or social sharing.</p>
             </div>
+
+            <details class="card" open>
+              <summary>Little details, optional <span>v</span></summary>
+              <p class="hint">Capture tiny phases, funny words, current favorites, personal milestones, or anything easy to forget.</p>
+              <div class="detail-grid">
+                <div class="detail-row">
+                  <label for="detailPhrase">Phrase or quote</label>
+                  <input id="detailPhrase" placeholder="Example: a funny word, saying, or mantra">
+                </div>
+                <div class="detail-row">
+                  <label for="detailFavorite">Current favorite</label>
+                  <input id="detailFavorite" placeholder="Snack, song, routine, place, hobby">
+                </div>
+                <div class="detail-row">
+                  <label for="detailMilestone">Tiny milestone</label>
+                  <input id="detailMilestone" placeholder="Something new, brave, sweet, or very you">
+                </div>
+              </div>
+            </details>
 
             <div class="card completion" id="completion">
               <span class="status-icon" id="statusIcon">O</span>
@@ -874,13 +922,13 @@
             </div>
             <div class="photo-grid">
               <button class="tile memory-item" type="button" data-people="kid1 family"><strong>Dinner with family<br>May 20</strong></button>
-              <button class="tile memory-item" type="button" data-people="kid2"><strong>A quiet path<br>May 18</strong></button>
-              <button class="tile memory-item" type="button" data-people="kid1 kid3"><strong>Good coffee<br>May 14</strong></button>
+              <button class="tile memory-item" type="button" data-people="kid2"><strong>Funny word phase<br>May 18</strong></button>
+              <button class="tile memory-item" type="button" data-people="kid1 kid3"><strong>Tiny milestone<br>May 14</strong></button>
               <button class="tile memory-item" type="button" data-people="family kid2 kid3"><strong>Golden hour<br>May 09</strong></button>
             </div>
             <div class="card" style="margin-top:14px;">
               <h3>Written memories</h3>
-              <p class="hint" id="memoryFilterHint">Showing all memories. Person filters make it easy to revisit each child's story.</p>
+              <p class="hint" id="memoryFilterHint">Showing all memories. Person filters and little details make it easy to revisit each child's story or your own milestones.</p>
             </div>
           </section>
 
@@ -956,6 +1004,7 @@
           <span class="chip">low guilt</span>
           <span class="chip">nostalgic</span>
           <span class="chip">people tags</span>
+          <span class="chip">little details</span>
         </div>
       </div>
 
@@ -964,6 +1013,7 @@
         <ul>
           <li>Click Add a photo and see whether the Today screen feels complete quickly.</li>
           <li>Type one or two nice things and decide if the ritual feels lightweight.</li>
+          <li>Add a tiny detail like a funny phrase, favorite snack, or personal milestone.</li>
           <li>Switch between Today, Memories, Calendar, Insights, and Settings.</li>
           <li>Tag people on Today and filter Memories by each kid.</li>
           <li>Click calendar days and check whether indicators are understandable.</li>

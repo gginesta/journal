@@ -2,7 +2,7 @@
 
 Photo Gratitude Journal is a polished, local-first iOS app for ending the day with one or two photos and a few positive reflections. The default ritual asks for three nice things that happened today, but users can customize prompts and choose an evening-only, once-daily, morning/evening, or anytime cadence.
 
-The product goal is simple: make a private, beautiful photo journal that helps people notice good moments and rediscover them later through streaks, a calendar, private people tags, and automatic nostalgia views.
+The product goal is simple: make a private, beautiful photo journal that helps people notice good moments and rediscover them later through streaks, a calendar, private people tags, optional Little Details, and automatic nostalgia views.
 
 ## Current Status
 
@@ -57,6 +57,7 @@ xcrun simctl list devices available
 - Photo-first Today and Timeline experiences.
 - Streaks, calendar browsing, mood tracking, and automatic Memory Lane look-backs.
 - Private people tagging so family memories can be browsed by child or loved one.
+- Optional Little Details for tiny phases, personal milestones, routines, favorites, and quotes.
 - Generous free tier with yearly Premium unlocks for widgets, advanced insights, export, app lock, themes, and richer nostalgia.
 
 ## Project Structure

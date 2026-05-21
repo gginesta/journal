@@ -90,6 +90,7 @@ Work:
 - Add photo deletion.
 - Add import loading and error states.
 - Add captions or lightweight photo notes if they do not clutter the flow.
+- Add optional Little Details for phrases, favorites, routines, tiny milestones, and quotes.
 - Preserve historical prompt text when prompts change.
 - Add support for multiple sessions based on cadence.
 - Add Settings controls for reminder times.
@@ -98,6 +99,7 @@ Work:
 Acceptance criteria:
 
 - User can add, preview, and delete photos.
+- User can add optional Little Details without making the daily flow feel required or child-only.
 - Failed photo imports are recoverable.
 - Cadence changes create the expected session choices.
 - Prompt edits affect future entries without mutating historical entries.
@@ -113,6 +115,7 @@ Work:
 - Add private people tags for children, family, and recurring memory subjects.
 - Add person filters to Memories.
 - Add entry-detail editing for people tags.
+- Show Little Details in entry detail and make them discoverable in Memories or search.
 - Improve Entry Detail as a memory page.
 - Improve Calendar visual density and month navigation.
 - Add "around this time" labels for near-date Memory Lane matches.
@@ -125,6 +128,7 @@ Acceptance criteria:
 - User can tag a memory with one or more people.
 - User can filter Memories by a selected person.
 - People tags remain private local/iCloud metadata, not social contacts.
+- User can revisit Little Details for a person or personal milestone.
 - Calendar clearly distinguishes photo, complete, and empty days.
 - Entry Detail renders photo-heavy and text-only entries well.
 - Memory Lane cards open the correct entry.

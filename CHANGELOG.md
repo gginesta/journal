@@ -13,6 +13,7 @@ All notable changes to Photo Gratitude Journal will be documented here.
 - Added a durable v0.3 design-system goal document for long-running Codex work.
 - Began the v0.3 photo-first design pass with reusable design components, Today ritual refinements, Memories browsing, and Calendar polish.
 - Updated iOS CI to run on `codex/**` implementation branches.
+- Added PC design-review prototype coverage for private people tags and optional Little Details.
 
 ## [0.1.0] - 2026-05-21
 
