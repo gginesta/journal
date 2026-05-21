@@ -25,6 +25,7 @@ Photo Gratitude Journal is a local-first SwiftUI app with Apple-native storage, 
   - Optional `PhotoAttachmentPersonTag` if photo-level tagging is needed.
 - Planned Little Details model:
   - `MemoryDetail`
+  - `MemoryDetailPersonTag`
 - CloudKit sync is intended to use the user's private iCloud database only. There is no custom backend and no shared public journal data.
 
 ## Photos
@@ -47,6 +48,7 @@ Photo Gratitude Journal is a local-first SwiftUI app with Apple-native storage, 
 - Little Details are optional structured notes attached to an entry, such as phrases, current favorites, routines, quotes, and milestones.
 - They should not require a people tag, so the feature works for both family-centered and self-focused journaling.
 - When linked to a `PersonTag`, Little Details can power future views like "Kid 1 phrases" or "Kid 1 favorites over time."
+- Detail-to-person tagging should be many-to-many so a single detail can belong to Me, a child, partner, family, or any custom tag.
 - The model should preserve the original text and category used at capture time.
 - Little Details should sync only through the user's private iCloud database.
 

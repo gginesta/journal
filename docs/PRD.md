@@ -139,8 +139,10 @@ The app is inspired by the emotional utility of Five Minute Journal, but the pro
 - Examples include a child's funny pronunciation, favorite snack, bedtime routine, a personal milestone, a hobby breakthrough, a travel detail, or a quote from the day.
 - The feature must not make the app feel child-only. Copy should support both family memories and self-focused personal milestones.
 - Little Details can be attached to an entry and optionally associated with people tags.
+- Each Little Detail can be tagged to one or more people independently of the whole entry, such as Me, each child, partner, family, or a custom person tag.
 - The first implementation should keep this lightweight: a few optional fields or chips, not a separate complex tracker.
 - Little Details should be visible in entry detail and discoverable from Memories filters or future search.
+- Person pages and filters should be able to show both full memories and Little Details associated with that person.
 - Little Details belong in the free core product because they improve memory capture and retrieval.
 
 ### Insights

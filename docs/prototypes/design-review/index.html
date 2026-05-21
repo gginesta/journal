@@ -752,6 +752,30 @@
       line-height: 1.35;
     }
 
+    .detail-person-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .detail-person {
+      min-height: 28px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0 9px;
+      color: var(--warm-gray);
+      background: transparent;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .detail-person.active {
+      color: var(--rose);
+      border-color: rgba(199, 69, 92, 0.28);
+      background: var(--rose-soft);
+    }
+
     @media (max-width: 860px) {
       .review-shell {
         display: block;
@@ -823,19 +847,37 @@
 
             <details class="card" open>
               <summary>Little details, optional <span>v</span></summary>
-              <p class="hint">Capture tiny phases, funny words, current favorites, personal milestones, or anything easy to forget.</p>
+              <p class="hint">Capture tiny phases, funny words, current favorites, personal milestones, or anything easy to forget. Each detail can be tagged to Me, a child, partner, or anyone else.</p>
               <div class="detail-grid">
                 <div class="detail-row">
                   <label for="detailPhrase">Phrase or quote</label>
                   <input id="detailPhrase" placeholder="Example: a funny word, saying, or mantra">
+                  <div class="detail-person-row" aria-label="People for phrase or quote">
+                    <button class="detail-person" type="button">Me</button>
+                    <button class="detail-person active" type="button">Kid 1</button>
+                    <button class="detail-person" type="button">Kid 2</button>
+                    <button class="detail-person" type="button">Partner</button>
+                  </div>
                 </div>
                 <div class="detail-row">
                   <label for="detailFavorite">Current favorite</label>
                   <input id="detailFavorite" placeholder="Snack, song, routine, place, hobby">
+                  <div class="detail-person-row" aria-label="People for current favorite">
+                    <button class="detail-person" type="button">Me</button>
+                    <button class="detail-person active" type="button">Kid 1</button>
+                    <button class="detail-person" type="button">Kid 2</button>
+                    <button class="detail-person" type="button">Partner</button>
+                  </div>
                 </div>
                 <div class="detail-row">
                   <label for="detailMilestone">Tiny milestone</label>
                   <input id="detailMilestone" placeholder="Something new, brave, sweet, or very you">
+                  <div class="detail-person-row" aria-label="People for tiny milestone">
+                    <button class="detail-person active" type="button">Me</button>
+                    <button class="detail-person" type="button">Kid 1</button>
+                    <button class="detail-person" type="button">Kid 2</button>
+                    <button class="detail-person" type="button">Partner</button>
+                  </div>
                 </div>
               </div>
             </details>
@@ -1083,6 +1125,12 @@
     moods.forEach((mood) => {
       mood.addEventListener("click", () => {
         moods.forEach((item) => item.classList.toggle("active", item === mood));
+      });
+    });
+
+    document.querySelectorAll(".detail-person").forEach((person) => {
+      person.addEventListener("click", () => {
+        person.classList.toggle("active");
       });
     });
 

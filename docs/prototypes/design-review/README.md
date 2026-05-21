@@ -7,7 +7,7 @@ Open `index.html` in a browser and review:
 - Today screen hierarchy.
 - Photo-first daily entry flow.
 - Private people tagging and Memories filters.
-- Optional Little Details for phases, favorites, routines, and milestones.
+- Optional Little Details for phases, favorites, routines, and milestones, including per-detail people tags.
 - Three nice things input.
 - Memory Lane tone.
 - Memories, Calendar, Insights, and Settings tab structure.

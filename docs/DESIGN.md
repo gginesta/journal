@@ -115,6 +115,7 @@ Build or refine these reusable components:
 - People tags should be editable after the entry is saved.
 - Person filters should preserve the photo-first archive layout.
 - Little Details should support neutral categories such as phrase, favorite, routine, milestone, and quote.
+- Little Details should offer lightweight per-detail person chips so one entry can contain details about Me, each child, partner, or family.
 - Memory cards should use exact labels when exact and softer labels when near dates, such as "Around this day in 2025."
 - Reminder setup should be optional and reversible.
 

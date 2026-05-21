@@ -100,6 +100,7 @@ Acceptance criteria:
 
 - User can add, preview, and delete photos.
 - User can add optional Little Details without making the daily flow feel required or child-only.
+- User can tag each Little Detail to Me, one or more children, partner, family, or another private person tag.
 - Failed photo imports are recoverable.
 - Cadence changes create the expected session choices.
 - Prompt edits affect future entries without mutating historical entries.
@@ -129,6 +130,7 @@ Acceptance criteria:
 - User can filter Memories by a selected person.
 - People tags remain private local/iCloud metadata, not social contacts.
 - User can revisit Little Details for a person or personal milestone.
+- Person filters include Little Details tagged to that person, not only whole-entry tags.
 - Calendar clearly distinguishes photo, complete, and empty days.
 - Entry Detail renders photo-heavy and text-only entries well.
 - Memory Lane cards open the correct entry.
