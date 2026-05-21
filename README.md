@@ -81,6 +81,7 @@ The current app schedules local notifications only; remote push notifications ar
 
 - [Product Requirements](docs/PRD.md)
 - [Design Direction](docs/DESIGN.md)
+- [v0.3 Design Goal](docs/GOAL_V0_3_DESIGN_SYSTEM.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Versioning](docs/VERSIONING.md)

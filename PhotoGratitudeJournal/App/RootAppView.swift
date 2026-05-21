@@ -5,7 +5,7 @@ struct RootAppView: View {
     @Environment(PrivacyLockService.self) private var privacyLock
     @State private var selectedTab: AppTab = .today
     @State private var todayRouter = RouterPath()
-    @State private var timelineRouter = RouterPath()
+    @State private var memoriesRouter = RouterPath()
     @State private var calendarRouter = RouterPath()
     @State private var insightsRouter = RouterPath()
     @State private var settingsRouter = RouterPath()
@@ -39,7 +39,7 @@ struct RootAppView: View {
     private func router(for tab: AppTab) -> RouterPath {
         switch tab {
         case .today: todayRouter
-        case .timeline: timelineRouter
+        case .memories: memoriesRouter
         case .calendar: calendarRouter
         case .insights: insightsRouter
         case .settings: settingsRouter
