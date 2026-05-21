@@ -9,7 +9,7 @@ Use this checklist to prepare the first private iPhone beta for the owner and sp
 - Minimum OS: iOS 17.0.
 - Bundle id: `com.guill.PhotoGratitudeJournal`.
 - iCloud container: `iCloud.com.guill.PhotoGratitudeJournal`.
-- Current Xcode values: `MARKETING_VERSION = 0.1.0`, `CURRENT_PROJECT_VERSION = 1`.
+- Current Xcode values: `MARKETING_VERSION = 0.2.0`, `CURRENT_PROJECT_VERSION = 2`.
 - For each TestFlight upload, increment `CURRENT_PROJECT_VERSION`; change `MARKETING_VERSION` only for a named milestone.
 
 ## Apple Developer Setup
