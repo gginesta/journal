@@ -2,6 +2,7 @@ import SwiftData
 import XCTest
 @testable import PhotoGratitudeJournal
 
+@MainActor
 final class JournalLogicTests: XCTestCase {
     func testCompletionAllowsTextOnly() {
         XCTAssertTrue(EntryCompletion.isComplete(responseTexts: ["A kind call"], photoCount: 0))
