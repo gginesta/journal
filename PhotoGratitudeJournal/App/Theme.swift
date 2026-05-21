@@ -39,6 +39,19 @@ extension Color {
     static var photoShadow: Color { Color(red: 0.26, green: 0.20, blue: 0.16).opacity(0.14) }
 }
 
+extension ShapeStyle where Self == Color {
+    static var rose: Color { Color.rose }
+    static var ink: Color { Color.ink }
+    static var mist: Color { Color.mist }
+    static var leaf: Color { Color.leaf }
+    static var dawn: Color { Color.dawn }
+    static var journalBackground: Color { Color.journalBackground }
+    static var journalSurface: Color { Color.journalSurface }
+    static var journalSurfaceRaised: Color { Color.journalSurfaceRaised }
+    static var warmGray: Color { Color.warmGray }
+    static var softInk: Color { Color.softInk }
+}
+
 extension View {
     func journalCard(padding: CGFloat = 16) -> some View {
         self
