@@ -34,7 +34,7 @@ struct SettingsView: View {
             }
 
             Section("Privacy") {
-                Toggle("App lock", isOn: $privacyLock.isEnabled)
+                Toggle("App lock", isOn: privacyLockBinding)
                 Text("App lock is a Premium feature in the final product. The switch is wired here so the privacy flow can be tested early.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -103,6 +103,13 @@ struct SettingsView: View {
                 config.isEnabled = newValue
                 Task { await reminderScheduler.schedule(config: config) }
             }
+        )
+    }
+
+    private var privacyLockBinding: Binding<Bool> {
+        Binding(
+            get: { privacyLock.isEnabled },
+            set: { privacyLock.isEnabled = $0 }
         )
     }
 
