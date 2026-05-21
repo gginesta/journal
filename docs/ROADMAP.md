@@ -2,6 +2,12 @@
 
 This roadmap is the execution plan for turning the current scaffold into a production-ready iOS app. Each milestone should land through a focused branch and commit set. `main` should remain stable and reviewable.
 
+Current beta-readiness docs:
+
+- Working beta goal: `docs/GOAL_WORKING_BETA_ROADMAP.md`.
+- TestFlight owner setup: `docs/TESTFLIGHT.md`.
+- Manual beta QA: `docs/QA_TESTFLIGHT.md`.
+
 ## Milestone 0.1.0 - Bootstrap
 
 Status: complete.
@@ -28,26 +34,32 @@ Acceptance criteria:
 - `main` tracks `origin/main`.
 - Documentation explains the product, architecture, and next milestones.
 
-## Milestone 0.2.0 - Mac Build Validation
+## Milestone 0.2.0 - Owner Working Beta
 
-Goal: get a clean simulator build and test run on macOS.
+Goal: prepare the first owner/spouse TestFlight build with a coherent first-run experience and enough polish to test the daily photo gratitude loop for real.
 
 Work:
 
-- Run the GitHub Actions macOS CI workflow.
-- Fix first-pass compile errors from the Xcode project or Swift code.
-- Confirm unit test target links and executes.
-- Confirm app launches to Today on simulator.
-- Verify SwiftData container creation in simulator.
-- Verify the placeholder asset catalog does not block build.
-- Add any missing signing or capability notes to README.
+- Run the GitHub Actions macOS CI workflow and keep it green.
+- Confirm the app launches to onboarding and then Today on simulator.
+- Add first-launch onboarding with cadence choice and optional reminders.
+- Add photo preview, removal, import feedback, and gentle one-or-two photo guidance.
+- Add Memories search and filters for people, photos, and text.
+- Make person filters include Little Details tagged to that person.
+- Improve Entry Detail readability for photo-heavy, text-only, people, and Little Details entries.
+- Improve Calendar and Memory Lane low-data states.
+- Keep TestFlight setup, QA docs, roadmap, changelog, Xcode marketing version, and build number aligned.
 
 Acceptance criteria:
 
 - `xcodebuild test` passes on macOS CI.
-- App launches in an iPhone simulator.
+- App launches in an iPhone simulator and presents onboarding for a fresh install.
+- A tester can add, preview, and remove photos.
+- A tester can write prompt responses, add people tags, add Little Details, and tag details per person.
+- A tester can search/filter Memories and open Entry Detail.
+- Calendar and Memory Lane do not feel like dead ends with low data.
 - No known compile-time blockers remain.
-- `CHANGELOG.md` has a `0.2.0` entry.
+- `CHANGELOG.md`, Xcode marketing version, and build number reflect the `0.2.0 (2)` beta.
 
 ## Milestone 0.3.0 - Design System And Today Redesign
 
@@ -90,6 +102,7 @@ Work:
 - Add photo deletion.
 - Add import loading and error states.
 - Add captions or lightweight photo notes if they do not clutter the flow.
+- Add optional Little Details for phrases, favorites, routines, tiny milestones, and quotes.
 - Preserve historical prompt text when prompts change.
 - Add support for multiple sessions based on cadence.
 - Add Settings controls for reminder times.
@@ -98,6 +111,8 @@ Work:
 Acceptance criteria:
 
 - User can add, preview, and delete photos.
+- User can add optional Little Details without making the daily flow feel required or child-only.
+- User can tag each Little Detail to Me, one or more children, partner, family, or another private person tag.
 - Failed photo imports are recoverable.
 - Cadence changes create the expected session choices.
 - Prompt edits affect future entries without mutating historical entries.
@@ -110,6 +125,10 @@ Goal: make browsing past entries visually rewarding.
 Work:
 
 - Redesign Memories as a photo-first feed or grid.
+- Add private people tags for children, family, and recurring memory subjects.
+- Add person filters to Memories.
+- Add entry-detail editing for people tags.
+- Show Little Details in entry detail and make them discoverable in Memories or search.
 - Improve Entry Detail as a memory page.
 - Improve Calendar visual density and month navigation.
 - Add "around this time" labels for near-date Memory Lane matches.
@@ -119,6 +138,11 @@ Work:
 Acceptance criteria:
 
 - Memories tab feels photo-led.
+- User can tag a memory with one or more people.
+- User can filter Memories by a selected person.
+- People tags remain private local/iCloud metadata, not social contacts.
+- User can revisit Little Details for a person or personal milestone.
+- Person filters include Little Details tagged to that person, not only whole-entry tags.
 - Calendar clearly distinguishes photo, complete, and empty days.
 - Entry Detail renders photo-heavy and text-only entries well.
 - Memory Lane cards open the correct entry.
@@ -200,6 +224,7 @@ Work:
 - Add App Store privacy nutrition label draft.
 - Add beta feedback workflow.
 - Add screenshots for App Store draft.
+- Keep `docs/TESTFLIGHT.md` and `docs/QA_TESTFLIGHT.md` current with the latest beta scope.
 
 Acceptance criteria:
 

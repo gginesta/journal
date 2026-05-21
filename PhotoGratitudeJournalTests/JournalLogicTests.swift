@@ -2,6 +2,7 @@ import SwiftData
 import XCTest
 @testable import PhotoGratitudeJournal
 
+@MainActor
 final class JournalLogicTests: XCTestCase {
     func testCompletionAllowsTextOnly() {
         XCTAssertTrue(EntryCompletion.isComplete(responseTexts: ["A kind call"], photoCount: 0))
@@ -13,6 +14,15 @@ final class JournalLogicTests: XCTestCase {
 
     func testCompletionRejectsEmptyEntry() {
         XCTAssertFalse(EntryCompletion.isComplete(responseTexts: ["  ", ""], photoCount: 0))
+    }
+
+    func testCompletionIsUnaffectedByLittleDetails() {
+        let entry = JournalEntry(day: Date())
+        entry.details = [
+            MemoryDetail(text: "Tiny hand squeeze", order: 0)
+        ]
+
+        XCTAssertFalse(entry.isComplete)
     }
 
     func testStreakSummaryCountsCurrentAndLongestStreak() {
@@ -62,6 +72,89 @@ final class JournalLogicTests: XCTestCase {
             "What made you smile?",
             "What do you want to remember from today?"
         ])
+    }
+
+    func testEntryCreationUsesSavedCadence() {
+        let container = AppModelContainer.make(inMemory: true)
+        let context = container.mainContext
+        PromptSeeder.seedIfNeeded(in: context)
+        let configs = (try? context.fetch(FetchDescriptor<ReminderConfig>())) ?? []
+        let config = configs.first ?? ReminderConfig(isEnabled: false)
+        if configs.isEmpty {
+            context.insert(config)
+        }
+        config.cadence = .morningEvening
+        try? context.save()
+
+        let entry = JournalStore.entry(for: Date(), in: context)
+
+        XCTAssertEqual(entry.sortedSessions.map(\.kind), [.morning, .evening])
+        XCTAssertEqual(entry.sortedSessions.first?.sortedResponses.count, 3)
+        XCTAssertEqual(entry.sortedSessions.last?.sortedResponses.count, 3)
+    }
+
+    func testPhotoRemovalUpdatesEntry() {
+        let container = AppModelContainer.make(inMemory: true)
+        let context = container.mainContext
+        let entry = JournalEntry(day: Date())
+        let photo = PhotoAttachment(originalFilename: "photo.jpg", thumbnailFilename: "thumb.jpg")
+        context.insert(entry)
+        JournalStore.addPhoto(photo, to: entry, in: context)
+
+        JournalStore.removePhoto(photo, from: entry, in: context)
+
+        XCTAssertTrue(entry.sortedPhotos.isEmpty)
+    }
+
+    func testPersonTagSeederCreatesDefaultPeople() {
+        let container = AppModelContainer.make(inMemory: true)
+        let context = container.mainContext
+
+        JournalStore.seedDefaultPersonTagsIfNeeded(in: context)
+        JournalStore.seedDefaultPersonTagsIfNeeded(in: context)
+        let tags = JournalStore.allPersonTags(in: context)
+
+        XCTAssertEqual(tags.map(\.name), ["Me", "Kid 1", "Kid 2", "Partner", "Family"])
+    }
+
+    func testAddingAndFilteringPersonTags() throws {
+        let container = AppModelContainer.make(inMemory: true)
+        let context = container.mainContext
+        let calendar = Calendar(identifier: .gregorian)
+        let taggedEntry = JournalEntry(day: calendar.date(from: DateComponents(year: 2026, month: 5, day: 21))!)
+        let untaggedEntry = JournalEntry(day: calendar.date(from: DateComponents(year: 2026, month: 5, day: 20))!)
+        context.insert(taggedEntry)
+        context.insert(untaggedEntry)
+
+        let tag = try XCTUnwrap(JournalStore.addPersonTag(named: "Grandma", colorHex: "#B56576", in: context))
+        JournalStore.assignPersonTag(tag, to: taggedEntry, in: context)
+        JournalStore.assignPersonTag(tag, to: taggedEntry, in: context)
+
+        XCTAssertEqual(taggedEntry.sortedPersonTags.map(\.name), ["Grandma"])
+        XCTAssertEqual(taggedEntry.personLinks?.count, 1)
+        XCTAssertEqual(JournalStore.entries([untaggedEntry, taggedEntry], taggedWith: tag).map(\.id), [taggedEntry.id])
+    }
+
+    func testDetailToPersonAssignment() throws {
+        let container = AppModelContainer.make(inMemory: true)
+        let context = container.mainContext
+        let entry = JournalEntry(day: Date())
+        context.insert(entry)
+
+        let kid = try XCTUnwrap(JournalStore.addPersonTag(named: "Kid 1", in: context))
+        let partner = try XCTUnwrap(JournalStore.addPersonTag(named: "Partner", in: context))
+        let detail = try XCTUnwrap(JournalStore.addLittleDetail(text: "Asked for one more story", to: entry, people: [kid], in: context))
+
+        JournalStore.assignPersonTag(partner, to: detail, in: context)
+        JournalStore.assignPersonTag(kid, to: detail, in: context)
+
+        XCTAssertEqual(entry.sortedDetails.map(\.text), ["Asked for one more story"])
+        XCTAssertEqual(detail.sortedPersonTags.map(\.name), ["Kid 1", "Partner"])
+        XCTAssertEqual(detail.personLinks?.count, 2)
+
+        JournalStore.removeLittleDetail(detail, from: entry, in: context)
+
+        XCTAssertTrue(entry.sortedDetails.isEmpty)
     }
 
     private func completeEntry(day: Date, calendar: Calendar) -> JournalEntry {

@@ -10,6 +10,15 @@ All notable changes to Photo Gratitude Journal will be documented here.
 - Added design direction and UX ownership documentation.
 - Expanded the roadmap into milestone-based execution steps with acceptance criteria.
 - Clarified branching, CI, and release version-control workflow.
+- Added a durable v0.3 design-system goal document for long-running Codex work.
+- Began the v0.3 photo-first design pass with reusable design components, Today ritual refinements, Memories browsing, and Calendar polish.
+- Updated iOS CI to run on `codex/**` implementation branches.
+- Added PC design-review prototype coverage for private people tags and optional Little Details.
+- Added TestFlight owner setup and manual QA checklists for the private beta.
+- Added first-run beta guidance, Settings feedback affordance, and beta version labeling.
+- Added a durable working-beta roadmap goal for photo management, onboarding, Memories search, and hardening.
+- Added working-beta onboarding, cadence-aware entry creation, reminder controls, photo preview/removal, Memories search/filtering, Entry Detail polish, Calendar low-data guidance, and Memory Lane fallback states.
+- Bumped the iOS beta to `0.2.0 (2)` for the next TestFlight upload.
 
 ## [0.1.0] - 2026-05-21
 

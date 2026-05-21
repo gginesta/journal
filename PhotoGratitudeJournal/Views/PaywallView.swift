@@ -19,7 +19,7 @@ struct PaywallView: View {
                     .foregroundStyle(.secondary)
 
                 VStack(alignment: .leading, spacing: 12) {
-                    premiumRow("Memory widgets", "See today’s prompt, streak, and past photos on the Home Screen.")
+                    premiumRow("Memory widgets", "See today's prompt, streak, and past photos on the Home Screen.")
                     premiumRow("Expanded nostalgia", "Browse this week from past years and seasonal photo recaps.")
                     premiumRow("Advanced insights", "Mood trends, streak patterns, export, and richer prompt sets.")
                     premiumRow("Privacy polish", "Face ID app lock and Premium themes.")

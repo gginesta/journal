@@ -2,7 +2,7 @@ import SwiftUI
 
 enum AppTab: String, CaseIterable, Identifiable {
     case today
-    case timeline
+    case memories
     case calendar
     case insights
     case settings
@@ -14,8 +14,8 @@ enum AppTab: String, CaseIterable, Identifiable {
         switch self {
         case .today:
             TodayView()
-        case .timeline:
-            TimelineView()
+        case .memories:
+            MemoriesView()
         case .calendar:
             JournalCalendarView()
         case .insights:
@@ -30,8 +30,8 @@ enum AppTab: String, CaseIterable, Identifiable {
         switch self {
         case .today:
             Label("Today", systemImage: "sun.max")
-        case .timeline:
-            Label("Timeline", systemImage: "photo.on.rectangle")
+        case .memories:
+            Label("Memories", systemImage: "photo.on.rectangle")
         case .calendar:
             Label("Calendar", systemImage: "calendar")
         case .insights:

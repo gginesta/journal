@@ -4,6 +4,7 @@ import UserNotifications
 @MainActor
 @Observable
 final class ReminderScheduler {
+    private let requestIdentifiers = ["daily-evening", "daily-morning"]
     var authorizationStatus: UNAuthorizationStatus = .notDetermined
 
     func refreshAuthorizationStatus() async {
@@ -14,7 +15,7 @@ final class ReminderScheduler {
     func requestAuthorizationIfNeeded() async -> Bool {
         await refreshAuthorizationStatus()
         guard authorizationStatus == .notDetermined else {
-            return authorizationStatus == .authorized || authorizationStatus == .provisional
+            return authorizationStatus == .authorized || authorizationStatus == .provisional || authorizationStatus == .ephemeral
         }
 
         do {
@@ -27,8 +28,9 @@ final class ReminderScheduler {
     }
 
     func schedule(config: ReminderConfig) async {
+        cancelScheduledReminders()
+
         guard config.isEnabled, await requestAuthorizationIfNeeded() else { return }
-        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["daily-evening", "daily-morning"])
 
         switch config.cadence {
         case .evening, .onceDaily, .anytime:
@@ -37,6 +39,10 @@ final class ReminderScheduler {
             scheduleDaily(id: "daily-morning", hour: config.morningHour, minute: config.morningMinute, title: "Set a gentle note", body: "What would make today feel good?")
             scheduleDaily(id: "daily-evening", hour: config.eveningHour, minute: config.eveningMinute, title: "Capture today", body: "Add your photo and three nice things.")
         }
+    }
+
+    func cancelScheduledReminders() {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: requestIdentifiers)
     }
 
     private func scheduleDaily(id: String, hour: Int, minute: Int, title: String, body: String) {

@@ -29,7 +29,7 @@
 		A00100000000000000000013 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200000000000000000013 /* TodayView.swift */; };
 		A00100000000000000000014 /* PhotoViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200000000000000000014 /* PhotoViews.swift */; };
 		A00100000000000000000015 /* MemoryLaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200000000000000000015 /* MemoryLaneView.swift */; };
-		A00100000000000000000016 /* TimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200000000000000000016 /* TimelineView.swift */; };
+		A00100000000000000000016 /* MemoriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200000000000000000016 /* MemoriesView.swift */; };
 		A00100000000000000000017 /* CalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200000000000000000017 /* CalendarView.swift */; };
 		A00100000000000000000018 /* InsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200000000000000000018 /* InsightsView.swift */; };
 		A00100000000000000000019 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200000000000000000019 /* SettingsView.swift */; };
@@ -38,6 +38,8 @@
 		A0010000000000000000001C /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0020000000000000000001C /* PaywallView.swift */; };
 		A0010000000000000000001D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A0020000000000000000001D /* Assets.xcassets */; };
 		A0010000000000000000001E /* JournalLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0020000000000000000001E /* JournalLogicTests.swift */; };
+		A00100000000000000000020 /* JournalDesignComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200000000000000000024 /* JournalDesignComponents.swift */; };
+		A00100000000000000000021 /* JournalPreviewFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200000000000000000025 /* JournalPreviewFixtures.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -72,7 +74,7 @@
 		A00200000000000000000013 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
 		A00200000000000000000014 /* PhotoViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoViews.swift; sourceTree = "<group>"; };
 		A00200000000000000000015 /* MemoryLaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryLaneView.swift; sourceTree = "<group>"; };
-		A00200000000000000000016 /* TimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineView.swift; sourceTree = "<group>"; };
+		A00200000000000000000016 /* MemoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoriesView.swift; sourceTree = "<group>"; };
 		A00200000000000000000017 /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
 		A00200000000000000000018 /* InsightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsView.swift; sourceTree = "<group>"; };
 		A00200000000000000000019 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -86,6 +88,8 @@
 		A00200000000000000000021 /* PhotoGratitudeJournal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhotoGratitudeJournal.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A00200000000000000000022 /* PhotoGratitudeJournalTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhotoGratitudeJournalTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A00200000000000000000023 /* ExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportService.swift; sourceTree = "<group>"; };
+		A00200000000000000000024 /* JournalDesignComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JournalDesignComponents.swift; sourceTree = "<group>"; };
+		A00200000000000000000025 /* JournalPreviewFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JournalPreviewFixtures.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -159,10 +163,12 @@
 			isa = PBXGroup;
 			children = (
 				A00200000000000000000012 /* Components.swift */,
+				A00200000000000000000024 /* JournalDesignComponents.swift */,
+				A00200000000000000000025 /* JournalPreviewFixtures.swift */,
 				A00200000000000000000013 /* TodayView.swift */,
 				A00200000000000000000014 /* PhotoViews.swift */,
 				A00200000000000000000015 /* MemoryLaneView.swift */,
-				A00200000000000000000016 /* TimelineView.swift */,
+				A00200000000000000000016 /* MemoriesView.swift */,
 				A00200000000000000000017 /* CalendarView.swift */,
 				A00200000000000000000018 /* InsightsView.swift */,
 				A00200000000000000000019 /* SettingsView.swift */,
@@ -308,10 +314,12 @@
 				A00100000000000000000011 /* PrivacyLockService.swift in Sources */,
 				A0010000000000000000001F /* ExportService.swift in Sources */,
 				A00100000000000000000012 /* Components.swift in Sources */,
+				A00100000000000000000020 /* JournalDesignComponents.swift in Sources */,
+				A00100000000000000000021 /* JournalPreviewFixtures.swift in Sources */,
 				A00100000000000000000013 /* TodayView.swift in Sources */,
 				A00100000000000000000014 /* PhotoViews.swift in Sources */,
 				A00100000000000000000015 /* MemoryLaneView.swift in Sources */,
-				A00100000000000000000016 /* TimelineView.swift in Sources */,
+				A00100000000000000000016 /* MemoriesView.swift in Sources */,
 				A00100000000000000000017 /* CalendarView.swift in Sources */,
 				A00100000000000000000018 /* InsightsView.swift in Sources */,
 				A00100000000000000000019 /* SettingsView.swift in Sources */,
@@ -341,12 +349,12 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = PhotoGratitudeJournal/Resources/PhotoGratitudeJournal.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PhotoGratitudeJournal/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.guill.PhotoGratitudeJournal;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -361,12 +369,12 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = PhotoGratitudeJournal/Resources/PhotoGratitudeJournal.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PhotoGratitudeJournal/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.guill.PhotoGratitudeJournal;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
