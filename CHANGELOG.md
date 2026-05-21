@@ -2,6 +2,15 @@
 
 All notable changes to Photo Gratitude Journal will be documented here.
 
+## [Unreleased]
+
+### Added
+
+- Added a full product requirements document.
+- Added design direction and UX ownership documentation.
+- Expanded the roadmap into milestone-based execution steps with acceptance criteria.
+- Clarified branching, CI, and release version-control workflow.
+
 ## [0.1.0] - 2026-05-21
 
 ### Added
