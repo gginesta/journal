@@ -677,6 +677,52 @@
       font-weight: 700;
     }
 
+    .person-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .person-chip {
+      min-height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0 12px;
+      color: var(--soft-ink);
+      background: #faf8f2;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .person-chip.active {
+      color: var(--rose);
+      border-color: rgba(199, 69, 92, 0.28);
+      background: var(--rose-soft);
+    }
+
+    .person-chip.add {
+      border-style: dashed;
+      color: var(--warm-gray);
+      background: transparent;
+    }
+
+    .memory-people {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .person-dot {
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: var(--rose);
+      background: var(--rose-soft);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
     @media (max-width: 860px) {
       .review-shell {
         display: block;
@@ -730,6 +776,21 @@
                 <span class="muted">One or two is plenty.</span>
               </span>
             </button>
+
+            <div class="card">
+              <div class="section-title">
+                <h3>People in this memory</h3>
+                <p>Tag your kids or family so you can find their moments later.</p>
+              </div>
+              <div class="person-chips" id="todayPeople">
+                <button class="person-chip active" type="button" data-person="kid1">Kid 1</button>
+                <button class="person-chip" type="button" data-person="kid2">Kid 2</button>
+                <button class="person-chip" type="button" data-person="kid3">Kid 3</button>
+                <button class="person-chip" type="button" data-person="family">Family</button>
+                <button class="person-chip add" type="button">+ Add person</button>
+              </div>
+              <p class="hint">These are private memory tags, not contacts or social sharing.</p>
+            </div>
 
             <div class="card completion" id="completion">
               <span class="status-icon" id="statusIcon">O</span>
@@ -804,15 +865,22 @@
           <section class="page" id="memories">
             <p class="date">Photo-first archive</p>
             <h1>Memories</h1>
+            <div class="person-chips" aria-label="Filter memories by person">
+              <button class="person-chip active" type="button" data-filter="all">All</button>
+              <button class="person-chip" type="button" data-filter="kid1">Kid 1</button>
+              <button class="person-chip" type="button" data-filter="kid2">Kid 2</button>
+              <button class="person-chip" type="button" data-filter="kid3">Kid 3</button>
+              <button class="person-chip" type="button" data-filter="family">Family</button>
+            </div>
             <div class="photo-grid">
-              <button class="tile" type="button"><strong>Dinner with friends<br>May 20</strong></button>
-              <button class="tile" type="button"><strong>A quiet path<br>May 18</strong></button>
-              <button class="tile" type="button"><strong>Good coffee<br>May 14</strong></button>
-              <button class="tile" type="button"><strong>Golden hour<br>May 09</strong></button>
+              <button class="tile memory-item" type="button" data-people="kid1 family"><strong>Dinner with family<br>May 20</strong></button>
+              <button class="tile memory-item" type="button" data-people="kid2"><strong>A quiet path<br>May 18</strong></button>
+              <button class="tile memory-item" type="button" data-people="kid1 kid3"><strong>Good coffee<br>May 14</strong></button>
+              <button class="tile memory-item" type="button" data-people="family kid2 kid3"><strong>Golden hour<br>May 09</strong></button>
             </div>
             <div class="card" style="margin-top:14px;">
               <h3>Written memories</h3>
-              <p class="hint">The archive keeps text short so photos stay in front.</p>
+              <p class="hint" id="memoryFilterHint">Showing all memories. Person filters make it easy to revisit each child's story.</p>
             </div>
           </section>
 
@@ -860,6 +928,7 @@
             <div class="card">
               <div class="setting-row"><strong>Prompt templates</strong><span class="muted">3 active</span></div>
               <div class="setting-row"><strong>Reminder cadence</strong><span class="muted">Evening</span></div>
+              <div class="setting-row"><strong>People tags</strong><span class="muted">4 private tags</span></div>
               <div class="setting-row"><strong>iCloud sync</strong><span class="muted">Private</span></div>
               <div class="setting-row"><strong>App lock</strong><button class="switch" type="button" aria-label="App lock on"></button></div>
               <div class="setting-row"><strong>Export</strong><span class="muted">Premium</span></div>
@@ -886,6 +955,7 @@
           <span class="chip">warm</span>
           <span class="chip">low guilt</span>
           <span class="chip">nostalgic</span>
+          <span class="chip">people tags</span>
         </div>
       </div>
 
@@ -895,6 +965,7 @@
           <li>Click Add a photo and see whether the Today screen feels complete quickly.</li>
           <li>Type one or two nice things and decide if the ritual feels lightweight.</li>
           <li>Switch between Today, Memories, Calendar, Insights, and Settings.</li>
+          <li>Tag people on Today and filter Memories by each kid.</li>
           <li>Click calendar days and check whether indicators are understandable.</li>
           <li>Judge whether the warm palette feels premium or too soft.</li>
         </ul>
@@ -919,6 +990,10 @@
     const completionTitle = document.querySelector("#completionTitle");
     const completionText = document.querySelector("#completionText");
     const moods = document.querySelectorAll(".mood");
+    const todayPeople = document.querySelectorAll("#todayPeople .person-chip:not(.add)");
+    const memoryFilters = document.querySelectorAll("[data-filter]");
+    const memoryItems = document.querySelectorAll(".memory-item");
+    const memoryFilterHint = document.querySelector("#memoryFilterHint");
     let hasPhoto = false;
 
     function updateCompletion() {
@@ -958,6 +1033,26 @@
     moods.forEach((mood) => {
       mood.addEventListener("click", () => {
         moods.forEach((item) => item.classList.toggle("active", item === mood));
+      });
+    });
+
+    todayPeople.forEach((person) => {
+      person.addEventListener("click", () => {
+        person.classList.toggle("active");
+      });
+    });
+
+    memoryFilters.forEach((filter) => {
+      filter.addEventListener("click", () => {
+        const activeFilter = filter.dataset.filter;
+        memoryFilters.forEach((item) => item.classList.toggle("active", item === filter));
+        memoryItems.forEach((item) => {
+          const visible = activeFilter === "all" || item.dataset.people.split(" ").includes(activeFilter);
+          item.style.display = visible ? "flex" : "none";
+        });
+        memoryFilterHint.textContent = activeFilter === "all"
+          ? "Showing all memories. Person filters make it easy to revisit each child's story."
+          : `Showing memories tagged ${filter.textContent}.`;
       });
     });
 

@@ -19,6 +19,10 @@ Photo Gratitude Journal is a local-first SwiftUI app with Apple-native storage, 
   - `PromptResponse`
   - `PhotoAttachment`
   - `ReminderConfig`
+- Planned people-tagging models:
+  - `PersonTag`
+  - `JournalEntryPersonTag`
+  - Optional `PhotoAttachmentPersonTag` if photo-level tagging is needed.
 - CloudKit sync is intended to use the user's private iCloud database only. There is no custom backend and no shared public journal data.
 
 ## Photos
@@ -27,6 +31,14 @@ Photo Gratitude Journal is a local-first SwiftUI app with Apple-native storage, 
 - `PhotoStore` copies images into the app's Application Support directory and generates thumbnails.
 - Photo files use protected file attributes where supported.
 - SwiftData stores references to app-local filenames, not raw image blobs.
+
+## People Tags
+
+- People tags are private user-created labels for children, family members, friends, or other recurring memory subjects.
+- Tags should be stored as SwiftData entities and synced only through the user's private iCloud database.
+- Entry-level tagging should ship first because it keeps the daily ritual light.
+- Photo-level tagging can follow if users need to distinguish people across multiple photos in a single entry.
+- Memories filtering should query by tag without exposing tags outside the app.
 
 ## Core Logic
 

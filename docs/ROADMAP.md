@@ -110,6 +110,9 @@ Goal: make browsing past entries visually rewarding.
 Work:
 
 - Redesign Memories as a photo-first feed or grid.
+- Add private people tags for children, family, and recurring memory subjects.
+- Add person filters to Memories.
+- Add entry-detail editing for people tags.
 - Improve Entry Detail as a memory page.
 - Improve Calendar visual density and month navigation.
 - Add "around this time" labels for near-date Memory Lane matches.
@@ -119,6 +122,9 @@ Work:
 Acceptance criteria:
 
 - Memories tab feels photo-led.
+- User can tag a memory with one or more people.
+- User can filter Memories by a selected person.
+- People tags remain private local/iCloud metadata, not social contacts.
 - Calendar clearly distinguishes photo, complete, and empty days.
 - Entry Detail renders photo-heavy and text-only entries well.
 - Memory Lane cards open the correct entry.
