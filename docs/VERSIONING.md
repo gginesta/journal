@@ -25,6 +25,31 @@ For each release:
 - `codex/<topic>`: implementation branches owned by Codex.
 - `release/<version>`: optional stabilization branch for App Store release candidates.
 
+## Workflow
+
+- Plan and implementation work should start from `main`.
+- Use `codex/<topic>` branches for focused changes.
+- Keep docs, tests, and implementation changes in the same branch when they are part of the same product change.
+- Open a PR when GitHub tooling is available, or push the branch and review through GitHub.
+- Merge only after CI passes or after the failure is understood and documented.
+- Avoid force-pushing `main`.
+
+## Release Checklist
+
+For every milestone release:
+
+- Confirm `main` is clean.
+- Confirm CI status.
+- Update `CHANGELOG.md`.
+- Update Xcode `MARKETING_VERSION`.
+- Increment Xcode `CURRENT_PROJECT_VERSION`.
+- Create an annotated tag:
+
+```bash
+git tag -a vX.Y.Z -m "Release vX.Y.Z"
+git push origin vX.Y.Z
+```
+
 ## Commit Style
 
 Use concise imperative commit messages:
