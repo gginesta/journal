@@ -58,6 +58,7 @@ xcrun simctl list devices available
 - Streaks, calendar browsing, mood tracking, and automatic Memory Lane look-backs.
 - Private people tagging so family memories can be browsed by child or loved one.
 - Optional Little Details for tiny phases, personal milestones, routines, favorites, and quotes.
+- First-run beta guidance and Settings feedback flow for the private TestFlight loop.
 - Generous free tier with yearly Premium unlocks for widgets, advanced insights, export, app lock, themes, and richer nostalgia.
 
 ## Project Structure

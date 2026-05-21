@@ -10,12 +10,18 @@ struct TodayView: View {
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var importingPhotos = false
     @State private var entry: JournalEntry?
+    @AppStorage("hasSeenBetaWelcome") private var hasSeenBetaWelcome = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 if let entry {
                     TodayHeader(entry: entry, entries: entries)
+                    if !hasSeenBetaWelcome {
+                        BetaWelcomeCard {
+                            hasSeenBetaWelcome = true
+                        }
+                    }
                     PhotoStripView(entry: entry, selectedPhotos: $selectedPhotos, isImporting: importingPhotos)
                     PeopleTagEditor(entry: entry, people: sortedPeople)
                     CompletionBanner(isComplete: entry.isComplete)
@@ -75,6 +81,57 @@ struct TodayView: View {
             }
             return lhs.sortOrder < rhs.sortOrder
         }
+    }
+}
+
+private struct BetaWelcomeCard: View {
+    let dismiss: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.rose)
+                    .frame(width: 38, height: 38)
+                    .background(Color.rose.opacity(0.12), in: Circle())
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Welcome to the private beta")
+                        .font(.headline)
+                        .foregroundStyle(.ink)
+                    Text("Start with one photo or one nice thing. People and Little Details are optional, and everything is designed to stay private.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                betaHint("Add a photo if one moment stands out.", systemImage: "photo")
+                betaHint("Tag Me, family, or each child when useful.", systemImage: "person.2")
+                betaHint("Capture tiny phrases, favorites, and milestones.", systemImage: "sparkle")
+            }
+
+            Button(action: dismiss) {
+                Text("Got it")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 42)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.rose)
+        }
+        .journalCard()
+        .accessibilityElement(children: .contain)
+    }
+
+    private func betaHint(_ text: String, systemImage: String) -> some View {
+        Label(text, systemImage: systemImage)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 

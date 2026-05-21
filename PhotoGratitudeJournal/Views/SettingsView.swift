@@ -55,6 +55,18 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Beta") {
+                Label(appVersionText, systemImage: "app.badge")
+
+                Link(destination: feedbackURL) {
+                    Label("Send beta feedback", systemImage: "envelope")
+                }
+
+                Text("Please include what you tried, what felt confusing, and whether any memory, tag, detail, or photo did not persist after relaunch.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Data") {
                 Button {
                     exportURL = try? ExportService.export(entries: entries)
@@ -111,6 +123,16 @@ struct SettingsView: View {
             get: { privacyLock.isEnabled },
             set: { privacyLock.isEnabled = $0 }
         )
+    }
+
+    private var appVersionText: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
+        return "Beta \(version) (\(build))"
+    }
+
+    private var feedbackURL: URL {
+        URL(string: "mailto:?subject=Photo%20Journal%20Beta%20Feedback")!
     }
 
     private func deleteEntries() {

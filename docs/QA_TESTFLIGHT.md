@@ -15,6 +15,7 @@ Record before testing:
 - Install from TestFlight on a clean device or after deleting the app.
 - Launch the app.
 - Confirm Today is the first useful screen.
+- Confirm the private beta welcome card appears on first launch and can be dismissed.
 - Force quit and relaunch.
 - Confirm there is no crash, blank screen, or signing/iCloud warning that blocks use.
 
@@ -67,6 +68,8 @@ Record before testing:
 - Review reminder settings and request notification permission only if expected.
 - Confirm iCloud/private sync copy is understandable.
 - Review app lock, export, delete-all, and Premium surfaces without assuming production readiness.
+- Open Settings > Beta and confirm the build number is visible.
+- Tap Send beta feedback and confirm it opens a mail draft or the system handles unavailable Mail gracefully.
 - Do not run delete-all on a tester's only useful beta dataset unless explicitly testing deletion.
 
 ## Regression Pass

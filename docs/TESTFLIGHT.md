@@ -9,7 +9,7 @@ Use this checklist to prepare the first private iPhone beta for the owner and sp
 - Minimum OS: iOS 17.0.
 - Bundle id: `com.guill.PhotoGratitudeJournal`.
 - iCloud container: `iCloud.com.guill.PhotoGratitudeJournal`.
-- Current Xcode values: `MARKETING_VERSION = 1.0`, `CURRENT_PROJECT_VERSION = 1`.
+- Current Xcode values: `MARKETING_VERSION = 0.1.0`, `CURRENT_PROJECT_VERSION = 1`.
 - For each TestFlight upload, increment `CURRENT_PROJECT_VERSION`; change `MARKETING_VERSION` only for a named milestone.
 
 ## Apple Developer Setup
@@ -40,6 +40,7 @@ Use this checklist to prepare the first private iPhone beta for the owner and sp
   - Create today's entry with one or two photos.
   - Add three nice things, people tags, and optional Little Details.
   - Browse Memories, Calendar, and Memory Lane.
+  - Use Settings > Beta > Send beta feedback for notes after testing.
   - Report crashes, lost data, broken filters, confusing copy, and photo issues.
 - Do not invite external testers until the owner/spouse loop is stable.
 

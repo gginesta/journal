@@ -15,6 +15,7 @@ All notable changes to Photo Gratitude Journal will be documented here.
 - Updated iOS CI to run on `codex/**` implementation branches.
 - Added PC design-review prototype coverage for private people tags and optional Little Details.
 - Added TestFlight owner setup and manual QA checklists for the private beta.
+- Added first-run beta guidance, Settings feedback affordance, and beta version labeling.
 
 ## [0.1.0] - 2026-05-21
 
