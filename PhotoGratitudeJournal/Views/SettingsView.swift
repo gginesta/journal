@@ -115,7 +115,7 @@ struct SettingsView: View {
 
     private func deleteEntries() {
         for entry in entries {
-            for photo in entry.photos {
+            for photo in entry.sortedPhotos {
                 photoStore.deleteFiles(for: photo)
             }
             modelContext.delete(entry)

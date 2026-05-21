@@ -10,8 +10,8 @@ final class JournalEntry: Identifiable {
     var moodRawValue: Int = Mood.good.rawValue
     var note: String = ""
 
-    @Relationship(deleteRule: .cascade) var sessions: [JournalSession] = []
-    @Relationship(deleteRule: .cascade) var photos: [PhotoAttachment] = []
+    @Relationship(deleteRule: .cascade, inverse: \JournalSession.entry) var sessions: [JournalSession]? = []
+    @Relationship(deleteRule: .cascade, inverse: \PhotoAttachment.entry) var photos: [PhotoAttachment]? = []
 
     init(
         id: UUID = UUID(),
@@ -42,15 +42,15 @@ final class JournalEntry: Identifiable {
     }
 
     var sortedSessions: [JournalSession] {
-        sessions.sorted { $0.createdAt < $1.createdAt }
+        (sessions ?? []).sorted { $0.createdAt < $1.createdAt }
     }
 
     var sortedPhotos: [PhotoAttachment] {
-        photos.sorted { $0.createdAt < $1.createdAt }
+        (photos ?? []).sorted { $0.createdAt < $1.createdAt }
     }
 
     var isComplete: Bool {
-        EntryCompletion.isComplete(responseTexts: sessions.flatMap(\.responses).map(\.text), photoCount: photos.count)
+        EntryCompletion.isComplete(responseTexts: sortedSessions.flatMap(\.sortedResponses).map(\.text), photoCount: sortedPhotos.count)
     }
 }
 
@@ -60,8 +60,9 @@ final class JournalSession: Identifiable {
     var kindRawValue: String = SessionKind.evening.rawValue
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
+    var entry: JournalEntry?
 
-    @Relationship(deleteRule: .cascade) var responses: [PromptResponse] = []
+    @Relationship(deleteRule: .cascade, inverse: \PromptResponse.session) var responses: [PromptResponse]? = []
 
     init(
         id: UUID = UUID(),
@@ -86,7 +87,7 @@ final class JournalSession: Identifiable {
     }
 
     var sortedResponses: [PromptResponse] {
-        responses.sorted { $0.promptOrder < $1.promptOrder }
+        (responses ?? []).sorted { $0.promptOrder < $1.promptOrder }
     }
 }
 
@@ -129,6 +130,7 @@ final class PromptResponse: Identifiable {
     var text: String = ""
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
+    var session: JournalSession?
 
     init(
         id: UUID = UUID(),
@@ -159,6 +161,7 @@ final class PhotoAttachment: Identifiable {
     var localIdentifier: String?
     var createdAt: Date = Date()
     var caption: String = ""
+    var entry: JournalEntry?
 
     init(
         id: UUID = UUID(),

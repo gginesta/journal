@@ -38,7 +38,9 @@ enum JournalStore {
                 promptOrder: $0.order
             )
         }
-        entry.sessions.append(session)
+        var sessions = entry.sessions ?? []
+        sessions.append(session)
+        entry.sessions = sessions
         entry.updatedAt = .now
         try? context.save()
     }
@@ -56,7 +58,9 @@ enum JournalStore {
     }
 
     static func addPhoto(_ photo: PhotoAttachment, to entry: JournalEntry, in context: ModelContext) {
-        entry.photos.append(photo)
+        var photos = entry.photos ?? []
+        photos.append(photo)
+        entry.photos = photos
         entry.updatedAt = .now
         try? context.save()
     }

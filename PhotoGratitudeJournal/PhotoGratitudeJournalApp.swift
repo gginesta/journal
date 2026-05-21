@@ -10,7 +10,7 @@ struct PhotoGratitudeJournalApp: App {
     @State private var photoStore = PhotoStore()
 
     init() {
-        container = AppModelContainer.make()
+        container = AppModelContainer.make(inMemory: ProcessInfo.processInfo.isRunningTests)
         PromptSeeder.seedIfNeeded(in: container.mainContext)
     }
 
@@ -27,5 +27,11 @@ struct PhotoGratitudeJournalApp: App {
                     await reminderScheduler.refreshAuthorizationStatus()
                 }
         }
+    }
+}
+
+private extension ProcessInfo {
+    var isRunningTests: Bool {
+        environment["XCTestConfigurationFilePath"] != nil
     }
 }
