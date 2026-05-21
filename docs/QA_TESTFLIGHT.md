@@ -25,6 +25,9 @@ Record before testing:
 - Reopen Today and confirm the text remains.
 - Add one photo.
 - Add a second photo if the UI allows it.
+- Preview each added photo if the UI offers preview.
+- Remove one attached photo and confirm the entry still behaves correctly.
+- Try importing a photo, cancelling, and returning to Today.
 - Edit or remove a prompt response.
 - Confirm a photo-only or light-text entry still feels accepted by the UI.
 - Force quit, relaunch, and confirm the entry persists.
@@ -51,6 +54,9 @@ Record before testing:
 - Confirm saved entries render as photo-first cards where photos exist.
 - Open an entry from Memories.
 - Filter by a person tag.
+- Search for a word from a prompt response.
+- Search for a word from a Little Detail.
+- Toggle any photo/text filters if present.
 - Confirm entries and Little Details associated with that person are discoverable.
 - Clear the filter and confirm the broader list returns.
 
@@ -65,6 +71,8 @@ Record before testing:
 
 ## Settings And Privacy
 
+- Confirm cadence/reminder controls match the onboarding choices if onboarding is present.
+- Update reminder time if controls are present.
 - Review reminder settings and request notification permission only if expected.
 - Confirm iCloud/private sync copy is understandable.
 - Review app lock, export, delete-all, and Premium surfaces without assuming production readiness.

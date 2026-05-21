@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UserNotifications
 
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
@@ -22,8 +23,44 @@ struct SettingsView: View {
                             Text(cadence.title).tag(cadence)
                         }
                     }
+                    Text(cadenceDescription(for: config.cadence))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
 
                     Toggle("Daily reminders", isOn: reminderBinding(for: config))
+
+                    if config.isEnabled {
+                        DatePicker(
+                            primaryReminderLabel(for: config.cadence),
+                            selection: eveningTimeBinding(for: config),
+                            displayedComponents: .hourAndMinute
+                        )
+
+                        if config.cadence == .morningEvening {
+                            DatePicker(
+                                "Morning reminder",
+                                selection: morningTimeBinding(for: config),
+                                displayedComponents: .hourAndMinute
+                            )
+                        }
+
+                        Label(reminderPermissionText, systemImage: reminderPermissionIcon)
+                            .font(.footnote)
+                            .foregroundStyle(reminderPermissionColor)
+
+                        if reminderScheduler.authorizationStatus == .denied {
+                            Text("Notifications are off for this app in iOS Settings. Your cadence is saved here, but reminders cannot fire until permission is enabled.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        Text("Reminders are optional. Your cadence still shapes the journal prompts without scheduling notifications.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Label("Setting up reminder controls", systemImage: "bell")
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -96,6 +133,10 @@ struct SettingsView: View {
         } message: {
             Text("Prompts and settings will stay, but entries and attached records will be removed from the local SwiftData store and synced deletion will propagate through iCloud.")
         }
+        .task {
+            ensureReminderConfig()
+            await reminderScheduler.refreshAuthorizationStatus()
+        }
     }
 
     private func cadenceBinding(for config: ReminderConfig) -> Binding<RitualCadence> {
@@ -103,7 +144,7 @@ struct SettingsView: View {
             get: { config.cadence },
             set: { newValue in
                 config.cadence = newValue
-                Task { await reminderScheduler.schedule(config: config) }
+                saveAndReschedule(config)
             }
         )
     }
@@ -113,7 +154,31 @@ struct SettingsView: View {
             get: { config.isEnabled },
             set: { newValue in
                 config.isEnabled = newValue
-                Task { await reminderScheduler.schedule(config: config) }
+                saveAndReschedule(config)
+            }
+        )
+    }
+
+    private func eveningTimeBinding(for config: ReminderConfig) -> Binding<Date> {
+        Binding(
+            get: { date(hour: config.eveningHour, minute: config.eveningMinute) },
+            set: { newValue in
+                let components = Calendar.current.dateComponents([.hour, .minute], from: newValue)
+                config.eveningHour = components.hour ?? config.eveningHour
+                config.eveningMinute = components.minute ?? config.eveningMinute
+                saveAndReschedule(config)
+            }
+        )
+    }
+
+    private func morningTimeBinding(for config: ReminderConfig) -> Binding<Date> {
+        Binding(
+            get: { date(hour: config.morningHour, minute: config.morningMinute) },
+            set: { newValue in
+                let components = Calendar.current.dateComponents([.hour, .minute], from: newValue)
+                config.morningHour = components.hour ?? config.morningHour
+                config.morningMinute = components.minute ?? config.morningMinute
+                saveAndReschedule(config)
             }
         )
     }
@@ -135,6 +200,49 @@ struct SettingsView: View {
         URL(string: "mailto:?subject=Photo%20Journal%20Beta%20Feedback")!
     }
 
+    private var reminderPermissionText: String {
+        switch reminderScheduler.authorizationStatus {
+        case .notDetermined:
+            "Notification permission has not been requested yet."
+        case .denied:
+            "Notification permission is off."
+        case .authorized:
+            "Notification permission is on."
+        case .provisional:
+            "Quiet notifications are allowed."
+        case .ephemeral:
+            "Temporary notifications are allowed."
+        @unknown default:
+            "Notification permission status is unknown."
+        }
+    }
+
+    private var reminderPermissionIcon: String {
+        switch reminderScheduler.authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            "checkmark.circle"
+        case .denied:
+            "exclamationmark.triangle"
+        case .notDetermined:
+            "questionmark.circle"
+        @unknown default:
+            "questionmark.circle"
+        }
+    }
+
+    private var reminderPermissionColor: Color {
+        switch reminderScheduler.authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            .leaf
+        case .denied:
+            .dawn
+        case .notDetermined:
+            .secondary
+        @unknown default:
+            .secondary
+        }
+    }
+
     private func deleteEntries() {
         for entry in entries {
             for photo in entry.sortedPhotos {
@@ -143,5 +251,50 @@ struct SettingsView: View {
             modelContext.delete(entry)
         }
         try? modelContext.save()
+    }
+
+    private func ensureReminderConfig() {
+        guard reminderConfigs.isEmpty else { return }
+        modelContext.insert(ReminderConfig(isEnabled: false))
+        try? modelContext.save()
+    }
+
+    private func saveAndReschedule(_ config: ReminderConfig) {
+        try? modelContext.save()
+        Task { await reminderScheduler.schedule(config: config) }
+    }
+
+    private func primaryReminderLabel(for cadence: RitualCadence) -> String {
+        switch cadence {
+        case .morningEvening:
+            "Evening reminder"
+        case .evening:
+            "Evening reminder"
+        case .onceDaily, .anytime:
+            "Reminder time"
+        }
+    }
+
+    private func cadenceDescription(for cadence: RitualCadence) -> String {
+        switch cadence {
+        case .evening:
+            "One evening prompt to capture today's photo and nice things."
+        case .onceDaily:
+            "One flexible daily session."
+        case .morningEvening:
+            "A morning note and an evening journal session."
+        case .anytime:
+            "A loose rhythm for journaling whenever something is worth saving."
+        }
+    }
+
+    private func date(hour: Int, minute: Int) -> Date {
+        Calendar.current.date(
+            from: DateComponents(
+                calendar: Calendar.current,
+                hour: hour,
+                minute: minute
+            )
+        ) ?? .now
     }
 }

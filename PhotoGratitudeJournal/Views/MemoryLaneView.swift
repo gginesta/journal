@@ -20,12 +20,20 @@ struct MemoryLaneView: View {
             }
 
             if matches.isEmpty {
-                Text("Once you have older entries, this space will bring back moments from 1 month, 1 year, 2 years, and 3 years ago.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(14)
-                    .background(Color(.tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                VStack(alignment: .leading, spacing: 12) {
+                    Label(emptyMessage, systemImage: "sparkles")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    if let fallbackEntry {
+                        RecentMemoryFallbackCard(entry: fallbackEntry) {
+                            router.navigate(to: .entry(fallbackEntry.id))
+                        }
+                    }
+                }
+                .padding(14)
+                .background(Color(.tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             } else {
                 VStack(spacing: 12) {
                     ForEach(matches) { match in
@@ -43,6 +51,23 @@ struct MemoryLaneView: View {
 
     private func entry(for match: MemoryMatch) -> JournalEntry? {
         entries.first { $0.id == match.entryID }
+    }
+
+    private var fallbackEntry: JournalEntry? {
+        entries
+            .filter { !Calendar.current.isDateInToday($0.day) }
+            .sorted { $0.day > $1.day }
+            .first
+    }
+
+    private var emptyMessage: String {
+        if entries.isEmpty {
+            return "Once you have older entries, this space will bring back moments from 1 month, 1 year, 2 years, and 3 years ago."
+        }
+        if fallbackEntry == nil {
+            return "Save a few days and Memory Lane will have something older to bring back."
+        }
+        return "No look-backs line up with today yet. Here is a recent saved memory instead."
     }
 }
 
@@ -88,7 +113,7 @@ private struct MemoryLaneCard: View {
     @ViewBuilder
     private var thumbnail: some View {
         if let photo = entry.sortedPhotos.first {
-            AsyncImage(url: photoStore.thumbnailURL(for: photo)) { image in
+            StoredPhotoImage(url: photoStore.thumbnailURL(for: photo)) { image in
                 image
                     .resizable()
                     .scaledToFill()
@@ -115,6 +140,78 @@ private struct MemoryLaneCard: View {
             return match.label
         }
         return "Around \(match.label)"
+    }
+
+    private var excerpt: String? {
+        entry.sortedSessions
+            .flatMap(\.sortedResponses)
+            .map(\.text)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty }
+    }
+}
+
+private struct RecentMemoryFallbackCard: View {
+    @Environment(PhotoStore.self) private var photoStore
+    let entry: JournalEntry
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                thumbnail
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Recent memory")
+                        .font(.headline)
+                        .foregroundStyle(.ink)
+                    Text(entry.day.formatted(date: .abbreviated, time: .omitted))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    if let excerpt {
+                        Text(excerpt)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                }
+
+                Spacer(minLength: 4)
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.bold())
+                    .foregroundStyle(.secondary)
+            }
+            .padding(10)
+            .background(Color.journalSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Recent memory, \(entry.day.formatted(date: .abbreviated, time: .omitted))")
+    }
+
+    @ViewBuilder
+    private var thumbnail: some View {
+        if let photo = entry.sortedPhotos.first {
+            StoredPhotoImage(url: photoStore.thumbnailURL(for: photo)) { image in
+                image
+                    .resizable()
+                    .scaledToFill()
+            } placeholder: {
+                Color.mist
+                    .overlay(Image(systemName: "photo").foregroundStyle(.secondary))
+            }
+            .frame(width: 66, height: 72)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        } else {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.mist)
+                .frame(width: 66, height: 72)
+                .overlay {
+                    Image(systemName: "quote.bubble")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                }
+        }
     }
 
     private var excerpt: String? {

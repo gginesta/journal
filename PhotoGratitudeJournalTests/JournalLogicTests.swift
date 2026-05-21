@@ -74,6 +74,38 @@ final class JournalLogicTests: XCTestCase {
         ])
     }
 
+    func testEntryCreationUsesSavedCadence() {
+        let container = AppModelContainer.make(inMemory: true)
+        let context = container.mainContext
+        PromptSeeder.seedIfNeeded(in: context)
+        let configs = (try? context.fetch(FetchDescriptor<ReminderConfig>())) ?? []
+        let config = configs.first ?? ReminderConfig(isEnabled: false)
+        if configs.isEmpty {
+            context.insert(config)
+        }
+        config.cadence = .morningEvening
+        try? context.save()
+
+        let entry = JournalStore.entry(for: Date(), in: context)
+
+        XCTAssertEqual(entry.sortedSessions.map(\.kind), [.morning, .evening])
+        XCTAssertEqual(entry.sortedSessions.first?.sortedResponses.count, 3)
+        XCTAssertEqual(entry.sortedSessions.last?.sortedResponses.count, 3)
+    }
+
+    func testPhotoRemovalUpdatesEntry() {
+        let container = AppModelContainer.make(inMemory: true)
+        let context = container.mainContext
+        let entry = JournalEntry(day: Date())
+        let photo = PhotoAttachment(originalFilename: "photo.jpg", thumbnailFilename: "thumb.jpg")
+        context.insert(entry)
+        JournalStore.addPhoto(photo, to: entry, in: context)
+
+        JournalStore.removePhoto(photo, from: entry, in: context)
+
+        XCTAssertTrue(entry.sortedPhotos.isEmpty)
+    }
+
     func testPersonTagSeederCreatesDefaultPeople() {
         let container = AppModelContainer.make(inMemory: true)
         let context = container.mainContext

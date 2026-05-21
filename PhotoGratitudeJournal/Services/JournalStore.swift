@@ -21,16 +21,10 @@ enum JournalStore {
         }
 
         let entry = JournalEntry(day: targetDay)
-        let session = JournalSession(kind: .evening)
-        session.responses = PromptSeeder.enabledPrompts(in: context).map {
-            PromptResponse(
-                promptID: $0.id,
-                promptTitle: $0.title,
-                promptText: $0.prompt,
-                promptOrder: $0.order
-            )
+        let prompts = PromptSeeder.enabledPrompts(in: context)
+        entry.sessions = sessionKindsForNewEntry(in: context).enumerated().map { index, kind in
+            makeSession(kind: kind, prompts: prompts, offset: index)
         }
-        entry.sessions = [session]
         context.insert(entry)
         try? context.save()
         return entry
@@ -117,6 +111,13 @@ enum JournalStore {
         photos.append(photo)
         entry.photos = photos
         entry.updatedAt = .now
+        try? context.save()
+    }
+
+    static func removePhoto(_ photo: PhotoAttachment, from entry: JournalEntry, in context: ModelContext) {
+        entry.photos = (entry.photos ?? []).filter { $0.id != photo.id }
+        entry.updatedAt = .now
+        context.delete(photo)
         try? context.save()
     }
 
@@ -216,5 +217,27 @@ enum JournalStore {
 
     private static func normalizedName(_ name: String) -> String {
         name.trimmingCharacters(in: .whitespacesAndNewlines).localizedLowercase
+    }
+
+    private static func sessionKindsForNewEntry(in context: ModelContext) -> [SessionKind] {
+        let descriptor = FetchDescriptor<ReminderConfig>()
+        let cadence = (try? context.fetch(descriptor).first?.cadence) ?? .evening
+        return cadence.defaultSessionKinds
+    }
+
+    private static func makeSession(kind: SessionKind, prompts: [PromptTemplate], offset: Int = 0) -> JournalSession {
+        let createdAt = Date.now.addingTimeInterval(TimeInterval(offset))
+        let session = JournalSession(kind: kind, createdAt: createdAt, updatedAt: createdAt)
+        session.responses = prompts.map {
+            PromptResponse(
+                promptID: $0.id,
+                promptTitle: $0.title,
+                promptText: $0.prompt,
+                promptOrder: $0.order,
+                createdAt: createdAt,
+                updatedAt: createdAt
+            )
+        }
+        return session
     }
 }

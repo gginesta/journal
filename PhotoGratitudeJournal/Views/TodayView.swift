@@ -9,6 +9,7 @@ struct TodayView: View {
     @Query(sort: \PersonTag.sortOrder) private var personTags: [PersonTag]
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var importingPhotos = false
+    @State private var photoImportMessage: String?
     @State private var entry: JournalEntry?
     @AppStorage("hasSeenBetaWelcome") private var hasSeenBetaWelcome = false
 
@@ -22,7 +23,14 @@ struct TodayView: View {
                             hasSeenBetaWelcome = true
                         }
                     }
-                    PhotoStripView(entry: entry, selectedPhotos: $selectedPhotos, isImporting: importingPhotos)
+                    PhotoStripView(
+                        entry: entry,
+                        selectedPhotos: $selectedPhotos,
+                        isImporting: importingPhotos,
+                        importErrorMessage: photoImportMessage
+                    ) { photo in
+                        removePhoto(photo, from: entry)
+                    }
                     PeopleTagEditor(entry: entry, people: sortedPeople)
                     CompletionBanner(isComplete: entry.isComplete)
                     promptSections(entry: entry)
@@ -62,16 +70,39 @@ struct TodayView: View {
     private func importSelectedPhotos(_ items: [PhotosPickerItem]) async {
         guard let entry, !items.isEmpty else { return }
         importingPhotos = true
+        photoImportMessage = nil
         defer {
             importingPhotos = false
             selectedPhotos = []
         }
 
-        for item in items {
-            if let attachment = try? await photoStore.importPhoto(from: item) {
+        let remainingSlots = max(0, 2 - entry.sortedPhotos.count)
+        guard remainingSlots > 0 else {
+            photoImportMessage = "Two photos is plenty for today."
+            return
+        }
+
+        var failedImports = 0
+        for item in items.prefix(remainingSlots) {
+            do {
+                let attachment = try await photoStore.importPhoto(from: item)
                 JournalStore.addPhoto(attachment, to: entry, in: modelContext)
+            } catch {
+                failedImports += 1
             }
         }
+
+        if failedImports > 0 {
+            photoImportMessage = failedImports == 1 ? "One photo could not be added." : "\(failedImports) photos could not be added."
+        } else if items.count > remainingSlots {
+            photoImportMessage = remainingSlots == 1 ? "Saved the first photo. Keep today to one or two photos." : "Saved the first two photos. Keep today to one or two photos."
+        }
+    }
+
+    private func removePhoto(_ photo: PhotoAttachment, from entry: JournalEntry) {
+        photoStore.deleteFiles(for: photo)
+        JournalStore.removePhoto(photo, from: entry, in: modelContext)
+        photoImportMessage = nil
     }
 
     private var sortedPeople: [PersonTag] {

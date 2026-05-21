@@ -12,6 +12,9 @@ struct JournalCalendarView: View {
         ScrollView {
             VStack(spacing: 14) {
                 monthControls
+                if let lowDataMessage {
+                    CalendarLowDataBanner(message: lowDataMessage)
+                }
                 VStack(spacing: 8) {
                     weekdayHeader
                     LazyVGrid(columns: columns, spacing: 6) {
@@ -62,6 +65,16 @@ struct JournalCalendarView: View {
             }
             .accessibilityLabel("Next month")
         }
+    }
+
+    private var lowDataMessage: String? {
+        if entries.isEmpty {
+            return "Calendar fills in as you save entries. Today's square is outlined so you always have a place to begin."
+        }
+        if entries.count < 4 {
+            return "You have \(entries.count) saved \(entries.count == 1 ? "day" : "days") so far. Days with photos or writing are marked below."
+        }
+        return nil
     }
 
     private var weekdayHeader: some View {
@@ -118,6 +131,25 @@ struct JournalCalendarView: View {
         let photoLabel = photoCount == 1 ? "1 photo" : "\(photoCount) photos"
         let completion = entry.isComplete ? "complete" : "not complete"
         return "\(date), \(photoLabel), \(completion)"
+    }
+}
+
+private struct CalendarLowDataBanner: View {
+    let message: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "calendar.badge.clock")
+                .font(.headline)
+                .foregroundStyle(.rose)
+                .frame(width: 28)
+
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .journalCard(padding: 14)
     }
 }
 

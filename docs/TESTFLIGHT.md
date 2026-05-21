@@ -38,8 +38,10 @@ Use this checklist to prepare the first private iPhone beta for the owner and sp
 - Add internal testers: owner first, spouse second after owner smoke test passes.
 - Add concise beta notes:
   - Create today's entry with one or two photos.
+  - Preview and remove photos.
   - Add three nice things, people tags, and optional Little Details.
-  - Browse Memories, Calendar, and Memory Lane.
+  - Browse and search Memories, Calendar, and Memory Lane.
+  - Check onboarding, cadence, reminders, and Settings.
   - Use Settings > Beta > Send beta feedback for notes after testing.
   - Report crashes, lost data, broken filters, confusing copy, and photo issues.
 - Do not invite external testers until the owner/spouse loop is stable.
@@ -48,7 +50,7 @@ Use this checklist to prepare the first private iPhone beta for the owner and sp
 
 - Journal content is local-first and intended to sync only through the user's private iCloud database.
 - There is no custom account backend and no shared public journal data.
-- Photos are imported into app-local storage; testers should not use irreplaceable-only photos during the first beta.
+- Photos are imported into app-local storage; testers should still avoid using irreplaceable-only photos during the first beta.
 - People tags are private labels, not contacts or social profiles.
 - Premium and StoreKit surfaces are scaffolded; do not treat purchase behavior as production-ready in this beta.
 - App Store privacy labels and legal links are not final for App Store submission.
