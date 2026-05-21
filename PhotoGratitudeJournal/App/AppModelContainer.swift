@@ -11,6 +11,10 @@ enum AppModelContainer {
             PromptTemplate.self,
             PromptResponse.self,
             PhotoAttachment.self,
+            PersonTag.self,
+            EntryPersonTag.self,
+            MemoryDetail.self,
+            DetailPersonTag.self,
             ReminderConfig.self
         ])
 

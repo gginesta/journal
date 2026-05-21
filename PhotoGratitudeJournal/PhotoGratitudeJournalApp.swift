@@ -12,6 +12,7 @@ struct PhotoGratitudeJournalApp: App {
     init() {
         container = AppModelContainer.make(inMemory: ProcessInfo.processInfo.isRunningTests)
         PromptSeeder.seedIfNeeded(in: container.mainContext)
+        JournalStore.seedDefaultPersonTagsIfNeeded(in: container.mainContext)
     }
 
     var body: some Scene {

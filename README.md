@@ -87,5 +87,7 @@ The current app schedules local notifications only; remote push notifications ar
 - [Architecture](docs/ARCHITECTURE.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Versioning](docs/VERSIONING.md)
+- [TestFlight Owner Checklist](docs/TESTFLIGHT.md)
+- [TestFlight Manual QA](docs/QA_TESTFLIGHT.md)
 - [Contributing](CONTRIBUTING.md)
 - [Changelog](CHANGELOG.md)

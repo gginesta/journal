@@ -19,6 +19,15 @@ For each release:
 - Update `CHANGELOG.md`.
 - Tag the release as `vX.Y.Z`.
 
+## TestFlight Builds
+
+- Bundle id: `com.guill.PhotoGratitudeJournal`.
+- iCloud container: `iCloud.com.guill.PhotoGratitudeJournal`.
+- Keep `MARKETING_VERSION` aligned to the planned milestone.
+- Increment `CURRENT_PROJECT_VERSION` for every uploaded TestFlight build, even if the marketing version is unchanged.
+- Record the uploaded build number in tester notes and QA results.
+- Do not tag every internal TestFlight upload; tag only named milestone releases or release candidates.
+
 ## Branches
 
 - `main`: stable trunk.

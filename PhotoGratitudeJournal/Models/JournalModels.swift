@@ -12,6 +12,8 @@ final class JournalEntry: Identifiable {
 
     @Relationship(deleteRule: .cascade, inverse: \JournalSession.entry) var sessions: [JournalSession]? = []
     @Relationship(deleteRule: .cascade, inverse: \PhotoAttachment.entry) var photos: [PhotoAttachment]? = []
+    @Relationship(deleteRule: .cascade, inverse: \EntryPersonTag.entry) var personLinks: [EntryPersonTag]? = []
+    @Relationship(deleteRule: .cascade, inverse: \MemoryDetail.entry) var details: [MemoryDetail]? = []
 
     init(
         id: UUID = UUID(),
@@ -21,7 +23,9 @@ final class JournalEntry: Identifiable {
         mood: Mood = .good,
         note: String = "",
         sessions: [JournalSession] = [],
-        photos: [PhotoAttachment] = []
+        photos: [PhotoAttachment] = [],
+        personLinks: [EntryPersonTag] = [],
+        details: [MemoryDetail] = []
     ) {
         self.id = id
         self.day = Calendar.current.startOfDay(for: day)
@@ -31,6 +35,8 @@ final class JournalEntry: Identifiable {
         self.note = note
         self.sessions = sessions
         self.photos = photos
+        self.personLinks = personLinks
+        self.details = details
     }
 
     var mood: Mood {
@@ -49,8 +55,145 @@ final class JournalEntry: Identifiable {
         (photos ?? []).sorted { $0.createdAt < $1.createdAt }
     }
 
+    var sortedPersonTags: [PersonTag] {
+        (personLinks ?? [])
+            .compactMap(\.person)
+            .sorted { lhs, rhs in
+                if lhs.sortOrder == rhs.sortOrder {
+                    return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+                }
+                return lhs.sortOrder < rhs.sortOrder
+            }
+    }
+
+    var sortedDetails: [MemoryDetail] {
+        (details ?? []).sorted { lhs, rhs in
+            if lhs.order == rhs.order {
+                return lhs.createdAt < rhs.createdAt
+            }
+            return lhs.order < rhs.order
+        }
+    }
+
     var isComplete: Bool {
         EntryCompletion.isComplete(responseTexts: sortedSessions.flatMap(\.sortedResponses).map(\.text), photoCount: sortedPhotos.count)
+    }
+}
+
+@Model
+final class PersonTag: Identifiable {
+    var id: UUID = UUID()
+    var name: String = ""
+    var colorHex: String = ""
+    var sortOrder: Int = 0
+    var isDefault: Bool = false
+    var createdAt: Date = Date()
+    var updatedAt: Date = Date()
+
+    @Relationship(deleteRule: .cascade, inverse: \EntryPersonTag.person) var entryLinks: [EntryPersonTag]? = []
+    @Relationship(deleteRule: .cascade, inverse: \DetailPersonTag.person) var detailLinks: [DetailPersonTag]? = []
+
+    init(
+        id: UUID = UUID(),
+        name: String,
+        colorHex: String = "#7C6F64",
+        sortOrder: Int = 0,
+        isDefault: Bool = false,
+        createdAt: Date = .now,
+        updatedAt: Date = .now,
+        entryLinks: [EntryPersonTag] = [],
+        detailLinks: [DetailPersonTag] = []
+    ) {
+        self.id = id
+        self.name = name
+        self.colorHex = colorHex
+        self.sortOrder = sortOrder
+        self.isDefault = isDefault
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.entryLinks = entryLinks
+        self.detailLinks = detailLinks
+    }
+}
+
+@Model
+final class EntryPersonTag: Identifiable {
+    var id: UUID = UUID()
+    var createdAt: Date = Date()
+    var entry: JournalEntry?
+    var person: PersonTag?
+
+    init(
+        id: UUID = UUID(),
+        createdAt: Date = .now,
+        entry: JournalEntry? = nil,
+        person: PersonTag? = nil
+    ) {
+        self.id = id
+        self.createdAt = createdAt
+        self.entry = entry
+        self.person = person
+    }
+}
+
+@Model
+final class MemoryDetail: Identifiable {
+    var id: UUID = UUID()
+    var text: String = ""
+    var order: Int = 0
+    var createdAt: Date = Date()
+    var updatedAt: Date = Date()
+    var entry: JournalEntry?
+
+    @Relationship(deleteRule: .cascade, inverse: \DetailPersonTag.detail) var personLinks: [DetailPersonTag]? = []
+
+    init(
+        id: UUID = UUID(),
+        text: String,
+        order: Int = 0,
+        createdAt: Date = .now,
+        updatedAt: Date = .now,
+        entry: JournalEntry? = nil,
+        personLinks: [DetailPersonTag] = []
+    ) {
+        self.id = id
+        self.text = text
+        self.order = order
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.entry = entry
+        self.personLinks = personLinks
+    }
+
+    var sortedPersonTags: [PersonTag] {
+        (personLinks ?? [])
+            .compactMap(\.person)
+            .sorted { lhs, rhs in
+                if lhs.sortOrder == rhs.sortOrder {
+                    return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+                }
+                return lhs.sortOrder < rhs.sortOrder
+            }
+    }
+}
+
+@Model
+final class DetailPersonTag: Identifiable {
+    var id: UUID = UUID()
+    var createdAt: Date = Date()
+    var detail: MemoryDetail?
+    var person: PersonTag?
+
+    init(
+        id: UUID = UUID(),
+        createdAt: Date = .now,
+        detail: MemoryDetail? = nil,
+        person: PersonTag? = nil
+    ) {
+        self.id = id
+        self.createdAt = createdAt
+        self.detail = detail
+        self.person = person
     }
 }
 

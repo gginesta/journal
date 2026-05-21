@@ -2,6 +2,11 @@
 
 This roadmap is the execution plan for turning the current scaffold into a production-ready iOS app. Each milestone should land through a focused branch and commit set. `main` should remain stable and reviewable.
 
+Current beta-readiness docs:
+
+- TestFlight owner setup: `docs/TESTFLIGHT.md`.
+- Manual beta QA: `docs/QA_TESTFLIGHT.md`.
+
 ## Milestone 0.1.0 - Bootstrap
 
 Status: complete.
@@ -212,6 +217,7 @@ Work:
 - Add App Store privacy nutrition label draft.
 - Add beta feedback workflow.
 - Add screenshots for App Store draft.
+- Keep `docs/TESTFLIGHT.md` and `docs/QA_TESTFLIGHT.md` current with the latest beta scope.
 
 Acceptance criteria:
 
