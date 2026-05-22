@@ -1315,15 +1315,11 @@ function MemoryLanePanel({
 }
 
 function MemoryLaneCard({ entry, label, onOpen }: { entry: JournalEntry; label: string; onOpen: (entryId: string) => void }) {
+  const photo = entry.photos[0];
+
   return (
     <button type="button" onClick={() => onOpen(entry.id)} className="flex gap-3 rounded-2xl bg-journal-raised p-3 text-left transition hover:-translate-y-0.5 hover:bg-white hover:shadow-sm">
-      {entry.photos[0] ? (
-        <img src={entry.photos[0].previewUrl} alt="" className="h-20 w-20 rounded-2xl object-cover" />
-      ) : (
-        <span className="grid h-20 w-20 place-items-center rounded-2xl bg-mist text-warm-gray">
-          <Sparkles aria-hidden="true" />
-        </span>
-      )}
+      <JournalPhoto src={photo?.previewUrl} alt="" className="h-20 w-20 rounded-2xl object-cover" />
       <div className="min-w-0">
         <p className="font-bold">{label}</p>
         <p className="text-sm text-warm-gray">{formatDisplayDate(entry.localDate, "short")}</p>
@@ -1346,16 +1342,11 @@ function MemoryCard({
 }) {
   const tagged = entryPeople(entry, people);
   const detail = entry.details.find((candidate) => candidate.text.trim());
+  const photo = entry.photos[0];
   return (
     <article className="overflow-hidden rounded-journal border border-journal-line bg-journal-surface shadow-sm transition hover:-translate-y-0.5 hover:shadow-photo">
       <button type="button" onClick={() => onOpen?.(entry.id)} className="block h-full w-full text-left">
-      {entry.photos[0] ? (
-        <img src={entry.photos[0].previewUrl} alt="" className={clsx("w-full object-cover", compact ? "h-40" : "h-60")} loading="lazy" />
-      ) : (
-        <div className={clsx("grid place-items-center bg-journal-raised text-warm-gray", compact ? "h-28" : "h-44")}>
-          <Sparkles aria-hidden="true" />
-        </div>
-      )}
+      <JournalPhoto src={photo?.previewUrl} alt="" className={clsx("w-full object-cover", compact ? "h-40" : "h-60")} loading="lazy" />
       <div className="p-4">
         <div className="flex items-center justify-between gap-3">
           <p className="font-bold">{formatDisplayDate(entry.localDate, "short")}</p>
@@ -1441,7 +1432,7 @@ function EntryDetailModal({ entry, people, onClose }: { entry: JournalEntry; peo
           {entry.photos.length > 0 ? (
             <div className={clsx("grid gap-3", entry.photos.length > 1 ? "md:grid-cols-2" : "")}>
               {entry.photos.map((photo) => (
-                <img key={photo.id} src={photo.previewUrl} alt={photo.caption || "Journal memory"} className="max-h-[520px] w-full rounded-[24px] object-cover shadow-sm" />
+                <JournalPhoto key={photo.id} src={photo.previewUrl} alt={photo.caption || "Journal memory"} className="max-h-[520px] w-full rounded-[24px] object-cover shadow-sm" />
               ))}
             </div>
           ) : (
@@ -1525,6 +1516,41 @@ function EntryDetailModal({ entry, people, onClose }: { entry: JournalEntry; peo
       </section>
     </div>
   );
+}
+
+function JournalPhoto({
+  src,
+  alt,
+  className,
+  loading
+}: {
+  src?: string;
+  alt: string;
+  className?: string;
+  loading?: "eager" | "lazy";
+}) {
+  const [failed, setFailed] = useState(!src);
+  const imageRef = useRef<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    setFailed(!src);
+  }, [src]);
+
+  useEffect(() => {
+    const image = imageRef.current;
+    if (!image) return;
+    if (image.complete && image.naturalWidth === 0) setFailed(true);
+  }, [src]);
+
+  if (failed) {
+    return (
+      <span className={clsx("grid place-items-center bg-journal-raised text-warm-gray", className)} aria-label={alt || "Memory without a loaded photo"}>
+        <Sparkles aria-hidden="true" />
+      </span>
+    );
+  }
+
+  return <img ref={imageRef} src={src} alt={alt} className={className} loading={loading} onError={() => setFailed(true)} />;
 }
 
 function PromptSnapshot({ prompts }: { prompts: PromptTemplate[] }) {
