@@ -2,7 +2,9 @@
 
 ## Product Summary
 
-Photo Gratitude Journal is a private, photo-first iOS journal that helps users end the day by noticing what was good. The core loop is intentionally small: add one or two photos, write a few nice things from the day, and revisit past moments through Memory Lane.
+Photo Gratitude Journal is a private, photo-first Guided Gratitude Memory System that helps users end the day by noticing what was good and preserving the details they will want to find later. The current beta path is a Next.js/Supabase web app for private household testing, with the native iOS app remaining the long-term Apple-native expression of the same product.
+
+The core loop is intentionally small: add one or two photos, write one or a few nice things from the day, optionally keep tiny details, and revisit past moments through Memory Lane, Memories, Calendar, and the Little Details repository.
 
 The app is inspired by the emotional utility of Five Minute Journal, but the product center is the user's own photos rather than a text-only habit checklist.
 
@@ -23,6 +25,7 @@ The app is inspired by the emotional utility of Five Minute Journal, but the pro
 - People who want a private journal without social posting or public sharing.
 - People who respond better to visual memory than long-form writing.
 - People who want a positive end-of-day ritual without a complex mental health app.
+- People who want a guided gratitude habit that offers starters without turning reflection into homework.
 - Parents or family members who want to revisit memories for each child without creating a social album.
 - People who want to preserve tiny phases, personal milestones, favorite routines, or details they might otherwise forget.
 
@@ -35,10 +38,30 @@ The app is inspired by the emotional utility of Five Minute Journal, but the pro
 - When I add personal memories, I want confidence that they stay private.
 - When I tag my kids in memories, I want to quickly see each child's story over time.
 - When a phase is easy to miss, I want a lightweight place to capture tiny details like funny phrases, favorite snacks, routines, or personal milestones.
+- When I am not journaling about kids or family, I want onboarding and tags to support solo memories, partner memories, friends, projects, places, and custom themes.
+- When I do not know what to write, I want a Gratitude Guide to offer prompt packs that fit the mood of the day.
 
 ## Scope
 
-### In Scope For v1
+### In Scope For Current Web/Supabase Beta
+
+- Next.js web app deployable on Vercel.
+- Supabase Auth with email magic links.
+- Supabase Postgres and private Storage for journal data and photos.
+- Workspace-based personal and household journals.
+- RLS-protected owner/editor/viewer access model.
+- Daily photo-led entry creation with text-only, photo-only, and mixed entries.
+- Balanced onboarding for solo, partner, family, and custom memory shapes.
+- Private people/theme tags created during onboarding, entry editing, or Settings.
+- Gratitude Guide prompt packs that suggest gentle starters without requiring AI.
+- Editable prompt templates for the workspace.
+- Optional Little Details on entries and from the repository flow.
+- Little Details repository with search/filter by text, category, date, and person/theme tag.
+- Memories, Calendar, Memory Lane, Insights, Settings, JSON export, and delete controls.
+- Demo mode with browser-local persistence for UX review.
+- Beta verification checklist for solo, family, custom, shared workspace, RLS, and Storage behavior.
+
+### In Scope For Native v1
 
 - iPhone-only SwiftUI app.
 - Local-first SwiftData persistence.
@@ -51,6 +74,7 @@ The app is inspired by the emotional utility of Five Minute Journal, but the pro
 - Private people tagging for entries and photos.
 - Person filters in Memories and search/browse surfaces.
 - Optional Little Details section for tiny phases, quotes, favorites, routines, and milestones.
+- Gratitude Guide prompt packs or equivalent guided starters.
 - Streak and completion summaries.
 - Automatic Memory Lane for 1 month, 1 year, 2 years, and 3 years ago.
 - Local reminders.
@@ -59,22 +83,24 @@ The app is inspired by the emotional utility of Five Minute Journal, but the pro
 - JSON export.
 - WidgetKit extension for Premium users.
 
-### Out Of Scope For v1
+### Out Of Scope For Current Beta
 
-- Android or web app.
-- Custom account system.
+- Android app.
 - Social sharing feed.
 - Public profiles.
-- AI-generated journaling advice.
+- AI-generated journaling advice or clinical interpretation.
 - Therapist or clinical mental health positioning.
-- Collaborative journals.
+- Open self-serve collaboration beyond invited private beta testers.
 - Remote push notifications.
+- Stripe/Premium billing enforcement.
 
 ## User Experience
 
-### First Launch
+### First Launch / Onboarding
 
 - Explain the product in one calm screen: a photo journal for noticing good moments.
+- Ask what shape the journal starts with: solo/self, partner, family, or custom people/themes.
+- Let users personalize private tags without making child/family use feel mandatory.
 - Ask for preferred ritual cadence.
 - Ask whether to enable reminders.
 - Seed default prompts.
@@ -89,12 +115,15 @@ The app is inspired by the emotional utility of Five Minute Journal, but the pro
 - Users can add one or two photos, but an entry can be completed without photos.
 - Users can optionally tag people, such as kids or family members, on the entry or individual photos.
 - Users can optionally add Little Details, such as a funny phrase, current favorite, small milestone, routine, or memorable quote.
+- Users can use Gratitude Guide suggestions from curated prompt packs when they are unsure what to write.
 - Users can optionally answer secondary prompts.
 - Users can select a mood.
 - A day is complete when it has at least one non-empty response or at least one photo.
 
 ### Prompt Customization
 
+- Gratitude Guide offers curated starter packs such as small gratitude, savoring, appreciation, self-kindness, hard-day, and family/relationship prompts.
+- Prompt packs should feel optional and gentle; choosing a suggestion should add editable text, not lock the user into a script.
 - Users can edit default prompts.
 - Users can add custom prompts.
 - Users can disable prompts.
@@ -142,6 +171,7 @@ The app is inspired by the emotional utility of Five Minute Journal, but the pro
 - Each Little Detail can be tagged to one or more people independently of the whole entry, such as Me, each child, partner, family, or a custom person tag.
 - The first implementation should keep this lightweight: a few optional fields or chips, not a separate complex tracker.
 - Little Details should be visible in entry detail and discoverable from Memories filters or future search.
+- The web beta should also support a Little Details repository where users can add, search, filter, edit, and remove details without treating them as a full tracker.
 - Person pages and filters should be able to show both full memories and Little Details associated with that person.
 - Little Details belong in the free core product because they improve memory capture and retrieval.
 
@@ -187,11 +217,11 @@ Premium should feel like a richer habit layer, not a ransom on personal memories
 
 ## Privacy And Data
 
-- No custom backend for v1.
-- Journal data syncs only through the user's private iCloud database.
-- Photos are copied into the app container and referenced by filename.
-- People tags are user-authored private metadata and should sync only through the private iCloud database.
-- Little Details are private journal content and should sync only through the private iCloud database.
+- Current web beta uses Supabase as the private backend. Every journal row belongs to a workspace, RLS is enabled for journal tables, and private Storage paths are scoped by workspace id.
+- Native v1 should remain local-first and sync only through the user's private iCloud database unless the product explicitly converges on the web/Supabase account model later.
+- In the native app, photos are copied into the app container and referenced by filename.
+- People tags are user-authored private metadata, not contacts or public profiles.
+- Little Details are private journal content.
 - Sensitive files should use iOS file protection where available.
 - App lock uses LocalAuthentication.
 - Export should be user-initiated.
@@ -205,8 +235,10 @@ Premium should feel like a richer habit layer, not a ransom on personal memories
 - Reminder opt-in rate.
 - Memory Lane tap-through rate.
 - Prompt customization rate.
+- Gratitude Guide suggestion usage and later editing rate.
 - People tag creation and tagged-memory revisit rate.
 - Little Details creation and revisit rate.
+- Little Details repository search/filter usage.
 - Premium conversion rate after users have created meaningful history.
 
 ## Non-Goals
@@ -224,6 +256,7 @@ Premium should feel like a richer habit layer, not a ransom on personal memories
 - Whether app lock is Premium-only or included free for trust.
 - Exact free export limitations, if any.
 - Whether mood tracking should be prominent or quiet.
-- Whether first launch should require reminder setup or defer it.
 - Whether people tags should be entry-level first, photo-level first, or both from v1.
 - Whether Little Details should use fixed categories, custom categories, or a mix of both.
+- Whether Gratitude Guide prompt packs should remain fixed, become user-editable, or become Premium-expanded later.
+- Whether the long-term shared-memory product standardizes on Supabase accounts, iCloud-only native sync, or a bridge between both.

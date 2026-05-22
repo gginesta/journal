@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap is the execution plan for turning the current scaffold into production-ready iOS and web apps. Each milestone should land through a focused branch and commit set. `main` should remain stable and reviewable.
+This roadmap is the execution plan for turning the current scaffold into a production-ready Guided Gratitude Memory System across web and iOS. The active beta path is the web/Supabase app because it can support private household testing immediately; the iOS app remains the Apple-native product path. Each milestone should land through a focused branch and commit set. `main` should remain stable and reviewable.
 
 Current beta-readiness docs:
 
@@ -29,13 +29,18 @@ Delivered:
 - Chromium E2E coverage for desktop and mobile demo journaling flow.
 - Authenticated Supabase autosave route for people, prompts, reminders, entries, sessions, responses, tags, Little Details, and private photo Storage uploads.
 - Server routes for creating workspaces through the secured database function and deleting workspace entries through RLS.
-- Web first-run onboarding with a three-step product tour, personal memory-focus choice, friendly name collection for self/partner/children, starter checklist, and Settings replay control.
+- Web first-run onboarding with a three-step product tour, balanced memory-focus choices, friendly name/tag collection for solo, partner, family, and custom use, starter checklist, and Settings replay control.
+- Gratitude Guide foundations with curated non-AI prompt packs for small gratitude, savoring, appreciation, self-kindness, hard days, and family/relationships.
+- Little Details repository foundations so tiny details can be searched and managed as first-class retrievable memories, not only as entry subfields.
 
 Acceptance criteria:
 
 - A tester can open `/app` in demo mode and create a text-only, photo-only, or mixed memory.
+- A tester can complete onboarding for solo/self, family, and custom tags without the app feeling child-only.
 - A tester can add private people tags and tag Little Details by person.
+- A tester can use a Gratitude Guide starter and then edit the saved response.
 - A tester can search Memories by a Little Detail or person and open a full memory page.
+- A tester can search/filter the Little Details repository by text, category, and person/theme tag.
 - Calendar and Memory Lane are entry points, not dead ends.
 - Web build, lint, typecheck, unit tests, and Chromium E2E pass from a clean non-OneDrive workspace.
 - In Supabase mode, server data is the source of truth; demo localStorage is not restored over authenticated data.
@@ -45,7 +50,29 @@ Remaining work:
 - Verify RLS and shared household behavior with two real authenticated users.
 - Add household invitation/member-management UI on top of `workspace_members`.
 - Add more granular sync conflict handling for two people editing the same entry at the same time.
-- Run the private household beta checklist from `docs/WEB_APP.md` after both testers have logged in.
+- Run the private beta verification checklist from `docs/WEB_APP.md` after both testers have logged in, including solo, family, custom, Gratitude Guide, Little Details repository, and owner/editor/viewer coverage.
+
+## Milestone 0.2.6 - Consolidated Beta Verification
+
+Status: in progress.
+
+Goal: prove the consolidated Guided Gratitude Memory System works as a private beta before widening tester access.
+
+Work:
+
+- Keep PRD, roadmap, web operations, and QA docs aligned with the web/Supabase beta path.
+- Verify onboarding does not privilege only family/kids use: solo/self, partner, family, and custom tags should all feel legitimate.
+- Verify Gratitude Guide prompt packs are optional, editable, non-AI starters.
+- Verify Little Details can be created from entry flow and repository flow, tagged by person/theme, searched, filtered, edited, and removed.
+- Verify Supabase RLS, private Storage paths, workspace roles, and demo-vs-authenticated source-of-truth behavior.
+- Expand Playwright coverage where selectors are stable; keep copy assertions limited to high-signal onboarding and repository landmarks.
+
+Acceptance criteria:
+
+- Docs describe current beta behavior and do not imply iCloud-only storage for the web beta.
+- Manual QA has a dedicated web/Supabase beta pass and a separate TestFlight/native pass.
+- E2E covers family/custom onboarding and Little Details retrieval without brittle marketing-copy dependence.
+- Known blockers and in-progress implementation risks are recorded before inviting additional testers.
 
 ## Milestone 0.1.0 - Bootstrap
 

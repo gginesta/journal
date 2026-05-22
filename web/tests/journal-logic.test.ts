@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { JournalEntry, PersonTag } from "../src/types/journal";
 import { isEntryComplete, memoryLaneMatches, searchEntries, streakSummary } from "../src/lib/journal-logic";
+import { listMemoryDetails } from "../src/lib/memory-details";
+import { addSuggestionToReflectionText, gratitudeGuideForEntry, gratitudePromptPacks } from "../src/lib/prompts";
 
 const people: PersonTag[] = [
   { id: "me", workspaceId: "w1", name: "Me", color: "#000", sortOrder: 0, isDefault: true },
@@ -89,5 +91,68 @@ describe("journal logic", () => {
     expect(searchEntries([target], people, "Kid 1")).toHaveLength(1);
     expect(searchEntries([target], people, "lellow")).toHaveLength(1);
     expect(searchEntries([target], people, "yellow snack")).toHaveLength(1);
+  });
+
+  it("lists little details by newest date and filters by search, person, and category", () => {
+    const older = entry("older", "2026-05-19", "Park");
+    older.details = [{
+      id: "older-detail",
+      entryId: older.id,
+      text: "Asked for the dinosaur spoon",
+      category: "favorite",
+      sortOrder: 0,
+      personTagIds: ["kid"]
+    }];
+
+    const newer = entry("newer", "2026-05-21", "Dinner");
+    newer.details = [{
+      id: "newer-detail",
+      entryId: newer.id,
+      text: "A quiet walk after dinner",
+      category: "routine",
+      sortOrder: 0,
+      personTagIds: ["me"]
+    }];
+
+    const allDetails = listMemoryDetails([older, newer], people);
+    expect(allDetails.map((item) => item.detail.id)).toEqual(["newer-detail", "older-detail"]);
+    expect(listMemoryDetails([older, newer], people, { query: "dinosaur" })).toHaveLength(1);
+    expect(listMemoryDetails([older, newer], people, { personId: "kid" }).map((item) => item.detail.id)).toEqual(["older-detail"]);
+    expect(listMemoryDetails([older, newer], people, { category: "routine" }).map((item) => item.people[0]?.name)).toEqual(["Me"]);
+  });
+});
+
+describe("gratitude prompts", () => {
+  it("includes the deterministic guide packs", () => {
+    expect(gratitudePromptPacks.map((pack) => pack.id)).toEqual([
+      "default-gratitude",
+      "savoring",
+      "appreciation",
+      "self-kindness",
+      "hard-day",
+      "family-relationships"
+    ]);
+  });
+
+  it("returns stable suggestions for the same entry context", () => {
+    const first = gratitudeGuideForEntry({ localDate: "2026-05-22", mood: "good", hasRelationships: true });
+    const second = gratitudeGuideForEntry({ localDate: "2026-05-22", mood: "good", hasRelationships: true });
+
+    expect(second).toEqual(first);
+    expect(first.suggestions).toHaveLength(3);
+  });
+
+  it("uses gentle copy and hard-day prompts for low mood", () => {
+    const guide = gratitudeGuideForEntry({ localDate: "2026-05-22", mood: "low" });
+
+    expect(guide.pack.id).toBe("hard-day");
+    expect(guide.moodCopy).toContain("honest and tiny");
+  });
+
+  it("adds suggestions without replacing typed reflection text", () => {
+    expect(addSuggestionToReflectionText("Already typed", "One small comfort")).toBe("Already typed\nOne small comfort");
+    expect(addSuggestionToReflectionText("Already typed\n", "One small comfort")).toBe("Already typed\nOne small comfort");
+    expect(addSuggestionToReflectionText("One\nTwo\nThree", "Four")).toBe("One\nTwo\nThree; Four");
+    expect(addSuggestionToReflectionText("One small comfort", "One small comfort")).toBe("One small comfort");
   });
 });

@@ -52,21 +52,28 @@ import {
   searchEntries,
   streakSummary
 } from "@/lib/journal-logic";
+import {
+  listMemoryDetails,
+  memoryDetailCategoryLabels,
+  type MemoryDetailCategory
+} from "@/lib/memory-details";
+import {
+  applyOnboardingSetupToPeople,
+  findPersonalizedPersonName,
+  onboardingFocusOptions,
+  onboardingStorageKey,
+  splitFlexibleTags,
+  type OnboardingFocus,
+  type OnboardingSetup
+} from "@/lib/onboarding";
+import { addSuggestionToReflectionText, gratitudeGuideForEntry } from "@/lib/prompts";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type AppTab = "today" | "memories" | "calendar" | "insights" | "settings";
 type SaveState = "saved" | "saving" | "offline";
 type MemoryFilter = "all" | "photos" | "text";
-type DetailCategory = MemoryDetail["category"];
-type OnboardingFocus = "self" | "family" | "kids" | "partner";
-type OnboardingSetup = {
-  focus: OnboardingFocus;
-  names: {
-    me: string;
-    partner: string;
-    children: string[];
-  };
-};
+type MemoryMode = "entries" | "details";
+type DetailCategory = MemoryDetailCategory;
 
 const tabs: Array<{ id: AppTab; title: string; icon: LucideIcon }> = [
   { id: "today", title: "Today", icon: Home },
@@ -84,17 +91,16 @@ const moodOptions: Array<{ id: Mood; title: string; icon: LucideIcon }> = [
   { id: "glowing", title: "Glowing", icon: Sparkles }
 ];
 
-const detailCategories: Array<{ id: DetailCategory; title: string }> = [
-  { id: "note", title: "Note" },
-  { id: "phrase", title: "Phrase" },
-  { id: "favorite", title: "Favorite" },
-  { id: "routine", title: "Routine" },
-  { id: "milestone", title: "Milestone" },
-  { id: "quote", title: "Quote" }
-];
+const detailCategories: Array<{ id: DetailCategory; title: string }> = ([
+  "note",
+  "phrase",
+  "favorite",
+  "routine",
+  "milestone",
+  "quote"
+] as DetailCategory[]).map((id) => ({ id, title: memoryDetailCategoryLabels[id] }));
 
 const storageKey = "photo-gratitude-web-state-v1";
-const onboardingStorageKey = "photo-gratitude-onboarding-v2";
 
 export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
   const [tab, setTab] = useState<AppTab>("today");
@@ -241,6 +247,61 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
     mutateEntries((current) => current.map((entry) => (entry.id === entryId ? updater(entry) : entry)));
   }
 
+  function addRepositoryDetail({
+    localDate,
+    text,
+    category,
+    personTagIds
+  }: {
+    localDate: string;
+    text: string;
+    category: DetailCategory;
+    personTagIds: string[];
+  }) {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    mutateEntries((current) => {
+      const existingEntry = current.find((entry) => entry.workspaceId === activeWorkspaceId && entry.localDate === localDate);
+      const entry = existingEntry ?? makeEntry(activeWorkspaceId, localDate, workspacePrompts, reminders.cadence);
+      const detail: MemoryDetail = {
+        id: crypto.randomUUID(),
+        entryId: entry.id,
+        text: trimmed,
+        category,
+        sortOrder: entry.details.length,
+        personTagIds
+      };
+      const updatedEntry = {
+        ...entry,
+        details: [...entry.details, detail],
+        updatedAt: new Date().toISOString()
+      };
+
+      if (existingEntry) {
+        return current.map((candidate) => (candidate.id === existingEntry.id ? updatedEntry : candidate));
+      }
+
+      return [updatedEntry, ...current];
+    });
+  }
+
+  function updateRepositoryDetail(entryId: string, detailId: string, updater: (detail: MemoryDetail) => MemoryDetail) {
+    updateEntry(entryId, (entry) => ({
+      ...entry,
+      details: entry.details.map((detail) => (detail.id === detailId ? updater(detail) : detail)),
+      updatedAt: new Date().toISOString()
+    }));
+  }
+
+  function deleteRepositoryDetail(entryId: string, detailId: string) {
+    updateEntry(entryId, (entry) => ({
+      ...entry,
+      details: entry.details.filter((detail) => detail.id !== detailId),
+      updatedAt: new Date().toISOString()
+    }));
+  }
+
   function addPerson(name: string): PersonTag | null {
     const trimmed = name.trim();
     if (!trimmed) return null;
@@ -335,44 +396,14 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
 
   function applyOnboardingSetup(setup: OnboardingSetup) {
     setSaveState("saving");
-    setPeople((current) => {
-      let next = [...current];
-      const workspaceTags = () => next.filter((person) => person.workspaceId === activeWorkspaceId);
-
-      function upsertPerson(name: string, aliases: string[], fallbackColor: string) {
-        const trimmed = name.trim();
-        if (!trimmed) return;
-        const normalizedAliases = aliases.map((alias) => alias.toLowerCase());
-        const existing = workspaceTags().find((person) => normalizedAliases.includes(person.name.toLowerCase()));
-        if (existing) {
-          next = next.map((person) => (person.id === existing.id ? { ...person, name: trimmed } : person));
-          return;
-        }
-
-        const duplicate = workspaceTags().find((person) => person.name.toLowerCase() === trimmed.toLowerCase());
-        if (duplicate) return;
-
-        next = [
-          ...next,
-          {
-            id: crypto.randomUUID(),
-            workspaceId: activeWorkspaceId,
-            name: trimmed,
-            color: fallbackColor,
-            sortOrder: workspaceTags().length,
-            isDefault: false
-          }
-        ];
-      }
-
-      upsertPerson(setup.names.me, ["me"], "#5B8DEF");
-      upsertPerson(setup.names.partner, ["partner"], "#E76F51");
-      setup.names.children.forEach((childName, index) => {
-        upsertPerson(childName, [`kid ${index + 1}`, `child ${index + 1}`], index === 0 ? "#F4A261" : "#2A9D8F");
-      });
-
-      return next;
-    });
+    setPeople((current) =>
+      applyOnboardingSetupToPeople({
+        people: current,
+        entries: workspaceEntries,
+        workspaceId: activeWorkspaceId,
+        setup
+      })
+    );
   }
 
   return (
@@ -411,6 +442,9 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
               people={workspacePeople}
               onOpenToday={() => setTab("today")}
               onOpenEntry={setSelectedEntryId}
+              onAddDetail={addRepositoryDetail}
+              onUpdateDetail={updateRepositoryDetail}
+              onDeleteDetail={deleteRepositoryDetail}
             />
           ) : null}
 
@@ -580,7 +614,7 @@ function OnboardingOverlay({
   onClose: () => void;
 }) {
   const [step, setStep] = useState(0);
-  const [focus, setFocus] = useState<OnboardingFocus>("family");
+  const [focus, setFocus] = useState<OnboardingFocus>("self");
   const firstName = profile?.displayName?.split(" ")[0] || "there";
   const [meName, setMeName] = useState(profile?.displayName ? firstName : "");
   const [partnerName, setPartnerName] = useState(() => findPersonalizedPersonName(people, "Partner"));
@@ -588,12 +622,7 @@ function OnboardingOverlay({
     findPersonalizedPersonName(people, "Kid 1"),
     findPersonalizedPersonName(people, "Kid 2")
   ]);
-  const focusOptions: Array<{ id: OnboardingFocus; title: string; text: string }> = [
-    { id: "self", title: "Me", text: "My milestones, moods, routines, and small wins." },
-    { id: "family", title: "Family", text: "Shared days, dinner-table moments, and trips." },
-    { id: "kids", title: "Kids", text: "Funny phrases, phases, favorites, and tiny milestones." },
-    { id: "partner", title: "Partner", text: "Dates, quiet teamwork, and things worth remembering together." }
-  ];
+  const [otherNames, setOtherNames] = useState([""]);
 
   const steps = [
     {
@@ -602,9 +631,9 @@ function OnboardingOverlay({
       body: "The app can hold photos, prompts, people, and memories, but the ritual is intentionally tiny: one photo or one line is enough."
     },
     {
-      title: "Make it personal",
-      heading: "Who would you like to find memories for later?",
-      body: "Names stay private. We use them as gentle tags so you can find a child's funny phrase, a partner moment, or your own milestones without digging."
+      title: "Choose your shape",
+      heading: "What kind of memories are you starting with?",
+      body: "Tags stay private. Use them for yourself, a partner, family, friends, projects, places, or any theme you might want to find later."
     },
     {
       title: "The aha moment",
@@ -624,7 +653,8 @@ function OnboardingOverlay({
       names: {
         me: meName,
         partner: partnerName,
-        children: childNames
+        children: childNames,
+        others: otherNames
       }
     });
   }
@@ -656,13 +686,14 @@ function OnboardingOverlay({
               {step === 1 ? (
                 <div className="mt-6 grid gap-4">
                   <div className="grid gap-2 sm:grid-cols-2">
-                    {focusOptions.map((option) => {
+                    {onboardingFocusOptions.map((option) => {
                       const active = focus === option.id;
                       return (
                         <button
                           key={option.id}
                           type="button"
                           onClick={() => setFocus(option.id)}
+                          aria-pressed={active}
                           className={clsx(
                             "rounded-[22px] border p-4 text-left transition",
                             active ? "border-rose/30 bg-rose/10" : "border-journal-line bg-white hover:border-rose/20"
@@ -679,28 +710,54 @@ function OnboardingOverlay({
                   </div>
 
                   <div className="rounded-[24px] border border-journal-line bg-white p-4">
-                    <p className="font-bold text-soft-ink">A few names to start</p>
-                    <p className="mt-1 text-sm leading-5 text-warm-gray">Leave anything blank. You can edit these tags later.</p>
+                    <p className="font-bold text-soft-ink">{focus === "other" ? "Tags to start" : "A few names to start"}</p>
+                    <p className="mt-1 text-sm leading-5 text-warm-gray">
+                      {focus === "other" ? "Add people, places, projects, or themes. Commas work too." : "Leave anything blank. You can edit these tags later."}
+                    </p>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <OnboardingNameField label="Me" value={meName} onChange={setMeName} placeholder="Guillermo" />
-                      <OnboardingNameField label="Partner" value={partnerName} onChange={setPartnerName} placeholder="Stephanie" />
-                      {childNames.map((name, index) => (
-                        <OnboardingNameField
-                          key={index}
-                          label={index === 0 ? "Child" : `Child ${index + 1}`}
-                          value={name}
-                          onChange={(value) => setChildNames((current) => current.map((candidate, candidateIndex) => (candidateIndex === index ? value : candidate)))}
-                          placeholder={index === 0 ? "Their name" : "Optional"}
-                        />
-                      ))}
+                      {focus !== "other" ? <OnboardingNameField label="Me" value={meName} onChange={setMeName} placeholder="Guillermo" /> : null}
+                      {focus === "partner" || focus === "family" ? (
+                        <OnboardingNameField label="Partner" value={partnerName} onChange={setPartnerName} placeholder="Stephanie" />
+                      ) : null}
+                      {focus === "family"
+                        ? childNames.map((name, index) => (
+                            <OnboardingNameField
+                              key={index}
+                              label={index === 0 ? "Child" : `Child ${index + 1}`}
+                              value={name}
+                              onChange={(value) => setChildNames((current) => current.map((candidate, candidateIndex) => (candidateIndex === index ? value : candidate)))}
+                              placeholder={index === 0 ? "Their name" : "Optional"}
+                            />
+                          ))
+                        : null}
+                      {focus === "other"
+                        ? otherNames.map((name, index) => (
+                            <OnboardingNameField
+                              key={index}
+                              label={index === 0 ? "Person or theme" : `Person or theme ${index + 1}`}
+                              value={name}
+                              onChange={(value) => setOtherNames((current) => current.map((candidate, candidateIndex) => (candidateIndex === index ? value : candidate)))}
+                              placeholder={index === 0 ? "Friends, travel, work wins" : "Optional"}
+                            />
+                          ))
+                        : null}
                     </div>
-                    {childNames.length < 4 ? (
+                    {focus === "family" && childNames.length < 4 ? (
                       <button
                         type="button"
                         onClick={() => setChildNames((current) => [...current, ""])}
                         className="mt-3 rounded-full bg-journal-raised px-4 py-2 text-sm font-bold text-soft-ink"
                       >
                         Add another child
+                      </button>
+                    ) : null}
+                    {focus === "other" && otherNames.length < 5 ? (
+                      <button
+                        type="button"
+                        onClick={() => setOtherNames((current) => [...current, ""])}
+                        className="mt-3 rounded-full bg-journal-raised px-4 py-2 text-sm font-bold text-soft-ink"
+                      >
+                        Add another tag
                       </button>
                     ) : null}
                   </div>
@@ -721,19 +778,13 @@ function OnboardingOverlay({
 
           <div className="bg-[linear-gradient(150deg,#f9ece6,#f7fbf2_48%,#fff7f1)] p-5 sm:p-8">
             {step === 0 ? <OnboardingTodayPreview /> : null}
-            {step === 1 ? <OnboardingPeoplePreview focus={focus} meName={meName} partnerName={partnerName} childNames={childNames} /> : null}
-            {step === 2 ? <OnboardingMemoryPreview childNames={childNames} partnerName={partnerName} /> : null}
+            {step === 1 ? <OnboardingPeoplePreview focus={focus} meName={meName} partnerName={partnerName} childNames={childNames} otherNames={otherNames} /> : null}
+            {step === 2 ? <OnboardingMemoryPreview focus={focus} childNames={childNames} partnerName={partnerName} otherNames={otherNames} /> : null}
           </div>
         </div>
       </section>
     </div>
   );
-}
-
-function findPersonalizedPersonName(people: PersonTag[], defaultName: string) {
-  const person = people.find((candidate) => candidate.name.toLowerCase() === defaultName.toLowerCase());
-  if (!person || person.name === defaultName) return "";
-  return person.name;
 }
 
 function OnboardingNameField({
@@ -769,7 +820,7 @@ function OnboardingTodayPreview() {
           <h2 className="mt-3 text-2xl font-bold leading-tight">One moment can hold the whole day.</h2>
         </div>
         <div className="grid gap-3 p-5">
-          {["Bath-time laughter", "A good cup of tea", "Everyone around the table"].map((line, index) => (
+          {["A good cup of tea", "Sun on the walk home", "One kind text"].map((line, index) => (
             <div key={line} className="flex items-center gap-3 rounded-2xl bg-journal-raised p-3">
               <span className="grid h-8 w-8 place-items-center rounded-full bg-rose/10 text-sm font-bold text-rose">{index + 1}</span>
               <span className="text-sm font-semibold text-soft-ink">{line}</span>
@@ -788,26 +839,30 @@ function OnboardingPeoplePreview({
   focus,
   meName,
   partnerName,
-  childNames
+  childNames,
+  otherNames
 }: {
   focus: OnboardingFocus;
   meName: string;
   partnerName: string;
   childNames: string[];
+  otherNames: string[];
 }) {
   const examples: Record<OnboardingFocus, string[]> = {
     self: ["Morning run felt easier", "Finished the thing I kept delaying"],
-    family: ["Sunday pancakes", "A sleepy walk home"],
-    kids: ["Still says 'lellow'", "Asked for the dinosaur spoon again"],
-    partner: ["A quiet coffee together", "Made each other laugh in the kitchen"]
+    partner: ["A quiet coffee together", "Made each other laugh in the kitchen"],
+    family: ["Still says 'lellow'", "Asked for the dinosaur spoon again"],
+    other: ["A generous client note", "The blue door in Lisbon"]
   };
   const namedChildren = childNames.map((name) => name.trim()).filter(Boolean);
-  const chips = [
-    meName.trim() || "Me",
-    ...namedChildren,
-    partnerName.trim() || "Partner",
-    "Family"
-  ];
+  const otherTags = splitFlexibleTags(otherNames);
+  const chipsByFocus: Record<OnboardingFocus, string[]> = {
+    self: [meName.trim() || "Me"],
+    partner: [meName.trim() || "Me", partnerName.trim() || "Partner"],
+    family: [meName.trim() || "Me", ...namedChildren, partnerName.trim() || "Partner", "Family"],
+    other: otherTags.length > 0 ? otherTags : ["Friends", "Travel", "Work wins"]
+  };
+  const chips = chipsByFocus[focus];
 
   return (
     <div className="grid h-full content-center gap-4">
@@ -835,19 +890,48 @@ function OnboardingPeoplePreview({
   );
 }
 
-function OnboardingMemoryPreview({ childNames, partnerName }: { childNames: string[]; partnerName: string }) {
+function OnboardingMemoryPreview({
+  focus,
+  childNames,
+  partnerName,
+  otherNames
+}: {
+  focus: OnboardingFocus;
+  childNames: string[];
+  partnerName: string;
+  otherNames: string[];
+}) {
   const childName = childNames.find((name) => name.trim())?.trim() || "someone little";
   const partner = partnerName.trim() || "your partner";
+  const theme = splitFlexibleTags(otherNames)[0] ?? "a favorite thread";
+  const memoriesByFocus: Record<OnboardingFocus, string[][]> = {
+    self: [
+      ["1 month ago", "Took the long walk and felt clear-headed after."],
+      ["1 year ago", "Saved the first quiet morning that made the week feel possible."],
+      ["3 years ago", "A tiny win that still sounds like you."]
+    ],
+    partner: [
+      ["1 month ago", `A quiet coffee with ${partner} before the day got loud.`],
+      ["1 year ago", "Made each other laugh in the kitchen."],
+      ["3 years ago", "The kind of ordinary dinner worth finding again."]
+    ],
+    family: [
+      ["1 month ago", `${childName} insisted the moon was following the car.`],
+      ["1 year ago", `A quiet coffee with ${partner} before the day got loud.`],
+      ["3 years ago", "The kind of ordinary dinner we would never want to lose."]
+    ],
+    other: [
+      ["1 month ago", `A small note from ${theme} that made the day brighter.`],
+      ["1 year ago", "The place, person, or project you almost forgot to write down."],
+      ["3 years ago", "A thread you can follow back without digging."]
+    ]
+  };
 
   return (
     <div className="grid h-full content-center gap-4">
       <div className="rounded-[30px] bg-white p-5 shadow-sm">
         <SectionTitle icon={Clock3} title="Memory Lane" subtitle="A little window back to days like this one." />
-        {[
-          ["1 month ago", `${childName} insisted the moon was following the car.`],
-          ["1 year ago", `A quiet coffee with ${partner} before the day got loud.`],
-          ["3 years ago", "The kind of ordinary dinner we would never want to lose."]
-        ].map(([label, text]) => (
+        {memoriesByFocus[focus].map(([label, text]) => (
           <div key={label} className="mt-3 flex gap-3 rounded-2xl bg-journal-raised p-3">
             <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white text-warm-gray">
               <Sparkles aria-hidden="true" size={18} />
@@ -893,6 +977,38 @@ function TodayView({
 }) {
   const summary = streakSummary(entries);
   const matches = memoryLaneMatches(entries).filter((match) => match.entryId !== entry.id);
+  const guide = gratitudeGuideForEntry({
+    localDate: entry.localDate,
+    mood: entry.mood,
+    hasRelationships: entry.personTagIds.length > 0 || people.length > 1
+  });
+
+  function useGuideSuggestion(suggestion: string) {
+    onUpdateEntry(entry.id, (current) => {
+      const targetSession = current.sessions.find((session) => session.responses.length > 0);
+      const targetResponse = targetSession?.responses[0];
+      if (!targetSession || !targetResponse) return current;
+
+      const nextText = addSuggestionToReflectionText(targetResponse.text, suggestion);
+      if (nextText === targetResponse.text) return current;
+
+      return {
+        ...current,
+        sessions: current.sessions.map((session) =>
+          session.id === targetSession.id
+            ? {
+                ...session,
+                responses: session.responses.map((response) =>
+                  response.id === targetResponse.id ? { ...response, text: nextText } : response
+                )
+              }
+            : session
+        ),
+        updatedAt: new Date().toISOString()
+      };
+    });
+    onFocusFirstReflection();
+  }
 
   return (
     <div className="mx-auto grid max-w-6xl gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -944,10 +1060,40 @@ function TodayView({
 
       <aside className="grid content-start gap-5">
         <CompletionCard entry={entry} />
+        <GratitudeGuideCard guide={guide} onUseSuggestion={useGuideSuggestion} />
         <MemoryLanePanel matches={matches} entries={entries} onOpenEntry={onOpenEntry} />
         <PromptSnapshot prompts={prompts} />
       </aside>
     </div>
+  );
+}
+
+function GratitudeGuideCard({
+  guide,
+  onUseSuggestion
+}: {
+  guide: ReturnType<typeof gratitudeGuideForEntry>;
+  onUseSuggestion: (suggestion: string) => void;
+}) {
+  return (
+    <section className="rounded-journal border border-journal-line bg-journal-surface p-5">
+      <SectionTitle icon={Sparkles} title="Gratitude Guide" subtitle={guide.moodCopy} />
+      <div className="grid gap-2">
+        {guide.suggestions.map((suggestion) => (
+          <button
+            key={suggestion}
+            type="button"
+            onClick={() => onUseSuggestion(suggestion)}
+            className="flex min-h-12 items-center justify-between gap-3 rounded-2xl bg-journal-raised px-3 py-2 text-left text-sm font-semibold leading-5 text-soft-ink transition hover:bg-white hover:shadow-sm"
+            aria-label={`Use suggestion: ${suggestion}`}
+          >
+            <span>{suggestion}</span>
+            <Plus aria-hidden="true" className="shrink-0 text-rose" size={16} />
+          </button>
+        ))}
+      </div>
+      <p className="mt-3 text-xs font-bold uppercase tracking-[0.12em] text-warm-gray">{guide.pack.title} pack</p>
+    </section>
   );
 }
 
@@ -1445,13 +1591,20 @@ function MemoriesView({
   entries,
   people,
   onOpenToday,
-  onOpenEntry
+  onOpenEntry,
+  onAddDetail,
+  onUpdateDetail,
+  onDeleteDetail
 }: {
   entries: JournalEntry[];
   people: PersonTag[];
   onOpenToday: () => void;
   onOpenEntry: (entryId: string) => void;
+  onAddDetail: (detail: { localDate: string; text: string; category: DetailCategory; personTagIds: string[] }) => void;
+  onUpdateDetail: (entryId: string, detailId: string, updater: (detail: MemoryDetail) => MemoryDetail) => void;
+  onDeleteDetail: (entryId: string, detailId: string) => void;
 }) {
+  const [mode, setMode] = useState<MemoryMode>("entries");
   const [query, setQuery] = useState("");
   const [personId, setPersonId] = useState<string | null>(null);
   const [filter, setFilter] = useState<MemoryFilter>("all");
@@ -1468,6 +1621,37 @@ function MemoriesView({
   return (
     <div className="mx-auto grid max-w-6xl gap-5">
       <PageHeader title="Memories" subtitle="Browse the good things by photo, person, text, and date." />
+      <div className="inline-grid w-full grid-cols-2 rounded-2xl border border-journal-line bg-journal-surface p-1 sm:w-fit">
+        {[
+          { id: "entries", title: "Entries" },
+          { id: "details", title: "Little Details" }
+        ].map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setMode(item.id as MemoryMode)}
+            className={clsx(
+              "min-h-10 rounded-xl px-4 text-sm font-bold transition",
+              mode === item.id ? "bg-rose text-white shadow-sm" : "text-warm-gray hover:bg-journal-raised"
+            )}
+            aria-pressed={mode === item.id}
+          >
+            {item.title}
+          </button>
+        ))}
+      </div>
+
+      {mode === "details" ? (
+        <LittleDetailsRepository
+          entries={entries}
+          people={people}
+          onOpenEntry={onOpenEntry}
+          onAddDetail={onAddDetail}
+          onUpdateDetail={onUpdateDetail}
+          onDeleteDetail={onDeleteDetail}
+        />
+      ) : (
+        <>
       <div className="rounded-journal border border-journal-line bg-journal-surface p-4">
         <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
           <label className="relative">
@@ -1500,6 +1684,251 @@ function MemoriesView({
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((entry) => (
             <MemoryCard key={entry.id} entry={entry} people={people} onOpen={onOpenEntry} />
+          ))}
+        </div>
+      )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function LittleDetailsRepository({
+  entries,
+  people,
+  onOpenEntry,
+  onAddDetail,
+  onUpdateDetail,
+  onDeleteDetail
+}: {
+  entries: JournalEntry[];
+  people: PersonTag[];
+  onOpenEntry: (entryId: string) => void;
+  onAddDetail: (detail: { localDate: string; text: string; category: DetailCategory; personTagIds: string[] }) => void;
+  onUpdateDetail: (entryId: string, detailId: string, updater: (detail: MemoryDetail) => MemoryDetail) => void;
+  onDeleteDetail: (entryId: string, detailId: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [personId, setPersonId] = useState<string | null>(null);
+  const [category, setCategory] = useState<DetailCategory | "all">("all");
+  const [newText, setNewText] = useState("");
+  const [newDate, setNewDate] = useState(toLocalDate());
+  const [newCategory, setNewCategory] = useState<DetailCategory>("note");
+  const [newPersonIds, setNewPersonIds] = useState<string[]>([]);
+
+  const details = useMemo(
+    () => listMemoryDetails(entries, people, { query, personId, category }),
+    [entries, people, query, personId, category]
+  );
+
+  function toggleNewPerson(personIdToToggle: string) {
+    setNewPersonIds((current) =>
+      current.includes(personIdToToggle)
+        ? current.filter((id) => id !== personIdToToggle)
+        : [...current, personIdToToggle]
+    );
+  }
+
+  function addDetail() {
+    const trimmed = newText.trim();
+    if (!trimmed) return;
+    onAddDetail({
+      localDate: newDate || toLocalDate(),
+      text: trimmed,
+      category: newCategory,
+      personTagIds: newPersonIds
+    });
+    setNewText("");
+    setNewPersonIds([]);
+  }
+
+  return (
+    <div className="grid gap-5">
+      <section className="rounded-journal border border-journal-line bg-journal-surface p-4">
+        <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto]">
+          <label className="relative">
+            <Search aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-gray" size={18} />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search little details, dates, categories, or people"
+              className="min-h-12 w-full rounded-2xl border border-journal-line bg-white pl-10 pr-3 outline-none focus:ring-4 focus:ring-rose/15"
+            />
+          </label>
+          <select
+            value={category}
+            onChange={(event) => setCategory(event.target.value as DetailCategory | "all")}
+            className="min-h-12 rounded-2xl border border-journal-line bg-white px-3 font-semibold outline-none"
+          >
+            <option value="all">All categories</option>
+            {detailCategories.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.title}
+              </option>
+            ))}
+          </select>
+          <span className="inline-flex min-h-12 items-center rounded-2xl bg-journal-raised px-4 text-sm font-bold text-warm-gray">
+            {details.length} detail{details.length === 1 ? "" : "s"}
+          </span>
+        </div>
+        <div className="mt-4">
+          <PersonChips people={people} selectedIds={personId ? [personId] : []} onToggle={(id) => setPersonId(personId === id ? null : id)} />
+        </div>
+      </section>
+
+      <section className="rounded-journal border border-journal-line bg-journal-surface p-4">
+        <div className="grid gap-3 lg:grid-cols-[150px_170px_1fr_auto]">
+          <input
+            type="date"
+            value={newDate}
+            onChange={(event) => setNewDate(event.target.value)}
+            className="min-h-12 rounded-2xl border border-journal-line bg-white px-3 font-semibold outline-none focus:ring-4 focus:ring-rose/15"
+            aria-label="Detail date"
+          />
+          <select
+            value={newCategory}
+            onChange={(event) => setNewCategory(event.target.value as DetailCategory)}
+            className="min-h-12 rounded-2xl border border-journal-line bg-white px-3 font-semibold outline-none"
+            aria-label="Detail category"
+          >
+            {detailCategories.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.title}
+              </option>
+            ))}
+          </select>
+          <input
+            value={newText}
+            onChange={(event) => setNewText(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") addDetail();
+            }}
+            placeholder="Add a phrase, favorite, routine, milestone, quote, or note"
+            className="min-h-12 min-w-0 rounded-2xl border border-journal-line bg-white px-3 outline-none focus:ring-4 focus:ring-rose/15"
+          />
+          <button
+            type="button"
+            onClick={addDetail}
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-rose px-5 text-sm font-bold text-white"
+          >
+            <Plus aria-hidden="true" size={18} />
+            Add
+          </button>
+        </div>
+        {people.length > 0 ? (
+          <div className="mt-3">
+            <PersonChips compact people={people} selectedIds={newPersonIds} onToggle={toggleNewPerson} />
+          </div>
+        ) : null}
+      </section>
+
+      {details.length === 0 ? (
+        <EmptyState
+          title="No little details found"
+          message="Try another search, change the filters, or save one tiny detail above."
+          action={() => {
+            setQuery("");
+            setPersonId(null);
+            setCategory("all");
+          }}
+          actionLabel="Clear filters"
+        />
+      ) : (
+        <div className="grid gap-3">
+          {details.map((item) => (
+            <article key={item.id} className="rounded-journal border border-journal-line bg-journal-surface p-4 shadow-sm">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onOpenEntry(item.entry.id)}
+                    className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-rose/10 px-3 text-xs font-bold text-rose"
+                  >
+                    <CalendarDays aria-hidden="true" size={14} />
+                    {formatDisplayDate(item.localDate, "short")}
+                  </button>
+                  <span className="inline-flex min-h-8 items-center rounded-full bg-journal-raised px-3 text-xs font-bold text-warm-gray">
+                    {item.categoryLabel}
+                  </span>
+                  {item.people.map((person) => (
+                    <span
+                      key={person.id}
+                      className="inline-flex min-h-8 items-center rounded-full px-3 text-xs font-bold"
+                      style={{ backgroundColor: `${person.color}1f`, color: person.color }}
+                    >
+                      {person.name}
+                    </span>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onOpenEntry(item.entry.id)}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full bg-journal-raised px-3 text-xs font-bold text-soft-ink"
+                  >
+                    Open entry
+                    <ArrowRight aria-hidden="true" size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDeleteDetail(item.entry.id, item.detail.id)}
+                    className="grid h-9 w-9 place-items-center rounded-full bg-journal-raised text-warm-gray"
+                    aria-label="Delete little detail"
+                  >
+                    <Trash2 aria-hidden="true" size={16} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid gap-3 lg:grid-cols-[170px_1fr]">
+                <select
+                  value={item.detail.category}
+                  onChange={(event) =>
+                    onUpdateDetail(item.entry.id, item.detail.id, (detail) => ({
+                      ...detail,
+                      category: event.target.value as DetailCategory
+                    }))
+                  }
+                  className="min-h-11 rounded-2xl border border-journal-line bg-white px-3 text-sm font-semibold outline-none"
+                  aria-label="Edit detail category"
+                >
+                  {detailCategories.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.title}
+                    </option>
+                  ))}
+                </select>
+                <textarea
+                  value={item.detail.text}
+                  onChange={(event) =>
+                    onUpdateDetail(item.entry.id, item.detail.id, (detail) => ({
+                      ...detail,
+                      text: event.target.value
+                    }))
+                  }
+                  className="min-h-16 rounded-2xl border border-journal-line bg-white p-3 outline-none focus:ring-4 focus:ring-rose/15"
+                  aria-label="Edit little detail"
+                />
+              </div>
+
+              {people.length > 0 ? (
+                <div className="mt-3">
+                  <PersonChips
+                    compact
+                    people={people}
+                    selectedIds={item.detail.personTagIds}
+                    onToggle={(personIdToToggle) =>
+                      onUpdateDetail(item.entry.id, item.detail.id, (detail) => ({
+                        ...detail,
+                        personTagIds: detail.personTagIds.includes(personIdToToggle)
+                          ? detail.personTagIds.filter((id) => id !== personIdToToggle)
+                          : [...detail.personTagIds, personIdToToggle]
+                      }))
+                    }
+                  />
+                </div>
+              ) : null}
+            </article>
           ))}
         </div>
       )}
@@ -2167,13 +2596,13 @@ function SettingsSection({ title, children }: { title: string; children: React.R
   );
 }
 
-function EmptyState({ title, message, action }: { title: string; message: string; action: () => void }) {
+function EmptyState({ title, message, action, actionLabel = "Open Today" }: { title: string; message: string; action: () => void; actionLabel?: string }) {
   return (
     <section className="rounded-journal border border-journal-line bg-journal-surface p-8 text-center">
       <Sparkles aria-hidden="true" className="mx-auto text-rose" size={32} />
       <h2 className="mt-4 text-2xl font-bold">{title}</h2>
       <p className="mx-auto mt-2 max-w-md text-warm-gray">{message}</p>
-      <button onClick={action} className="mt-5 rounded-full bg-rose px-5 py-3 font-bold text-white">Open Today</button>
+      <button onClick={action} className="mt-5 rounded-full bg-rose px-5 py-3 font-bold text-white">{actionLabel}</button>
     </section>
   );
 }

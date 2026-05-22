@@ -1,6 +1,14 @@
 # Web App Plan And Operations
 
-The web app lives in `web/` and is designed as the future shared backend surface for Photo Gratitude Journal. It is a real Next.js + Supabase app, not just a static prototype.
+The web app lives in `web/` and is the active private-beta path for the consolidated Guided Gratitude Memory System. It is a real Next.js + Supabase app, not just a static prototype, and should be treated as the source of truth for shared household beta behavior.
+
+## Beta Product Path
+
+- The beta validates the daily gratitude loop, private memory retrieval, and shared household model before wider native distribution.
+- Onboarding should feel balanced for solo/self, partner, family, and custom people/themes. Family/kid memories are important, but they must not dominate the product framing.
+- Gratitude Guide prompt packs provide non-AI writing starters for small gratitude, savoring, appreciation, self-kindness, hard days, and family/relationships.
+- Little Details are first-class retrievable memory fragments. They can live inside an entry and should also be reachable through a repository-style view for search, filtering, editing, and removal.
+- Demo mode is for UX review. Supabase mode is for real beta data and verification.
 
 ## Architecture
 
@@ -10,6 +18,7 @@ The web app lives in `web/` and is designed as the future shared backend surface
 - Supabase Storage for private original photos and thumbnails.
 - Workspace-based data model for personal and household journals.
 - Vercel deployment with `web/` as the project root.
+- Demo-mode local persistence for unauthenticated UX review.
 
 ## Privacy Model
 
@@ -22,6 +31,7 @@ The web app lives in `web/` and is designed as the future shared backend surface
 - RLS is enabled for all journal tables, and policies are scoped to the Supabase `authenticated` role.
 - Storage object paths must start with the workspace id, allowing RLS to protect private photo files and fail closed for malformed paths.
 - Prompt responses, photo metadata, and person tag joins are checked so they cannot link records across workspaces.
+- Little Details and per-detail person tag joins are checked so detail records cannot leak across workspaces.
 - No public profiles, public feeds, or social sharing.
 
 ## Local Demo Mode
@@ -44,6 +54,29 @@ Demo mode stores changes in browser local storage. This is only for UX review an
 - Workspace creation uses the secured `public.create_workspace` database function through `/api/workspaces`.
 - Delete workspace entries uses `/api/journal/delete-workspace-entries` and relies on RLS plus cascade deletes for child rows.
 - Household invitation/member-management UI is still a beta follow-up; `workspace_members` is ready for it at the database layer.
+
+## Product Surfaces To Verify
+
+- Onboarding:
+  - First-run tour explains the tiny daily loop.
+  - Memory-focus choices support solo/self, partner, family, and custom people/themes.
+  - Friendly names or tags become private person/theme tags.
+  - Settings can replay onboarding.
+- Today:
+  - Text-only, photo-only, and mixed entries count as valid beta memories.
+  - Gratitude Guide suggestions can be inserted and edited.
+  - People/theme tags and Little Details are optional.
+- Memories:
+  - Search includes dates, prompt text, response text, people/theme tags, and Little Details.
+  - Person/theme filters include Little Details tagged directly to that person/theme, not only entry-level tags.
+  - Memory cards open full entry detail.
+- Little Details repository:
+  - Details can be created without forcing a full long-form entry.
+  - Details can be filtered by category and person/theme tag.
+  - Details can be edited and removed.
+  - Repository-created details attach to the selected local date and sync through the same entry/detail tables.
+- Settings:
+  - Workspace switching, prompt editing, people tags, reminders, export, delete controls, and sign out remain understandable in both demo and Supabase modes.
 
 ## Windows Local Setup
 
@@ -91,6 +124,8 @@ Do not put `SUPABASE_SERVICE_ROLE_KEY` in browser-readable code. It can exist in
    - A viewer cannot write journal data.
    - An editor can write journal data but cannot manage workspace membership.
    - A non-member cannot read workspace rows, journal rows, member rows, or storage objects.
+   - Private photo signed URLs load for accepted members and fail for non-members.
+   - Little Details and per-detail tags obey the same workspace boundaries as entries.
 
 ## Vercel Deployment
 
@@ -125,6 +160,9 @@ SUPABASE_THUMBNAILS_BUCKET=journal-thumbnails
 - Login with email magic link.
 - Confirm default personal workspace appears.
 - Create household workspace and switch between workspaces.
+- Complete onboarding once as solo/self, once as family, and once with custom people/themes in clean browser profiles.
+- Confirm family copy is present but not mandatory or dominant.
+- Use a Gratitude Guide suggestion, edit it, save it, and confirm the edited response appears in Memories and entry detail.
 - Confirm household access from a second accepted member account.
 - Confirm a viewer can read but cannot write entries, photos, prompts, tags, reminders, or member rows.
 - Confirm an editor can write journal content but cannot update `workspace_members`.
@@ -132,10 +170,22 @@ SUPABASE_THUMBNAILS_BUCKET=journal-thumbnails
 - Create a text-only entry.
 - Add one or two photos.
 - Add people tags and Little Details.
+- Add a Little Detail from the repository flow if present.
+- Filter Little Details by text, category, and person/theme tag.
+- Edit and remove a Little Detail, then reload and confirm persistence.
 - Search Memories by person, prompt text, response text, and detail text.
 - Browse Calendar and Memory Lane.
 - Export JSON.
 - Delete workspace entries only after confirming backup/export behavior.
+
+## Beta Exit Criteria
+
+- Web lint, typecheck, unit tests, build, and Chromium E2E pass from a clean checkout.
+- Manual Supabase beta QA passes with at least two authenticated accounts and two workspace roles beyond owner where practical.
+- No known RLS, Storage, or cross-workspace data-leak issue remains open.
+- Demo mode and Supabase mode have been tested separately, including confirming authenticated data is not overwritten by demo localStorage.
+- Solo/self, family, and custom onboarding paths have been tested on desktop and mobile viewport sizes.
+- Little Details repository behavior has been tested for create, search/filter, edit, delete, reload, and entry-detail retrieval.
 
 ## Verification Commands
 
@@ -147,6 +197,7 @@ npm.cmd run lint
 npm.cmd run typecheck
 npm.cmd test
 npm.cmd run build
+npm.cmd run test:e2e
 ```
 
 For Supabase, apply the migration to a fresh beta project first. Then test the owner/editor/viewer matrix with real authenticated users before reusing the migration in production.
