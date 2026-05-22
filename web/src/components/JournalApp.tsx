@@ -209,7 +209,9 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
     setSaveState("saving");
     startTransition(() => {
       setEntries((current) => updater(current));
-      window.setTimeout(() => setSaveState(initialData.mode === "demo" ? "offline" : "saved"), 450);
+      if (initialData.mode === "demo") {
+        window.setTimeout(() => setSaveState("offline"), 450);
+      }
     });
   }
 
