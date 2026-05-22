@@ -6,3 +6,12 @@ build/
 *.xcodeproj/xcuserdata/
 *.xcodeproj/project.xcworkspace/xcuserdata/
 PhotoGratitudeJournal/Generated/
+web/node_modules/
+web/.next/
+web/.next-build/
+web/out/
+web/.vercel/
+web/.env.local
+web/*.tsbuildinfo
+web/test-results/
+web/playwright-report/

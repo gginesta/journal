@@ -1,12 +1,50 @@
 # Roadmap
 
-This roadmap is the execution plan for turning the current scaffold into a production-ready iOS app. Each milestone should land through a focused branch and commit set. `main` should remain stable and reviewable.
+This roadmap is the execution plan for turning the current scaffold into production-ready iOS and web apps. Each milestone should land through a focused branch and commit set. `main` should remain stable and reviewable.
 
 Current beta-readiness docs:
 
 - Working beta goal: `docs/GOAL_WORKING_BETA_ROADMAP.md`.
+- Web beta operations: `docs/WEB_APP.md`.
 - TestFlight owner setup: `docs/TESTFLIGHT.md`.
 - Manual beta QA: `docs/QA_TESTFLIGHT.md`.
+
+## Milestone 0.2.5 - Web Private Beta Prototype
+
+Status: complete for demo/prototype testing; Supabase project setup remains external.
+
+Goal: make a polished browser version that can be tested on Windows, iPad browser, and iPhone browser while the native iOS distribution path is being resolved.
+
+Delivered:
+
+- Next.js App Router app under `web/` with TypeScript, Tailwind, PWA manifest, and responsive desktop/mobile navigation.
+- Demo mode with browser-local persistence for PC UX review.
+- Supabase schema migration with workspace-based tables, private Storage buckets, RLS policies, owner/editor/viewer roles, and last-owner protection.
+- Today flow with photo-first capture, compressed local previews, one-or-two photo guidance, three nice things, secondary prompts, mood, people tags, and Little Details.
+- Little Detail categories for notes, phrases, favorites, routines, milestones, and quotes, with per-detail people tags.
+- Memories search and filters across dates, prompt text, responses, people, and Little Details.
+- Tappable Memory Lane, Memories cards, and Calendar days that open a full entry detail modal.
+- Settings surfaces for workspaces, cadence/reminders, prompts, people tags, JSON export, delete controls, and sign out.
+- Web CI for lint, typecheck, unit tests, and production build.
+- Chromium E2E coverage for desktop and mobile demo journaling flow.
+- Authenticated Supabase autosave route for people, prompts, reminders, entries, sessions, responses, tags, Little Details, and private photo Storage uploads.
+- Server routes for creating workspaces through the secured database function and deleting workspace entries through RLS.
+
+Acceptance criteria:
+
+- A tester can open `/app` in demo mode and create a text-only, photo-only, or mixed memory.
+- A tester can add private people tags and tag Little Details by person.
+- A tester can search Memories by a Little Detail or person and open a full memory page.
+- Calendar and Memory Lane are entry points, not dead ends.
+- Web build, lint, typecheck, unit tests, and Chromium E2E pass from a clean non-OneDrive workspace.
+- In Supabase mode, server data is the source of truth; demo localStorage is not restored over authenticated data.
+
+Remaining work:
+
+- Apply the Supabase migration to a real beta project and verify RLS with two authenticated users.
+- Add household invitation/member-management UI on top of `workspace_members`.
+- Add more granular sync conflict handling for two people editing the same entry at the same time.
+- Deploy to Vercel and run the private household beta checklist from `docs/WEB_APP.md`.
 
 ## Milestone 0.1.0 - Bootstrap
 

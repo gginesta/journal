@@ -1,14 +1,15 @@
 # Photo Gratitude Journal
 
-Photo Gratitude Journal is a polished, local-first iOS app for ending the day with one or two photos and a few positive reflections. The default ritual asks for three nice things that happened today, but users can customize prompts and choose an evening-only, once-daily, morning/evening, or anytime cadence.
+Photo Gratitude Journal is a polished, photo-first journal for ending the day with one or two photos and a few positive reflections. The default ritual asks for three nice things that happened today, but users can customize prompts and choose an evening-only, once-daily, morning/evening, or anytime cadence.
 
 The product goal is simple: make a private, beautiful photo journal that helps people notice good moments and rediscover them later through streaks, a calendar, private people tags, optional Little Details, and automatic nostalgia views.
 
 ## Current Status
 
-This repository contains the first iOS app scaffold:
+This repository contains the first iOS app scaffold and a production web beta:
 
 - SwiftUI iPhone app targeting iOS 17+.
+- Next.js web app under `web/` for PC/mobile browser testing, Supabase-backed private sync, and Vercel deployment.
 - SwiftData models configured for CloudKit private database sync.
 - Photo import with `PhotosPicker`, app-local protected file storage, and thumbnails.
 - Today, Timeline, Calendar, Insights, Settings, Prompt Editor, Entry Detail, and Premium screens.
@@ -50,6 +51,19 @@ If your installed simulator has a different name, list available devices with:
 xcrun simctl list devices available
 ```
 
+## Web Beta
+
+The browser app lives in `web/` and is the fastest way to test the product from a PC, iPad browser, or iPhone browser before TestFlight is ready.
+
+```powershell
+cd web
+copy .env.example .env.local
+npm.cmd install
+npm.cmd run dev
+```
+
+Keep `NEXT_PUBLIC_DEMO_MODE=true` for local UX review without Supabase. For the private shared-family beta, deploy `web/` on Vercel, apply the Supabase migration in `web/supabase/migrations`, and use [Web App Operations](docs/WEB_APP.md) as the setup checklist.
+
 ## Product Shape
 
 - Default evening ritual with editable prompts and optional 1-2 photos.
@@ -68,6 +82,7 @@ xcrun simctl list devices available
 - `PhotoGratitudeJournal/Services`: persistence helpers, streaks, Memory Lane, photos, reminders, privacy, export, and StoreKit.
 - `PhotoGratitudeJournal/Views`: SwiftUI screens and reusable components.
 - `PhotoGratitudeJournalTests`: unit tests for core app logic.
+- `web`: Next.js, Supabase, and Vercel web beta.
 - `docs`: architecture, roadmap, and release/versioning notes.
 
 ## Capabilities
@@ -86,6 +101,7 @@ The current app schedules local notifications only; remote push notifications ar
 - [Design Direction](docs/DESIGN.md)
 - [v0.3 Design Goal](docs/GOAL_V0_3_DESIGN_SYSTEM.md)
 - [Architecture](docs/ARCHITECTURE.md)
+- [Web App Operations](docs/WEB_APP.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Versioning](docs/VERSIONING.md)
 - [TestFlight Owner Checklist](docs/TESTFLIGHT.md)

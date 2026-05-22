@@ -1,0 +1,16 @@
+{
+  "name": "Photo Gratitude Journal",
+  "short_name": "Journal",
+  "description": "A private photo-first gratitude journal.",
+  "start_url": "/app",
+  "display": "standalone",
+  "background_color": "#faf5ed",
+  "theme_color": "#c7455c",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
