@@ -96,8 +96,10 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
   const [reminders, setReminders] = useState(initialData.reminders);
   const [saveState, setSaveState] = useState<SaveState>(initialData.mode === "demo" ? "offline" : "saved");
   const [isPending, startTransition] = useTransition();
+  const didMountPersistence = useRef(false);
 
   useEffect(() => {
+    if (initialData.mode !== "demo") return;
     const cached = window.localStorage.getItem(storageKey);
     if (!cached) return;
     try {
@@ -111,14 +113,15 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
     } catch {
       window.localStorage.removeItem(storageKey);
     }
-  }, []);
+  }, [initialData.mode]);
 
   useEffect(() => {
+    if (initialData.mode !== "demo") return;
     window.localStorage.setItem(
       storageKey,
       JSON.stringify({ entries, people, prompts, workspaces, reminders, activeWorkspaceId })
     );
-  }, [entries, people, prompts, workspaces, reminders, activeWorkspaceId]);
+  }, [entries, people, prompts, workspaces, reminders, activeWorkspaceId, initialData.mode]);
 
   useEffect(() => {
     function updateOfflineState() {
@@ -164,6 +167,38 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
   );
 
   useEffect(() => {
+    if (initialData.mode !== "supabase" || !initialData.profile) return;
+    if (!didMountPersistence.current) {
+      didMountPersistence.current = true;
+      return;
+    }
+
+    setSaveState("saving");
+    const timeout = window.setTimeout(async () => {
+      try {
+        const response = await fetch("/api/journal/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workspaceId: activeWorkspaceId,
+            people: workspacePeople,
+            prompts: workspacePrompts,
+            reminders,
+            entries: workspaceEntries
+          })
+        });
+
+        if (!response.ok) throw new Error("Sync failed");
+        setSaveState("saved");
+      } catch {
+        setSaveState("offline");
+      }
+    }, 800);
+
+    return () => window.clearTimeout(timeout);
+  }, [activeWorkspaceId, workspaceEntries, workspacePeople, workspacePrompts, reminders, initialData.mode, initialData.profile]);
+
+  useEffect(() => {
     setEntries((current) => {
       if (current.some((entry) => entry.id === todayEntry.id)) return current;
       return [todayEntry, ...current];
@@ -196,11 +231,28 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
       sortOrder: workspacePeople.length,
       isDefault: false
     };
+    setSaveState("saving");
     setPeople((current) => [...current, person]);
     return person;
   }
 
-  function addWorkspace(kind: "personal" | "household") {
+  async function addWorkspace(kind: "personal" | "household") {
+    if (initialData.mode === "supabase") {
+      setSaveState("saving");
+      const name = kind === "personal" ? "My journal" : "Household journal";
+      const response = await fetch("/api/workspaces", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, kind })
+      });
+      if (response.ok) {
+        window.location.reload();
+        return;
+      }
+      setSaveState("offline");
+      return;
+    }
+
     const workspace: Workspace = {
       id: crypto.randomUUID(),
       name: kind === "personal" ? "My journal" : "Household journal",
@@ -209,6 +261,19 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
     };
     setWorkspaces((current) => [...current, workspace]);
     setActiveWorkspaceId(workspace.id);
+  }
+
+  async function deleteWorkspaceEntries() {
+    setEntries((current) => current.filter((entry) => entry.workspaceId !== activeWorkspaceId));
+    if (initialData.mode !== "supabase") return;
+
+    setSaveState("saving");
+    const response = await fetch("/api/journal/delete-workspace-entries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workspaceId: activeWorkspaceId })
+    });
+    setSaveState(response.ok ? "saved" : "offline");
   }
 
   async function signOut() {
@@ -271,9 +336,7 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
               setPrompts={setPrompts}
               setPeople={setPeople}
               addWorkspace={addWorkspace}
-              deleteWorkspaceData={() => {
-                setEntries((current) => current.filter((entry) => entry.workspaceId !== activeWorkspaceId));
-              }}
+              deleteWorkspaceData={deleteWorkspaceEntries}
               signOut={signOut}
             />
           ) : null}

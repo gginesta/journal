@@ -27,6 +27,8 @@ Delivered:
 - Settings surfaces for workspaces, cadence/reminders, prompts, people tags, JSON export, delete controls, and sign out.
 - Web CI for lint, typecheck, unit tests, and production build.
 - Chromium E2E coverage for desktop and mobile demo journaling flow.
+- Authenticated Supabase autosave route for people, prompts, reminders, entries, sessions, responses, tags, Little Details, and private photo Storage uploads.
+- Server routes for creating workspaces through the secured database function and deleting workspace entries through RLS.
 
 Acceptance criteria:
 
@@ -35,12 +37,13 @@ Acceptance criteria:
 - A tester can search Memories by a Little Detail or person and open a full memory page.
 - Calendar and Memory Lane are entry points, not dead ends.
 - Web build, lint, typecheck, unit tests, and Chromium E2E pass from a clean non-OneDrive workspace.
+- In Supabase mode, server data is the source of truth; demo localStorage is not restored over authenticated data.
 
 Remaining work:
 
 - Apply the Supabase migration to a real beta project and verify RLS with two authenticated users.
-- Implement live Supabase writes for entries, prompts, people, reminders, photos, and household membership beyond the local demo state.
-- Add real private photo upload/delete flows against Supabase Storage.
+- Add household invitation/member-management UI on top of `workspace_members`.
+- Add more granular sync conflict handling for two people editing the same entry at the same time.
 - Deploy to Vercel and run the private household beta checklist from `docs/WEB_APP.md`.
 
 ## Milestone 0.1.0 - Bootstrap

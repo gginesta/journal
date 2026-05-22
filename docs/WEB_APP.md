@@ -32,7 +32,18 @@ The app can run without Supabase credentials using:
 NEXT_PUBLIC_DEMO_MODE=true
 ```
 
-Demo mode stores changes in browser local storage. This is only for UX review and PC testing; production data should use Supabase.
+Demo mode stores changes in browser local storage. This is only for UX review and PC testing; production data should use Supabase. When Supabase mode is enabled, server data is treated as the source of truth and demo local storage is ignored.
+
+## Supabase Sync Behavior
+
+- Authenticated users load journal data through server-side Supabase queries.
+- Edits to the active workspace are debounced and posted to `/api/journal/sync`.
+- The sync route upserts people tags, prompt templates, reminder preferences, entries, sessions, prompt responses, entry people links, Little Details, and per-detail people links.
+- Browser-selected photos are uploaded from compressed local previews into private Supabase Storage paths under `<workspace-id>/<local-date>/...`.
+- Photo metadata is written only after Storage upload succeeds, and future page loads use signed URLs for private photo previews.
+- Workspace creation uses the secured `public.create_workspace` database function through `/api/workspaces`.
+- Delete workspace entries uses `/api/journal/delete-workspace-entries` and relies on RLS plus cascade deletes for child rows.
+- Household invitation/member-management UI is still a beta follow-up; `workspace_members` is ready for it at the database layer.
 
 ## Windows Local Setup
 

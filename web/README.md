@@ -13,6 +13,8 @@ npm.cmd run dev
 
 `NEXT_PUBLIC_DEMO_MODE=true` lets the app run locally without Supabase credentials. The UI remains fully interactive through browser state so product review can continue before the Supabase project is connected.
 
+With `NEXT_PUBLIC_DEMO_MODE=false`, authenticated edits autosave through Supabase-backed API routes. Demo local storage is ignored in that mode so server data stays authoritative.
+
 ## Supabase Setup
 
 1. Create a Supabase project.
@@ -32,4 +34,4 @@ npm.cmd run dev
 
 ## Scope
 
-The first web beta supports personal and shared household workspaces, daily capture, photos, prompts, people tags, Little Details, Memories, Calendar, Memory Lane, Insights, export, and delete controls. Stripe/Premium billing is intentionally deferred.
+The first web beta supports personal and shared household workspaces, daily capture, private photo Storage upload, prompts, people tags, Little Details, Memories, Calendar, Memory Lane, Insights, export, and delete controls. Household invite/member-management UI and Stripe/Premium billing are intentionally deferred.

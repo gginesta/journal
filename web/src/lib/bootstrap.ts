@@ -151,6 +151,9 @@ export async function loadJournalBootstrap(): Promise<JournalBootstrap> {
     supabase.from("reminder_preferences").select("*").eq("workspace_id", activeWorkspaceId).maybeSingle()
   ]);
 
+  const rawEntries = (entriesResult.data ?? []) as EntryRow[];
+  const signedPhotoUrls = await createPhotoUrlMap(rawEntries);
+
   return {
     mode: "supabase",
     profile: {
@@ -162,7 +165,7 @@ export async function loadJournalBootstrap(): Promise<JournalBootstrap> {
     activeWorkspaceId,
     people: ((peopleResult.data ?? []) as PersonRow[]).map(mapPerson),
     prompts: ((promptsResult.data ?? []) as PromptRow[]).map(mapPrompt),
-    entries: ((entriesResult.data ?? []) as EntryRow[]).map(mapEntry),
+    entries: rawEntries.map((entry) => mapEntry(entry, signedPhotoUrls)),
     reminders: mapReminders(remindersResult.data as ReminderRow | null)
   };
 }
@@ -190,7 +193,26 @@ function mapPrompt(row: PromptRow): PromptTemplate {
   };
 }
 
-function mapEntry(row: EntryRow): JournalEntry {
+async function createPhotoUrlMap(entries: EntryRow[]): Promise<Map<string, string>> {
+  const supabase = await createSupabaseServerClient();
+  const paths = entries.flatMap((entry) => (entry.photo_attachments ?? []).map((photo) => photo.storage_path).filter(Boolean));
+  const urls = new Map<string, string>();
+  if (!supabase || paths.length === 0) return urls;
+
+  const results = await Promise.all(
+    paths.map(async (path) => {
+      const { data } = await supabase.storage.from("journal-photos").createSignedUrl(path, 60 * 60 * 24 * 7);
+      return [path, data?.signedUrl ?? ""] as const;
+    })
+  );
+
+  for (const [path, signedUrl] of results) {
+    if (signedUrl) urls.set(path, signedUrl);
+  }
+  return urls;
+}
+
+function mapEntry(row: EntryRow, signedPhotoUrls = new Map<string, string>()): JournalEntry {
   return {
     id: row.id,
     workspaceId: row.workspace_id,
@@ -205,7 +227,7 @@ function mapEntry(row: EntryRow): JournalEntry {
       entryId: photo.entry_id,
       storagePath: photo.storage_path,
       thumbnailPath: photo.thumbnail_path,
-      previewUrl: photo.public_url ?? "",
+      previewUrl: signedPhotoUrls.get(photo.storage_path) ?? "",
       caption: photo.caption ?? "",
       sortOrder: photo.sort_order,
       createdAt: photo.created_at
