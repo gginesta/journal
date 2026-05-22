@@ -11,7 +11,7 @@ Current beta-readiness docs:
 
 ## Milestone 0.2.5 - Web Private Beta Prototype
 
-Status: complete for demo/prototype testing; Supabase project setup remains external.
+Status: complete for private beta testing; Supabase and Vercel are live for the first household testers.
 
 Goal: make a polished browser version that can be tested on Windows, iPad browser, and iPhone browser while the native iOS distribution path is being resolved.
 
@@ -29,6 +29,7 @@ Delivered:
 - Chromium E2E coverage for desktop and mobile demo journaling flow.
 - Authenticated Supabase autosave route for people, prompts, reminders, entries, sessions, responses, tags, Little Details, and private photo Storage uploads.
 - Server routes for creating workspaces through the secured database function and deleting workspace entries through RLS.
+- Web first-run onboarding with a three-step product tour, personal memory-focus choice, starter checklist, and Settings replay control.
 
 Acceptance criteria:
 
@@ -41,10 +42,10 @@ Acceptance criteria:
 
 Remaining work:
 
-- Apply the Supabase migration to a real beta project and verify RLS with two authenticated users.
+- Verify RLS and shared household behavior with two real authenticated users.
 - Add household invitation/member-management UI on top of `workspace_members`.
 - Add more granular sync conflict handling for two people editing the same entry at the same time.
-- Deploy to Vercel and run the private household beta checklist from `docs/WEB_APP.md`.
+- Run the private household beta checklist from `docs/WEB_APP.md` after both testers have logged in.
 
 ## Milestone 0.1.0 - Bootstrap
 

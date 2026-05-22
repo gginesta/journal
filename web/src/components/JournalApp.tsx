@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import clsx from "clsx";
 import {
+  ArrowRight,
   Bell,
   CalendarDays,
   Camera,
@@ -57,6 +58,7 @@ type AppTab = "today" | "memories" | "calendar" | "insights" | "settings";
 type SaveState = "saved" | "saving" | "offline";
 type MemoryFilter = "all" | "photos" | "text";
 type DetailCategory = MemoryDetail["category"];
+type OnboardingFocus = "self" | "family" | "kids" | "partner";
 
 const tabs: Array<{ id: AppTab; title: string; icon: LucideIcon }> = [
   { id: "today", title: "Today", icon: Home },
@@ -84,6 +86,7 @@ const detailCategories: Array<{ id: DetailCategory; title: string }> = [
 ];
 
 const storageKey = "photo-gratitude-web-state-v1";
+const onboardingStorageKey = "photo-gratitude-onboarding-v2";
 
 export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
   const [tab, setTab] = useState<AppTab>("today");
@@ -95,8 +98,12 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
   const [entries, setEntries] = useState(initialData.entries);
   const [reminders, setReminders] = useState(initialData.reminders);
   const [saveState, setSaveState] = useState<SaveState>(initialData.mode === "demo" ? "offline" : "saved");
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showStarterGuide, setShowStarterGuide] = useState(false);
   const [isPending, startTransition] = useTransition();
   const didMountPersistence = useRef(false);
+
+  const onboardingKey = useMemo(() => `${onboardingStorageKey}:${initialData.profile?.id ?? "demo"}`, [initialData.profile?.id]);
 
   useEffect(() => {
     if (initialData.mode !== "demo") return;
@@ -205,6 +212,13 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
     });
   }, [todayEntry]);
 
+  useEffect(() => {
+    const completed = window.localStorage.getItem(onboardingKey) === "complete";
+    const starterDismissed = window.localStorage.getItem(`${onboardingKey}:starter-dismissed`) === "true";
+    setShowOnboarding(!completed);
+    setShowStarterGuide(completed && !starterDismissed);
+  }, [onboardingKey]);
+
   function mutateEntries(updater: (entries: JournalEntry[]) => JournalEntry[]) {
     setSaveState("saving");
     startTransition(() => {
@@ -284,6 +298,32 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
     window.location.href = "/login";
   }
 
+  function focusFirstReflection() {
+    window.setTimeout(() => {
+      const firstField = document.getElementById("nice-thing-0");
+      firstField?.scrollIntoView({ behavior: "smooth", block: "center" });
+      firstField?.focus({ preventScroll: true });
+    }, 120);
+  }
+
+  function completeOnboarding() {
+    window.localStorage.setItem(onboardingKey, "complete");
+    window.localStorage.removeItem(`${onboardingKey}:starter-dismissed`);
+    setShowOnboarding(false);
+    setShowStarterGuide(true);
+    setTab("today");
+  }
+
+  function dismissStarterGuide() {
+    window.localStorage.setItem(`${onboardingKey}:starter-dismissed`, "true");
+    setShowStarterGuide(false);
+  }
+
+  function replayOnboarding() {
+    setTab("today");
+    setShowOnboarding(true);
+  }
+
   return (
     <div className="min-h-screen pb-20 text-ink lg:pb-0">
       <div className="mx-auto grid min-h-screen w-full max-w-[1480px] lg:grid-cols-[280px_1fr]">
@@ -305,9 +345,12 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
               people={workspacePeople}
               prompts={workspacePrompts}
               saveState={saveState}
+              showStarterGuide={showStarterGuide}
               onUpdateEntry={updateEntry}
               onAddPerson={addPerson}
               onOpenEntry={setSelectedEntryId}
+              onFocusFirstReflection={focusFirstReflection}
+              onDismissStarterGuide={dismissStarterGuide}
             />
           ) : null}
 
@@ -340,6 +383,7 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
               addWorkspace={addWorkspace}
               deleteWorkspaceData={deleteWorkspaceEntries}
               signOut={signOut}
+              replayOnboarding={replayOnboarding}
             />
           ) : null}
         </main>
@@ -347,6 +391,7 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
 
       <MobileTabs activeTab={tab} setTab={setTab} />
       {selectedEntry ? <EntryDetailModal entry={selectedEntry} people={workspacePeople} onClose={() => setSelectedEntryId(null)} /> : null}
+      {showOnboarding ? <OnboardingOverlay profile={initialData.profile} onComplete={completeOnboarding} onClose={completeOnboarding} /> : null}
     </div>
   );
 }
@@ -465,24 +510,234 @@ function MobileTabs({ activeTab, setTab }: { activeTab: AppTab; setTab: (tab: Ap
   );
 }
 
+function OnboardingOverlay({
+  profile,
+  onComplete,
+  onClose
+}: {
+  profile: JournalBootstrap["profile"];
+  onComplete: () => void;
+  onClose: () => void;
+}) {
+  const [step, setStep] = useState(0);
+  const [focus, setFocus] = useState<OnboardingFocus>("family");
+  const firstName = profile?.displayName?.split(" ")[0] || "there";
+  const focusOptions: Array<{ id: OnboardingFocus; title: string; text: string }> = [
+    { id: "self", title: "Me", text: "My milestones, moods, routines, and small wins." },
+    { id: "family", title: "Family", text: "Shared days, dinner-table moments, and trips." },
+    { id: "kids", title: "Kids", text: "Funny phrases, phases, favorites, and tiny milestones." },
+    { id: "partner", title: "Partner", text: "Dates, quiet teamwork, and things worth remembering together." }
+  ];
+
+  const steps = [
+    {
+      title: `Welcome, ${firstName}.`,
+      heading: "This is a quiet place to keep one good moment from today.",
+      body: "The app can hold photos, prompts, people, and memories, but the ritual is intentionally tiny: one photo or one line is enough."
+    },
+    {
+      title: "Make it personal",
+      heading: "Tag memories around the people and details that matter.",
+      body: "People tags and Little Details are optional. They are here for the things you will want to find again: a funny word, a favorite snack, a new habit, a small win."
+    },
+    {
+      title: "The aha moment",
+      heading: "Today becomes something future-you can rediscover.",
+      body: "As entries build up, Memory Lane brings back this day one month, one year, and a few years from now. The archive starts with the first small thing you save."
+    }
+  ];
+  const current = steps[step];
+
+  function next() {
+    if (step < steps.length - 1) {
+      setStep((currentStep) => currentStep + 1);
+      return;
+    }
+    onComplete();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/45 px-4 py-5 backdrop-blur-md lg:items-center">
+      <section className="w-full max-w-5xl overflow-hidden rounded-[32px] bg-journal-surface shadow-photo">
+        <div className="grid lg:grid-cols-[1fr_420px]">
+          <div className="grid content-between gap-8 p-6 sm:p-8 lg:min-h-[640px] lg:p-10">
+            <div>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex gap-2">
+                  {steps.map((item, index) => (
+                    <span
+                      key={item.title}
+                      className={clsx("h-2.5 rounded-full transition-all", index === step ? "w-9 bg-rose" : "w-2.5 bg-journal-line")}
+                    />
+                  ))}
+                </div>
+                <button type="button" onClick={onClose} className="grid h-10 w-10 place-items-center rounded-full bg-journal-raised text-warm-gray" aria-label="Close welcome">
+                  <X aria-hidden="true" size={18} />
+                </button>
+              </div>
+
+              <p className="mt-10 text-sm font-bold uppercase tracking-[0.14em] text-rose">{current.title}</p>
+              <h1 className="mt-3 max-w-2xl text-4xl font-bold leading-[1.03] tracking-normal sm:text-5xl">{current.heading}</h1>
+              <p className="mt-4 max-w-xl text-base leading-7 text-warm-gray">{current.body}</p>
+
+              {step === 1 ? (
+                <div className="mt-6 grid gap-2 sm:grid-cols-2">
+                  {focusOptions.map((option) => {
+                    const active = focus === option.id;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => setFocus(option.id)}
+                        className={clsx(
+                          "rounded-[22px] border p-4 text-left transition",
+                          active ? "border-rose/30 bg-rose/10" : "border-journal-line bg-white hover:border-rose/20"
+                        )}
+                      >
+                        <span className="flex items-center gap-2 font-bold text-ink">
+                          {active ? <CheckCircle2 aria-hidden="true" size={16} className="text-rose" /> : null}
+                          {option.title}
+                        </span>
+                        <span className="mt-1 block text-sm leading-5 text-warm-gray">{option.text}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <button type="button" onClick={next} className="inline-flex min-h-12 items-center gap-2 rounded-full bg-rose px-5 font-bold text-white shadow-sm">
+                {step === steps.length - 1 ? "Start today" : "Continue"}
+                <ArrowRight aria-hidden="true" size={17} />
+              </button>
+              <button type="button" onClick={onClose} className="min-h-12 rounded-full bg-journal-raised px-5 font-bold text-warm-gray">
+                Skip tour
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-[linear-gradient(150deg,#f9ece6,#f7fbf2_48%,#fff7f1)] p-5 sm:p-8">
+            {step === 0 ? <OnboardingTodayPreview /> : null}
+            {step === 1 ? <OnboardingPeoplePreview focus={focus} /> : null}
+            {step === 2 ? <OnboardingMemoryPreview /> : null}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function OnboardingTodayPreview() {
+  return (
+    <div className="grid h-full content-center gap-4">
+      <div className="overflow-hidden rounded-[30px] bg-white shadow-sm">
+        <div className="grid min-h-64 content-end bg-[linear-gradient(135deg,#8da38e,#e6c392_54%,#70413c)] p-6 text-white">
+          <p className="text-xs font-bold uppercase tracking-[0.16em]">Photo of the day</p>
+          <h2 className="mt-3 text-2xl font-bold leading-tight">One moment can hold the whole day.</h2>
+        </div>
+        <div className="grid gap-3 p-5">
+          {["Bath-time laughter", "A good cup of tea", "Everyone around the table"].map((line, index) => (
+            <div key={line} className="flex items-center gap-3 rounded-2xl bg-journal-raised p-3">
+              <span className="grid h-8 w-8 place-items-center rounded-full bg-rose/10 text-sm font-bold text-rose">{index + 1}</span>
+              <span className="text-sm font-semibold text-soft-ink">{line}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <p className="rounded-[24px] bg-white/75 p-4 text-sm leading-6 text-warm-gray">
+        The first screen becomes much simpler when you know the rule: one good thing is already a complete entry.
+      </p>
+    </div>
+  );
+}
+
+function OnboardingPeoplePreview({ focus }: { focus: OnboardingFocus }) {
+  const examples: Record<OnboardingFocus, string[]> = {
+    self: ["Morning run felt easier", "Finished the thing I kept delaying"],
+    family: ["Sunday pancakes", "A sleepy walk home"],
+    kids: ["Still says 'lellow'", "Asked for the dinosaur spoon again"],
+    partner: ["A quiet coffee together", "Made each other laugh in the kitchen"]
+  };
+
+  return (
+    <div className="grid h-full content-center gap-4">
+      <div className="rounded-[30px] bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap gap-2">
+          {["Me", "Kid 1", "Kid 2", "Partner", "Family"].map((person, index) => (
+            <span key={person} className={clsx("rounded-full px-3 py-2 text-xs font-bold", index === 1 || index === 4 ? "bg-rose/10 text-rose" : "bg-journal-raised text-warm-gray")}>
+              {person}
+            </span>
+          ))}
+        </div>
+        <div className="mt-5 grid gap-3">
+          {examples[focus].map((example) => (
+            <div key={example} className="rounded-2xl bg-journal-raised p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-rose">Little detail</p>
+              <p className="mt-2 font-semibold text-soft-ink">{example}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+      <p className="rounded-[24px] bg-white/75 p-4 text-sm leading-6 text-warm-gray">
+        Tags are private labels, not social sharing. They make memories searchable by the people woven into them.
+      </p>
+    </div>
+  );
+}
+
+function OnboardingMemoryPreview() {
+  return (
+    <div className="grid h-full content-center gap-4">
+      <div className="rounded-[30px] bg-white p-5 shadow-sm">
+        <SectionTitle icon={Clock3} title="Memory Lane" subtitle="A little window back to days like this one." />
+        {[
+          ["1 month ago", "A sunny park loop and a tiny hand holding mine."],
+          ["1 year ago", "First beach day of the season."],
+          ["3 years ago", "The kind of ordinary dinner we would never want to lose."]
+        ].map(([label, text]) => (
+          <div key={label} className="mt-3 flex gap-3 rounded-2xl bg-journal-raised p-3">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white text-warm-gray">
+              <Sparkles aria-hidden="true" size={18} />
+            </span>
+            <div>
+              <p className="font-bold">{label}</p>
+              <p className="mt-1 text-sm leading-5 text-soft-ink">{text}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="rounded-[24px] bg-white/75 p-4 text-sm leading-6 text-warm-gray">
+        This is the payoff: the app gently returns the good parts of life when enough days have been kept.
+      </p>
+    </div>
+  );
+}
+
 function TodayView({
   entry,
   entries,
   people,
   prompts,
   saveState,
+  showStarterGuide,
   onUpdateEntry,
   onAddPerson,
-  onOpenEntry
+  onOpenEntry,
+  onFocusFirstReflection,
+  onDismissStarterGuide
 }: {
   entry: JournalEntry;
   entries: JournalEntry[];
   people: PersonTag[];
   prompts: PromptTemplate[];
   saveState: SaveState;
+  showStarterGuide: boolean;
   onUpdateEntry: (entryId: string, updater: (entry: JournalEntry) => JournalEntry) => void;
   onAddPerson: (name: string) => PersonTag | null;
   onOpenEntry: (entryId: string) => void;
+  onFocusFirstReflection: () => void;
+  onDismissStarterGuide: () => void;
 }) {
   const summary = streakSummary(entries);
   const matches = memoryLaneMatches(entries).filter((match) => match.entryId !== entry.id);
@@ -502,6 +757,14 @@ function TodayView({
             <SaveStatePill state={saveState} />
           </div>
         </header>
+
+        {showStarterGuide ? (
+          <StarterGuideCard
+            entry={entry}
+            onFocusFirstReflection={onFocusFirstReflection}
+            onDismiss={onDismissStarterGuide}
+          />
+        ) : null}
 
         <PhotoHero
           entry={entry}
@@ -656,6 +919,70 @@ function PhotoHero({
   );
 }
 
+function StarterGuideCard({
+  entry,
+  onFocusFirstReflection,
+  onDismiss
+}: {
+  entry: JournalEntry;
+  onFocusFirstReflection: () => void;
+  onDismiss: () => void;
+}) {
+  const hasReflection = entry.sessions.some((session) => session.responses.some((response) => response.text.trim()));
+  const hasPerson = entry.personTagIds.length > 0;
+  const hasDetail = entry.details.some((detail) => detail.text.trim());
+  const steps = [
+    { label: "Write one nice thing", done: hasReflection },
+    { label: "Tag who was part of it", done: hasPerson },
+    { label: "Keep one tiny detail", done: hasDetail }
+  ];
+  const completed = steps.filter((step) => step.done).length;
+
+  return (
+    <section className="overflow-hidden rounded-[28px] border border-rose/15 bg-[linear-gradient(135deg,#fff7f1,#f7fbf2_55%,#fff)] shadow-sm">
+      <div className="grid gap-4 p-5 sm:p-6 lg:grid-cols-[1fr_300px] lg:items-center">
+        <div>
+          <p className="text-sm font-bold uppercase tracking-[0.12em] text-rose">Start small</p>
+          <h2 className="mt-2 text-2xl font-bold tracking-normal text-ink">Keep the first memory in under a minute.</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-warm-gray">
+            You do not need to fill every section. One line is enough to save the day; tags and little details just make it easier to find later.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onFocusFirstReflection}
+              className="inline-flex min-h-11 items-center gap-2 rounded-full bg-rose px-4 text-sm font-bold text-white shadow-sm"
+            >
+              Start with one line
+              <ArrowRight aria-hidden="true" size={16} />
+            </button>
+            <button type="button" onClick={onDismiss} className="min-h-11 rounded-full bg-white px-4 text-sm font-bold text-warm-gray">
+              I know my way around
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-[24px] border border-journal-line bg-white/80 p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-sm font-bold text-soft-ink">First-entry path</p>
+            <span className="rounded-full bg-rose/10 px-3 py-1 text-xs font-bold text-rose">{completed}/3</span>
+          </div>
+          <div className="grid gap-2">
+            {steps.map((step) => (
+              <div key={step.label} className="flex items-center gap-2 rounded-2xl bg-journal-raised px-3 py-2 text-sm font-bold text-soft-ink">
+                <span className={clsx("grid h-6 w-6 place-items-center rounded-full", step.done ? "bg-leaf text-white" : "bg-white text-warm-gray")}>
+                  {step.done ? <CheckCircle2 aria-hidden="true" size={14} /> : <Sparkles aria-hidden="true" size={13} />}
+                </span>
+                {step.label}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function PromptPanel({
   entry,
   onUpdateEntry
@@ -696,6 +1023,7 @@ function PromptPanel({
               {index + 1}
             </span>
             <textarea
+              id={index === 0 ? "nice-thing-0" : undefined}
               value={lines[index] ?? ""}
               onChange={(event) => {
                 const next = [...lines];
@@ -1139,7 +1467,8 @@ function SettingsView({
   setPeople,
   addWorkspace,
   deleteWorkspaceData,
-  signOut
+  signOut,
+  replayOnboarding
 }: {
   profile: { email: string; displayName: string } | null;
   workspaces: Workspace[];
@@ -1155,16 +1484,23 @@ function SettingsView({
   addWorkspace: (kind: "personal" | "household") => void;
   deleteWorkspaceData: () => void;
   signOut: () => void;
+  replayOnboarding: () => void;
 }) {
   return (
     <div className="mx-auto grid max-w-5xl gap-5">
       <PageHeader title="Settings" subtitle="Plain controls for privacy, prompts, people, export, and household access." />
       <SettingsSection title="Account">
         <p className="text-warm-gray">{profile?.email ?? "Local demo user"}</p>
-        <button onClick={signOut} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-full bg-ink px-4 text-sm font-bold text-white">
-          <LogOut aria-hidden="true" size={16} />
-          Sign out
-        </button>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button onClick={replayOnboarding} className="inline-flex min-h-10 items-center gap-2 rounded-full bg-rose/10 px-4 text-sm font-bold text-rose">
+            <Sparkles aria-hidden="true" size={16} />
+            Replay welcome
+          </button>
+          <button onClick={signOut} className="inline-flex min-h-10 items-center gap-2 rounded-full bg-ink px-4 text-sm font-bold text-white">
+            <LogOut aria-hidden="true" size={16} />
+            Sign out
+          </button>
+        </div>
       </SettingsSection>
 
       <SettingsSection title="Workspaces">
