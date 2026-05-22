@@ -19,6 +19,7 @@ All notable changes to Photo Gratitude Journal will be documented here.
 - Added a durable working-beta roadmap goal for photo management, onboarding, Memories search, and hardening.
 - Added working-beta onboarding, cadence-aware entry creation, reminder controls, photo preview/removal, Memories search/filtering, Entry Detail polish, Calendar low-data guidance, and Memory Lane fallback states.
 - Bumped the iOS beta to `0.2.0 (2)` for the next TestFlight upload.
+- Added a Next.js/Supabase web beta prototype under `web/` with demo-mode journaling, responsive Today/Memories/Calendar/Insights/Settings, people tags, Little Details, Memory Lane, entry detail modal, PWA metadata, Supabase RLS migration, web docs, Web CI, and Chromium desktop/mobile E2E coverage.
 
 ## [0.1.0] - 2026-05-21
 
