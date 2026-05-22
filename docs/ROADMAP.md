@@ -29,7 +29,7 @@ Delivered:
 - Chromium E2E coverage for desktop and mobile demo journaling flow.
 - Authenticated Supabase autosave route for people, prompts, reminders, entries, sessions, responses, tags, Little Details, and private photo Storage uploads.
 - Server routes for creating workspaces through the secured database function and deleting workspace entries through RLS.
-- Web first-run onboarding with a three-step product tour, personal memory-focus choice, starter checklist, and Settings replay control.
+- Web first-run onboarding with a three-step product tour, personal memory-focus choice, friendly name collection for self/partner/children, starter checklist, and Settings replay control.
 
 Acceptance criteria:
 

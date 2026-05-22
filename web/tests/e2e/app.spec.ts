@@ -13,8 +13,10 @@ test("demo user can edit today and find the saved memory", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "This is a quiet place to keep one good moment from today." })).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("heading", { name: "Tag memories around the people and details that matter." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Who would you like to find memories for later?" })).toBeVisible();
   await page.getByRole("button", { name: "Kids" }).click();
+  await page.getByLabel("Child", { exact: true }).fill("Leo Test");
+  await page.getByLabel("Partner").fill("Steph Test");
   await expect(page.getByText("Still says 'lellow'")).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("heading", { name: "Today becomes something future-you can rediscover." })).toBeVisible();
@@ -22,6 +24,7 @@ test("demo user can edit today and find the saved memory", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "What felt good today?" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Keep the first memory in under a minute." })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Leo Test" }).first()).toBeVisible();
   await page.getByPlaceholder("A small good thing").fill(response);
   await page.getByPlaceholder("Add a private person").fill(person);
   await page.getByLabel("Add person").click();

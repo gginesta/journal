@@ -59,6 +59,14 @@ type SaveState = "saved" | "saving" | "offline";
 type MemoryFilter = "all" | "photos" | "text";
 type DetailCategory = MemoryDetail["category"];
 type OnboardingFocus = "self" | "family" | "kids" | "partner";
+type OnboardingSetup = {
+  focus: OnboardingFocus;
+  names: {
+    me: string;
+    partner: string;
+    children: string[];
+  };
+};
 
 const tabs: Array<{ id: AppTab; title: string; icon: LucideIcon }> = [
   { id: "today", title: "Today", icon: Home },
@@ -306,7 +314,8 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
     }, 120);
   }
 
-  function completeOnboarding() {
+  function completeOnboarding(setup?: OnboardingSetup) {
+    if (setup) applyOnboardingSetup(setup);
     window.localStorage.setItem(onboardingKey, "complete");
     window.localStorage.removeItem(`${onboardingKey}:starter-dismissed`);
     setShowOnboarding(false);
@@ -322,6 +331,48 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
   function replayOnboarding() {
     setTab("today");
     setShowOnboarding(true);
+  }
+
+  function applyOnboardingSetup(setup: OnboardingSetup) {
+    setSaveState("saving");
+    setPeople((current) => {
+      let next = [...current];
+      const workspaceTags = () => next.filter((person) => person.workspaceId === activeWorkspaceId);
+
+      function upsertPerson(name: string, aliases: string[], fallbackColor: string) {
+        const trimmed = name.trim();
+        if (!trimmed) return;
+        const normalizedAliases = aliases.map((alias) => alias.toLowerCase());
+        const existing = workspaceTags().find((person) => normalizedAliases.includes(person.name.toLowerCase()));
+        if (existing) {
+          next = next.map((person) => (person.id === existing.id ? { ...person, name: trimmed } : person));
+          return;
+        }
+
+        const duplicate = workspaceTags().find((person) => person.name.toLowerCase() === trimmed.toLowerCase());
+        if (duplicate) return;
+
+        next = [
+          ...next,
+          {
+            id: crypto.randomUUID(),
+            workspaceId: activeWorkspaceId,
+            name: trimmed,
+            color: fallbackColor,
+            sortOrder: workspaceTags().length,
+            isDefault: false
+          }
+        ];
+      }
+
+      upsertPerson(setup.names.me, ["me"], "#5B8DEF");
+      upsertPerson(setup.names.partner, ["partner"], "#E76F51");
+      setup.names.children.forEach((childName, index) => {
+        upsertPerson(childName, [`kid ${index + 1}`, `child ${index + 1}`], index === 0 ? "#F4A261" : "#2A9D8F");
+      });
+
+      return next;
+    });
   }
 
   return (
@@ -391,7 +442,14 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
 
       <MobileTabs activeTab={tab} setTab={setTab} />
       {selectedEntry ? <EntryDetailModal entry={selectedEntry} people={workspacePeople} onClose={() => setSelectedEntryId(null)} /> : null}
-      {showOnboarding ? <OnboardingOverlay profile={initialData.profile} onComplete={completeOnboarding} onClose={completeOnboarding} /> : null}
+      {showOnboarding ? (
+        <OnboardingOverlay
+          profile={initialData.profile}
+          people={workspacePeople}
+          onComplete={completeOnboarding}
+          onClose={() => completeOnboarding()}
+        />
+      ) : null}
     </div>
   );
 }
@@ -512,16 +570,24 @@ function MobileTabs({ activeTab, setTab }: { activeTab: AppTab; setTab: (tab: Ap
 
 function OnboardingOverlay({
   profile,
+  people,
   onComplete,
   onClose
 }: {
   profile: JournalBootstrap["profile"];
-  onComplete: () => void;
+  people: PersonTag[];
+  onComplete: (setup: OnboardingSetup) => void;
   onClose: () => void;
 }) {
   const [step, setStep] = useState(0);
   const [focus, setFocus] = useState<OnboardingFocus>("family");
   const firstName = profile?.displayName?.split(" ")[0] || "there";
+  const [meName, setMeName] = useState(profile?.displayName ? firstName : "");
+  const [partnerName, setPartnerName] = useState(() => findPersonalizedPersonName(people, "Partner"));
+  const [childNames, setChildNames] = useState(() => [
+    findPersonalizedPersonName(people, "Kid 1"),
+    findPersonalizedPersonName(people, "Kid 2")
+  ]);
   const focusOptions: Array<{ id: OnboardingFocus; title: string; text: string }> = [
     { id: "self", title: "Me", text: "My milestones, moods, routines, and small wins." },
     { id: "family", title: "Family", text: "Shared days, dinner-table moments, and trips." },
@@ -537,8 +603,8 @@ function OnboardingOverlay({
     },
     {
       title: "Make it personal",
-      heading: "Tag memories around the people and details that matter.",
-      body: "People tags and Little Details are optional. They are here for the things you will want to find again: a funny word, a favorite snack, a new habit, a small win."
+      heading: "Who would you like to find memories for later?",
+      body: "Names stay private. We use them as gentle tags so you can find a child's funny phrase, a partner moment, or your own milestones without digging."
     },
     {
       title: "The aha moment",
@@ -553,7 +619,14 @@ function OnboardingOverlay({
       setStep((currentStep) => currentStep + 1);
       return;
     }
-    onComplete();
+    onComplete({
+      focus,
+      names: {
+        me: meName,
+        partner: partnerName,
+        children: childNames
+      }
+    });
   }
 
   return (
@@ -581,27 +654,56 @@ function OnboardingOverlay({
               <p className="mt-4 max-w-xl text-base leading-7 text-warm-gray">{current.body}</p>
 
               {step === 1 ? (
-                <div className="mt-6 grid gap-2 sm:grid-cols-2">
-                  {focusOptions.map((option) => {
-                    const active = focus === option.id;
-                    return (
+                <div className="mt-6 grid gap-4">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {focusOptions.map((option) => {
+                      const active = focus === option.id;
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => setFocus(option.id)}
+                          className={clsx(
+                            "rounded-[22px] border p-4 text-left transition",
+                            active ? "border-rose/30 bg-rose/10" : "border-journal-line bg-white hover:border-rose/20"
+                          )}
+                        >
+                          <span className="flex items-center gap-2 font-bold text-ink">
+                            {active ? <CheckCircle2 aria-hidden="true" size={16} className="text-rose" /> : null}
+                            {option.title}
+                          </span>
+                          <span className="mt-1 block text-sm leading-5 text-warm-gray">{option.text}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="rounded-[24px] border border-journal-line bg-white p-4">
+                    <p className="font-bold text-soft-ink">A few names to start</p>
+                    <p className="mt-1 text-sm leading-5 text-warm-gray">Leave anything blank. You can edit these tags later.</p>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <OnboardingNameField label="Me" value={meName} onChange={setMeName} placeholder="Guillermo" />
+                      <OnboardingNameField label="Partner" value={partnerName} onChange={setPartnerName} placeholder="Stephanie" />
+                      {childNames.map((name, index) => (
+                        <OnboardingNameField
+                          key={index}
+                          label={index === 0 ? "Child" : `Child ${index + 1}`}
+                          value={name}
+                          onChange={(value) => setChildNames((current) => current.map((candidate, candidateIndex) => (candidateIndex === index ? value : candidate)))}
+                          placeholder={index === 0 ? "Their name" : "Optional"}
+                        />
+                      ))}
+                    </div>
+                    {childNames.length < 4 ? (
                       <button
-                        key={option.id}
                         type="button"
-                        onClick={() => setFocus(option.id)}
-                        className={clsx(
-                          "rounded-[22px] border p-4 text-left transition",
-                          active ? "border-rose/30 bg-rose/10" : "border-journal-line bg-white hover:border-rose/20"
-                        )}
+                        onClick={() => setChildNames((current) => [...current, ""])}
+                        className="mt-3 rounded-full bg-journal-raised px-4 py-2 text-sm font-bold text-soft-ink"
                       >
-                        <span className="flex items-center gap-2 font-bold text-ink">
-                          {active ? <CheckCircle2 aria-hidden="true" size={16} className="text-rose" /> : null}
-                          {option.title}
-                        </span>
-                        <span className="mt-1 block text-sm leading-5 text-warm-gray">{option.text}</span>
+                        Add another child
                       </button>
-                    );
-                  })}
+                    ) : null}
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -619,12 +721,42 @@ function OnboardingOverlay({
 
           <div className="bg-[linear-gradient(150deg,#f9ece6,#f7fbf2_48%,#fff7f1)] p-5 sm:p-8">
             {step === 0 ? <OnboardingTodayPreview /> : null}
-            {step === 1 ? <OnboardingPeoplePreview focus={focus} /> : null}
-            {step === 2 ? <OnboardingMemoryPreview /> : null}
+            {step === 1 ? <OnboardingPeoplePreview focus={focus} meName={meName} partnerName={partnerName} childNames={childNames} /> : null}
+            {step === 2 ? <OnboardingMemoryPreview childNames={childNames} partnerName={partnerName} /> : null}
           </div>
         </div>
       </section>
     </div>
+  );
+}
+
+function findPersonalizedPersonName(people: PersonTag[], defaultName: string) {
+  const person = people.find((candidate) => candidate.name.toLowerCase() === defaultName.toLowerCase());
+  if (!person || person.name === defaultName) return "";
+  return person.name;
+}
+
+function OnboardingNameField({
+  label,
+  value,
+  onChange,
+  placeholder
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <label className="grid gap-1 text-sm font-bold text-soft-ink">
+      {label}
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="min-h-11 rounded-2xl border border-journal-line bg-journal-raised px-3 font-normal outline-none focus:ring-4 focus:ring-rose/15"
+      />
+    </label>
   );
 }
 
@@ -652,20 +784,37 @@ function OnboardingTodayPreview() {
   );
 }
 
-function OnboardingPeoplePreview({ focus }: { focus: OnboardingFocus }) {
+function OnboardingPeoplePreview({
+  focus,
+  meName,
+  partnerName,
+  childNames
+}: {
+  focus: OnboardingFocus;
+  meName: string;
+  partnerName: string;
+  childNames: string[];
+}) {
   const examples: Record<OnboardingFocus, string[]> = {
     self: ["Morning run felt easier", "Finished the thing I kept delaying"],
     family: ["Sunday pancakes", "A sleepy walk home"],
     kids: ["Still says 'lellow'", "Asked for the dinosaur spoon again"],
     partner: ["A quiet coffee together", "Made each other laugh in the kitchen"]
   };
+  const namedChildren = childNames.map((name) => name.trim()).filter(Boolean);
+  const chips = [
+    meName.trim() || "Me",
+    ...namedChildren,
+    partnerName.trim() || "Partner",
+    "Family"
+  ];
 
   return (
     <div className="grid h-full content-center gap-4">
       <div className="rounded-[30px] bg-white p-5 shadow-sm">
         <div className="flex flex-wrap gap-2">
-          {["Me", "Kid 1", "Kid 2", "Partner", "Family"].map((person, index) => (
-            <span key={person} className={clsx("rounded-full px-3 py-2 text-xs font-bold", index === 1 || index === 4 ? "bg-rose/10 text-rose" : "bg-journal-raised text-warm-gray")}>
+          {chips.map((person, index) => (
+            <span key={`${person}-${index}`} className={clsx("rounded-full px-3 py-2 text-xs font-bold", index === 1 || person === "Family" ? "bg-rose/10 text-rose" : "bg-journal-raised text-warm-gray")}>
               {person}
             </span>
           ))}
@@ -686,14 +835,17 @@ function OnboardingPeoplePreview({ focus }: { focus: OnboardingFocus }) {
   );
 }
 
-function OnboardingMemoryPreview() {
+function OnboardingMemoryPreview({ childNames, partnerName }: { childNames: string[]; partnerName: string }) {
+  const childName = childNames.find((name) => name.trim())?.trim() || "someone little";
+  const partner = partnerName.trim() || "your partner";
+
   return (
     <div className="grid h-full content-center gap-4">
       <div className="rounded-[30px] bg-white p-5 shadow-sm">
         <SectionTitle icon={Clock3} title="Memory Lane" subtitle="A little window back to days like this one." />
         {[
-          ["1 month ago", "A sunny park loop and a tiny hand holding mine."],
-          ["1 year ago", "First beach day of the season."],
+          ["1 month ago", `${childName} insisted the moon was following the car.`],
+          ["1 year ago", `A quiet coffee with ${partner} before the day got loud.`],
           ["3 years ago", "The kind of ordinary dinner we would never want to lose."]
         ].map(([label, text]) => (
           <div key={label} className="mt-3 flex gap-3 rounded-2xl bg-journal-raised p-3">
