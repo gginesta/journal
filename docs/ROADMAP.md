@@ -9,6 +9,27 @@ Current beta-readiness docs:
 - TestFlight owner setup: `docs/TESTFLIGHT.md`.
 - Manual beta QA: `docs/QA_TESTFLIGHT.md`.
 
+## Milestone 0.2.8 - Progressive Memory Lane
+
+Status: complete for implementation; ready for beta QA after deployment.
+
+Goal: make Memory Lane useful immediately for new users instead of leaving the signature nostalgia feature mostly empty until a month or year of history exists.
+
+Delivered:
+
+- Web package version set to `0.2.8`.
+- Onboarding now explains that Memory Lane starts with recent look-backs and grows into monthly, seasonal, and yearly memories.
+- Memory Lane matching now supports yesterday, 3 days ago, 1 week ago, 2 weeks ago, 1 month, 3 months, 6 months, and 1/2/3 year targets.
+- When no target matches, Memory Lane can show the most recent complete older entry as a gentle early payoff.
+- Unit and E2E coverage updated for progressive look-backs and the new onboarding copy.
+
+Acceptance criteria:
+
+- A new user understands during onboarding that value can appear within days or weeks.
+- A young account can see useful recent memories before any year-old data exists.
+- A mature account still prioritizes month, season, and anniversary-style memories.
+- Today stays calm by limiting Memory Lane to a small set of strong cards.
+
 ## Milestone 0.2.7 - Docs, Versioning, And QA Lane
 
 Status: complete for this docs/versioning lane; manual household QA still needs real tester accounts.

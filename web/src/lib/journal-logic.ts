@@ -1,5 +1,5 @@
 import type { JournalEntry, MemoryMatch, PersonTag } from "../types/journal";
-import { addMonths, addYears, dayDistance, toLocalDate } from "./dates";
+import { addDays, addMonths, addYears, dayDistance, toLocalDate } from "./dates";
 
 export function isEntryComplete(entry: JournalEntry): boolean {
   const hasText = entry.sessions
@@ -64,20 +64,33 @@ export function streakSummary(entries: JournalEntry[], today = toLocalDate()): {
 }
 
 export function memoryLaneMatches(entries: JournalEntry[], today = toLocalDate()): MemoryMatch[] {
-  const targets = [
-    { label: "1 month ago", date: addMonths(today, -1) },
-    { label: "1 year ago", date: addYears(today, -1) },
-    { label: "2 years ago", date: addYears(today, -2) },
-    { label: "3 years ago", date: addYears(today, -3) }
-  ];
+  const completedEntries = entries
+    .filter((entry) => entry.localDate !== today && entry.localDate < today && isEntryComplete(entry))
+    .sort((left, right) => right.localDate.localeCompare(left.localDate));
 
-  return targets.flatMap((target) => {
-    const candidate = entries
+  const targets = [
+    { label: "1 year ago", date: addYears(today, -1), tolerance: 3 },
+    { label: "2 years ago", date: addYears(today, -2), tolerance: 3 },
+    { label: "3 years ago", date: addYears(today, -3), tolerance: 3 },
+    { label: "6 months ago", date: addMonths(today, -6), tolerance: 7 },
+    { label: "3 months ago", date: addMonths(today, -3), tolerance: 5 },
+    { label: "1 month ago", date: addMonths(today, -1), tolerance: 3 },
+    { label: "2 weeks ago", date: addDays(today, -14), tolerance: 2 },
+    { label: "1 week ago", date: addDays(today, -7), tolerance: 2 },
+    { label: "3 days ago", date: addDays(today, -3), tolerance: 1 },
+    { label: "Yesterday", date: addDays(today, -1), tolerance: 0 }
+  ];
+  const usedEntryIds = new Set<string>();
+
+  const matches = targets.flatMap((target) => {
+    const candidate = completedEntries
+      .filter((entry) => !usedEntryIds.has(entry.id))
       .map((entry) => ({ entry, distance: Math.abs(dayDistance(entry.localDate, target.date)) }))
-      .filter(({ distance }) => distance <= 3)
+      .filter(({ distance }) => distance <= target.tolerance)
       .sort((lhs, rhs) => lhs.distance - rhs.distance || rhs.entry.localDate.localeCompare(lhs.entry.localDate))[0];
 
     if (!candidate) return [];
+    usedEntryIds.add(candidate.entry.id);
 
     return {
       id: `${target.label}-${candidate.entry.id}`,
@@ -88,6 +101,20 @@ export function memoryLaneMatches(entries: JournalEntry[], today = toLocalDate()
       dayDistance: candidate.distance
     };
   });
+
+  if (matches.length > 0) return matches.slice(0, 4);
+
+  const recent = completedEntries[0];
+  if (!recent) return [];
+
+  return [{
+    id: `Recent good thing-${recent.id}`,
+    label: "Recent good thing",
+    targetDate: recent.localDate,
+    entryId: recent.id,
+    entryDate: recent.localDate,
+    dayDistance: Math.abs(dayDistance(recent.localDate, today))
+  }];
 }
 
 export function searchEntries(entries: JournalEntry[], people: PersonTag[], query: string): JournalEntry[] {

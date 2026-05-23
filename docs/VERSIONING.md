@@ -26,7 +26,7 @@ For web beta releases:
 - Confirm Settings > Beta shows the package version in the running app.
 - Update the milestone docs and QA notes with the tested version.
 
-Current web beta version: `0.2.7`.
+Current web beta version: `0.2.8`.
 
 ## TestFlight Builds
 

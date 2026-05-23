@@ -10,7 +10,7 @@ The app is inspired by the emotional utility of Five Minute Journal, but the pro
 
 ## Current Beta Version
 
-- Current web beta app version: `0.2.7`.
+- Current web beta app version: `0.2.8`.
 - The web package version is the app version source of truth and is visible in Settings > Beta for QA notes.
 - Manual QA should record this version when testing household sharing, Supabase sync safety, and photo handling.
 
@@ -85,7 +85,7 @@ The app is inspired by the emotional utility of Five Minute Journal, but the pro
 - Optional Little Details section for tiny phases, quotes, favorites, routines, and milestones.
 - Gratitude Guide prompt packs or equivalent guided starters.
 - Streak and completion summaries.
-- Automatic Memory Lane for 1 month, 1 year, 2 years, and 3 years ago.
+- Progressive Memory Lane for early look-backs such as yesterday, 3 days ago, 1 week ago, 2 weeks ago, 1 month ago, 3 months ago, 6 months ago, and yearly anniversaries.
 - Local reminders.
 - Face ID/passcode app lock.
 - Yearly Premium scaffolding and entitlement gates.
@@ -141,8 +141,11 @@ The app is inspired by the emotional utility of Five Minute Journal, but the pro
 
 ### Memory Lane
 
-- Today shows matching memories from 1 month, 1 year, 2 years, and 3 years ago when available.
-- If an exact date is unavailable, the app may show the closest entry within plus or minus 3 days.
+- Today shows the most meaningful available look-backs without waiting for a full year of history.
+- Early users can see recent memories such as yesterday, 3 days ago, 1 week ago, or 2 weeks ago.
+- As the archive grows, Today adds 1 month, 3 month, 6 month, 1 year, 2 year, and 3 year look-backs.
+- If an exact date is unavailable, the app may show the closest entry within a small window, with wider windows for month/season targets.
+- If no target matches, Memory Lane can surface the most recent kept memory so the section still creates value.
 - Memory cards should prioritize photos and date context.
 - Tapping a memory opens the entry detail.
 - Premium unlocks richer seasonal browsing and proactive look-back notifications.

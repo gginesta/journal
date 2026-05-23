@@ -76,6 +76,27 @@ describe("journal logic", () => {
     expect(matches[0]?.dayDistance).toBe(2);
   });
 
+  it("adds early look-backs before a user has anniversary history", () => {
+    const matches = memoryLaneMatches([
+      entry("week", "2026-05-14", "A week-old coffee"),
+      entry("three-days", "2026-05-18", "Tiny walk"),
+      entry("yesterday", "2026-05-20", "Kitchen laugh")
+    ], "2026-05-21");
+
+    expect(matches.map((match) => match.label)).toEqual(["1 week ago", "3 days ago", "Yesterday"]);
+  });
+
+  it("falls back to the most recent kept memory when no look-back target matches", () => {
+    const matches = memoryLaneMatches([
+      entry("recent", "2026-05-10", "Still worth seeing"),
+      entry("today", "2026-05-21", "Today should not be resurfaced")
+    ], "2026-05-21");
+
+    expect(matches).toHaveLength(1);
+    expect(matches[0]?.label).toBe("Recent good thing");
+    expect(matches[0]?.entryId).toBe("recent");
+  });
+
   it("searches prompt text, responses, people, and little details", () => {
     const target = entry("target", "2026-05-21", "Loved the yellow snack");
     target.personTagIds = ["kid"];

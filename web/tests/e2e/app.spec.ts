@@ -22,7 +22,7 @@ async function continueFromWelcome(page: Page) {
 
 async function startToday(page: Page) {
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("heading", { name: "Today becomes something future-you can rediscover." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Memory Lane starts sooner than you think." })).toBeVisible();
   await page.getByRole("button", { name: "Start today" }).click();
   await expect(page.getByRole("heading", { name: "What felt good today?" })).toBeVisible();
 }
@@ -84,7 +84,7 @@ test("demo user can choose just me and other onboarding shapes without family-on
 
   await page.getByRole("button", { name: "Settings" }).first().click();
   await expect(page.getByRole("heading", { name: "Beta" })).toBeVisible();
-  await expect(page.getByText("App version 0.2.7")).toBeVisible();
+  await expect(page.getByText("App version 0.2.8")).toBeVisible();
   await page.getByRole("button", { name: "Replay welcome" }).click();
   await continueFromWelcome(page);
   await page.getByRole("button", { name: "Other people or themes" }).click();

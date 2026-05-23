@@ -772,8 +772,8 @@ function OnboardingOverlay({
     },
     {
       title: "The aha moment",
-      heading: "Today becomes something future-you can rediscover.",
-      body: "As entries build up, Memory Lane brings back this day one month, one year, and a few years from now. The archive starts with the first small thing you save."
+      heading: "Memory Lane starts sooner than you think.",
+      body: "After a few kept days, the app can bring back yesterday, last week, one month ago, then three months and yearly moments as your archive grows."
     }
   ];
   const current = steps[step];
@@ -1041,24 +1041,24 @@ function OnboardingMemoryPreview({
   const theme = splitFlexibleTags(otherNames)[0] ?? "a favorite thread";
   const memoriesByFocus: Record<OnboardingFocus, string[][]> = {
     self: [
+      ["1 week ago", "A small win you might have already forgotten."],
       ["1 month ago", "Took the long walk and felt clear-headed after."],
-      ["1 year ago", "Saved the first quiet morning that made the week feel possible."],
-      ["3 years ago", "A tiny win that still sounds like you."]
+      ["3 months ago", "Proof that ordinary good days have been adding up."]
     ],
     partner: [
+      ["1 week ago", `A small exchange with ${partner} worth keeping.`],
       ["1 month ago", `A quiet coffee with ${partner} before the day got loud.`],
-      ["1 year ago", "Made each other laugh in the kitchen."],
-      ["3 years ago", "The kind of ordinary dinner worth finding again."]
+      ["3 months ago", "The kind of ordinary dinner worth finding again."]
     ],
     family: [
+      ["1 week ago", `${childName} had a tiny phase you almost missed.`],
       ["1 month ago", `${childName} insisted the moon was following the car.`],
-      ["1 year ago", `A quiet coffee with ${partner} before the day got loud.`],
-      ["3 years ago", "The kind of ordinary dinner we would never want to lose."]
+      ["3 months ago", "A family routine that already feels like a little era."]
     ],
     other: [
+      ["1 week ago", `A recent thread from ${theme} that still matters.`],
       ["1 month ago", `A small note from ${theme} that made the day brighter.`],
-      ["1 year ago", "The place, person, or project you almost forgot to write down."],
-      ["3 years ago", "A thread you can follow back without digging."]
+      ["3 months ago", "A place, person, or project you almost forgot to write down."]
     ]
   };
 
@@ -1079,7 +1079,7 @@ function OnboardingMemoryPreview({
         ))}
       </div>
       <p className="rounded-[24px] bg-white/75 p-4 text-sm leading-6 text-warm-gray">
-        This is the payoff: the app gently returns the good parts of life when enough days have been kept.
+        This is the payoff: short look-backs begin within days, then become month, season, and anniversary moments over time.
       </p>
     </div>
   );
@@ -2979,7 +2979,7 @@ function MemoryLanePanel({
 
   return (
     <section className="rounded-journal border border-journal-line bg-journal-surface p-5">
-      <SectionTitle icon={Clock3} title="Memory Lane" subtitle="A little window back to days like this one." />
+      <SectionTitle icon={Clock3} title="Memory Lane" subtitle="A little window back to recent, monthly, and anniversary moments." />
       <div className="grid gap-3">
         {matches.length > 0
           ? matches.map((match) => {
@@ -2988,17 +2988,22 @@ function MemoryLanePanel({
                 <MemoryLaneCard
                   key={match.id}
                   entry={entry}
-                  label={match.dayDistance === 0 ? match.label : `Around ${match.label}`}
+                  label={memoryLaneLabel(match)}
                   onOpen={onOpenEntry}
                 />
               ) : null;
             })
           : fallback
-            ? <MemoryLaneCard entry={fallback} label="Recent memory" onOpen={onOpenEntry} />
+            ? <MemoryLaneCard entry={fallback} label="Recent good thing" onOpen={onOpenEntry} />
             : <MemoryLaneEmpty completeCount={completeCount} />}
       </div>
     </section>
   );
+}
+
+function memoryLaneLabel(match: ReturnType<typeof memoryLaneMatches>[number]) {
+  if (match.label === "Recent good thing" || match.label === "Yesterday" || match.dayDistance === 0) return match.label;
+  return `Around ${match.label}`;
 }
 
 function MemoryLaneCard({ entry, label, onOpen }: { entry: JournalEntry; label: string; onOpen: (entryId: string) => void }) {
@@ -3026,7 +3031,7 @@ function MemoryLaneEmpty({ completeCount }: { completeCount: number }) {
           : "A few more kept days will give this space something older to return."}
       </p>
       <div className="grid grid-cols-3 gap-2 text-center text-xs font-bold text-warm-gray">
-        {["1 month", "1 year", "3 years"].map((label) => (
+        {["1 week", "1 month", "3 months"].map((label) => (
           <span key={label} className="rounded-2xl bg-white px-2 py-3">{label}</span>
         ))}
       </div>

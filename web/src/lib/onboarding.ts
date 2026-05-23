@@ -19,7 +19,7 @@ export const onboardingFocusOptions: Array<{ id: OnboardingFocus; title: string;
   { id: "other", title: "Other people or themes", text: "Friends, travel, work wins, creative projects, or any thread you want to find again." }
 ];
 
-export const onboardingStorageVersion = "v3";
+export const onboardingStorageVersion = "v4";
 export const onboardingStorageKey = `photo-gratitude-onboarding-${onboardingStorageVersion}`;
 
 const genericDefaultNames = new Set(["kid 1", "kid 2", "partner", "family"]);
