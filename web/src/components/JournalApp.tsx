@@ -41,7 +41,9 @@ import type {
   PromptTemplate,
   ReminderPreferences,
   RitualCadence,
-  Workspace
+  Workspace,
+  WorkspaceMember,
+  WorkspaceRole
 } from "@/types/journal";
 import { daysInCalendarMonth, formatDisplayDate, toLocalDate } from "@/lib/dates";
 import {
@@ -67,10 +69,11 @@ import {
   type OnboardingSetup
 } from "@/lib/onboarding";
 import { addSuggestionToReflectionText, gratitudeGuideForEntry } from "@/lib/prompts";
+import { canMutateWorkspaceRole } from "@/lib/journal-sync-safety";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type AppTab = "today" | "memories" | "calendar" | "insights" | "settings";
-type SaveState = "saved" | "saving" | "offline";
+type SaveState = "saved" | "saving" | "offline" | "error" | "local" | "readonly";
 type MemoryFilter = "all" | "photos" | "text";
 type MemoryMode = "entries" | "details";
 type DetailCategory = MemoryDetailCategory;
@@ -102,33 +105,42 @@ const detailCategories: Array<{ id: DetailCategory; title: string }> = ([
 
 const storageKey = "photo-gratitude-web-state-v1";
 
-export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
+export function JournalApp({ initialData, appVersion }: { initialData: JournalBootstrap; appVersion: string }) {
   const [tab, setTab] = useState<AppTab>("today");
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(initialData.activeWorkspaceId);
   const [workspaces, setWorkspaces] = useState(initialData.workspaces);
+  const [workspaceMembers, setWorkspaceMembers] = useState(initialData.workspaceMembers);
   const [people, setPeople] = useState(initialData.people);
   const [prompts, setPrompts] = useState(initialData.prompts);
   const [entries, setEntries] = useState(initialData.entries);
   const [reminders, setReminders] = useState(initialData.reminders);
-  const [saveState, setSaveState] = useState<SaveState>(initialData.mode === "demo" ? "offline" : "saved");
+  const [saveState, setSaveState] = useState<SaveState>(initialData.mode === "demo" ? "local" : "saved");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [syncRetryToken, setSyncRetryToken] = useState(0);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showStarterGuide, setShowStarterGuide] = useState(false);
   const [isPending, startTransition] = useTransition();
   const didMountPersistence = useRef(false);
+  const latestSyncId = useRef(0);
 
   const onboardingKey = useMemo(() => `${onboardingStorageKey}:${initialData.profile?.id ?? "demo"}`, [initialData.profile?.id]);
+  const activeWorkspace = useMemo(
+    () => workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null,
+    [workspaces, activeWorkspaceId]
+  );
 
   useEffect(() => {
     if (initialData.mode !== "demo") return;
     const cached = window.localStorage.getItem(storageKey);
     if (!cached) return;
     try {
-      const parsed = JSON.parse(cached) as Pick<JournalBootstrap, "entries" | "people" | "prompts" | "workspaces" | "reminders" | "activeWorkspaceId">;
+      const parsed = JSON.parse(cached) as Pick<JournalBootstrap, "entries" | "people" | "prompts" | "workspaces" | "workspaceMembers" | "reminders" | "activeWorkspaceId">;
       setEntries(parsed.entries);
       setPeople(parsed.people);
       setPrompts(parsed.prompts);
       setWorkspaces(parsed.workspaces);
+      setWorkspaceMembers(parsed.workspaceMembers ?? []);
       setReminders(parsed.reminders);
       setActiveWorkspaceId(parsed.activeWorkspaceId);
     } catch {
@@ -140,17 +152,25 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
     if (initialData.mode !== "demo") return;
     window.localStorage.setItem(
       storageKey,
-      JSON.stringify({ entries, people, prompts, workspaces, reminders, activeWorkspaceId })
+      JSON.stringify({ entries, people, prompts, workspaces, workspaceMembers, reminders, activeWorkspaceId })
     );
-  }, [entries, people, prompts, workspaces, reminders, activeWorkspaceId, initialData.mode]);
+  }, [entries, people, prompts, workspaces, workspaceMembers, reminders, activeWorkspaceId, initialData.mode]);
 
   useEffect(() => {
+    let initialized = false;
+
     function updateOfflineState() {
       if (!navigator.onLine) {
         setSaveState("offline");
+        setSaveError("You are offline. Changes will stay local until sync succeeds.");
       } else if (initialData.mode === "supabase") {
-        setSaveState("saved");
+        setSaveError((current) => (current?.startsWith("You are offline.") ? null : current));
+        if (initialized) setSyncRetryToken((current) => current + 1);
+      } else {
+        setSaveState("local");
+        setSaveError(null);
       }
+      initialized = true;
     }
 
     window.addEventListener("online", updateOfflineState);
@@ -177,6 +197,13 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
     [prompts, activeWorkspaceId]
   );
 
+  const activeWorkspaceRole = activeWorkspace?.role ?? "viewer";
+  const canEditActiveWorkspace = initialData.mode === "demo" || canMutateWorkspaceRole(activeWorkspaceRole);
+  const activeWorkspaceMembers = useMemo(
+    () => workspaceMembers.filter((member) => member.workspaceId === activeWorkspaceId),
+    [workspaceMembers, activeWorkspaceId]
+  );
+
   const todayEntry = useMemo(() => {
     const today = toLocalDate();
     return workspaceEntries.find((entry) => entry.localDate === today) ?? makeEntry(activeWorkspaceId, today, workspacePrompts, reminders.cadence);
@@ -189,17 +216,33 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
 
   useEffect(() => {
     if (initialData.mode !== "supabase" || !initialData.profile) return;
+    if (!canEditActiveWorkspace) {
+      setSaveState("readonly");
+      setSaveError(null);
+      return;
+    }
     if (!didMountPersistence.current) {
       didMountPersistence.current = true;
       return;
     }
 
+    if (!navigator.onLine) {
+      setSaveState("offline");
+      setSaveError("You are offline. Changes will stay local until sync succeeds.");
+      return;
+    }
+
+    const syncId = latestSyncId.current + 1;
+    latestSyncId.current = syncId;
+    const controller = new AbortController();
     setSaveState("saving");
+    setSaveError(null);
     const timeout = window.setTimeout(async () => {
       try {
         const response = await fetch("/api/journal/sync", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
           body: JSON.stringify({
             workspaceId: activeWorkspaceId,
             people: workspacePeople,
@@ -209,22 +252,36 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
           })
         });
 
-        if (!response.ok) throw new Error("Sync failed");
-        setSaveState("saved");
-      } catch {
-        setSaveState("offline");
+        if (!response.ok) throw new Error(await responseErrorMessage(response, "Sync failed"));
+        if (latestSyncId.current === syncId) {
+          if (navigator.onLine) {
+            setSaveState("saved");
+            setSaveError(null);
+          } else {
+            setSaveState("offline");
+            setSaveError("You are offline. Changes will stay local until sync succeeds.");
+          }
+        }
+      } catch (error) {
+        if (controller.signal.aborted || latestSyncId.current !== syncId) return;
+        setSaveState(navigator.onLine ? "error" : "offline");
+        setSaveError(error instanceof Error ? error.message : "Sync failed");
       }
     }, 800);
 
-    return () => window.clearTimeout(timeout);
-  }, [activeWorkspaceId, workspaceEntries, workspacePeople, workspacePrompts, reminders, initialData.mode, initialData.profile]);
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [activeWorkspaceId, workspaceEntries, workspacePeople, workspacePrompts, reminders, syncRetryToken, initialData.mode, initialData.profile, canEditActiveWorkspace]);
 
   useEffect(() => {
+    if (!canEditActiveWorkspace) return;
     setEntries((current) => {
       if (current.some((entry) => entry.id === todayEntry.id)) return current;
       return [todayEntry, ...current];
     });
-  }, [todayEntry]);
+  }, [todayEntry, canEditActiveWorkspace]);
 
   useEffect(() => {
     const completed = window.localStorage.getItem(onboardingKey) === "complete";
@@ -233,15 +290,46 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
     setShowStarterGuide(completed && !starterDismissed);
   }, [onboardingKey]);
 
-  function mutateEntries(updater: (entries: JournalEntry[]) => JournalEntry[]) {
+  function markPendingSave() {
     setSaveState("saving");
+    setSaveError(null);
+    if (initialData.mode === "demo") {
+      window.setTimeout(() => setSaveState("local"), 450);
+    }
+  }
+
+  function blockReadOnlyMutation() {
+    if (canEditActiveWorkspace) return false;
+    setSaveState("readonly");
+    setSaveError("Viewer access can read this workspace, but cannot change it.");
+    return true;
+  }
+
+  function mutateEntries(updater: (entries: JournalEntry[]) => JournalEntry[]) {
+    if (blockReadOnlyMutation()) return;
+    markPendingSave();
     startTransition(() => {
       setEntries((current) => updater(current));
-      if (initialData.mode === "demo") {
-        window.setTimeout(() => setSaveState("offline"), 450);
-      }
     });
   }
+
+  const updateReminders: React.Dispatch<React.SetStateAction<ReminderPreferences>> = (value) => {
+    if (blockReadOnlyMutation()) return;
+    markPendingSave();
+    setReminders(value);
+  };
+
+  const updatePrompts: React.Dispatch<React.SetStateAction<PromptTemplate[]>> = (value) => {
+    if (blockReadOnlyMutation()) return;
+    markPendingSave();
+    setPrompts(value);
+  };
+
+  const updatePeople: React.Dispatch<React.SetStateAction<PersonTag[]>> = (value) => {
+    if (blockReadOnlyMutation()) return;
+    markPendingSave();
+    setPeople(value);
+  };
 
   function updateEntry(entryId: string, updater: (entry: JournalEntry) => JournalEntry) {
     mutateEntries((current) => current.map((entry) => (entry.id === entryId ? updater(entry) : entry)));
@@ -303,6 +391,7 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
   }
 
   function addPerson(name: string): PersonTag | null {
+    if (blockReadOnlyMutation()) return null;
     const trimmed = name.trim();
     if (!trimmed) return null;
     const existing = workspacePeople.find((person) => person.name.toLowerCase() === trimmed.toLowerCase());
@@ -316,7 +405,7 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
       sortOrder: workspacePeople.length,
       isDefault: false
     };
-    setSaveState("saving");
+    markPendingSave();
     setPeople((current) => [...current, person]);
     return person;
   }
@@ -324,6 +413,7 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
   async function addWorkspace(kind: "personal" | "household") {
     if (initialData.mode === "supabase") {
       setSaveState("saving");
+      setSaveError(null);
       const name = kind === "personal" ? "My journal" : "Household journal";
       const response = await fetch("/api/workspaces", {
         method: "POST",
@@ -334,7 +424,8 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
         window.location.reload();
         return;
       }
-      setSaveState("offline");
+      setSaveState(navigator.onLine ? "error" : "offline");
+      setSaveError(await responseErrorMessage(response, "Workspace could not be created"));
       return;
     }
 
@@ -345,20 +436,51 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
       role: "owner"
     };
     setWorkspaces((current) => [...current, workspace]);
+    setWorkspaceMembers((current) => [
+      ...current,
+      {
+        workspaceId: workspace.id,
+        userId: initialData.profile?.id ?? "demo-user",
+        email: initialData.profile?.email ?? "demo@photojournal.local",
+        displayName: initialData.profile?.displayName ?? "Demo User",
+        role: "owner",
+        invitationState: "accepted",
+        invitedEmail: "",
+        createdAt: new Date().toISOString(),
+        isCurrentUser: true
+      }
+    ]);
     setActiveWorkspaceId(workspace.id);
   }
 
   async function deleteWorkspaceEntries() {
-    setEntries((current) => current.filter((entry) => entry.workspaceId !== activeWorkspaceId));
-    if (initialData.mode !== "supabase") return;
+    if (blockReadOnlyMutation()) return;
+    if (initialData.mode !== "supabase") {
+      markPendingSave();
+      setEntries((current) => current.filter((entry) => entry.workspaceId !== activeWorkspaceId));
+      return;
+    }
+    if (!navigator.onLine) {
+      setSaveState("offline");
+      setSaveError("You are offline. Delete was not sent to the server.");
+      return;
+    }
 
     setSaveState("saving");
-    const response = await fetch("/api/journal/delete-workspace-entries", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspaceId: activeWorkspaceId })
-    });
-    setSaveState(response.ok ? "saved" : "offline");
+    setSaveError(null);
+    try {
+      const response = await fetch("/api/journal/delete-workspace-entries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceId: activeWorkspaceId })
+      });
+      if (!response.ok) throw new Error(await responseErrorMessage(response, "Delete failed"));
+      setEntries((current) => current.filter((entry) => entry.workspaceId !== activeWorkspaceId));
+      setSaveState("saved");
+    } catch (error) {
+      setSaveState(navigator.onLine ? "error" : "offline");
+      setSaveError(error instanceof Error ? error.message : "Delete failed");
+    }
   }
 
   async function signOut() {
@@ -395,7 +517,8 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
   }
 
   function applyOnboardingSetup(setup: OnboardingSetup) {
-    setSaveState("saving");
+    if (blockReadOnlyMutation()) return;
+    markPendingSave();
     setPeople((current) =>
       applyOnboardingSetupToPeople({
         people: current,
@@ -416,6 +539,7 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
           activeWorkspaceId={activeWorkspaceId}
           setActiveWorkspaceId={setActiveWorkspaceId}
           saveState={isPending ? "saving" : saveState}
+          saveError={saveError}
           mode={initialData.mode}
         />
 
@@ -427,6 +551,8 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
               people={workspacePeople}
               prompts={workspacePrompts}
               saveState={saveState}
+              saveError={saveError}
+              canEdit={canEditActiveWorkspace}
               showStarterGuide={showStarterGuide}
               onUpdateEntry={updateEntry}
               onAddPerson={addPerson}
@@ -445,6 +571,7 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
               onAddDetail={addRepositoryDetail}
               onUpdateDetail={updateRepositoryDetail}
               onDeleteDetail={deleteRepositoryDetail}
+              canEdit={canEditActiveWorkspace}
             />
           ) : null}
 
@@ -455,20 +582,25 @@ export function JournalApp({ initialData }: { initialData: JournalBootstrap }) {
           {tab === "settings" ? (
             <SettingsView
               profile={initialData.profile}
+              mode={initialData.mode}
               workspaces={workspaces}
               activeWorkspaceId={activeWorkspaceId}
+              workspaceMembers={activeWorkspaceMembers}
               reminders={reminders}
               prompts={workspacePrompts}
               people={workspacePeople}
               entries={workspaceEntries}
+              canEdit={canEditActiveWorkspace}
+              setWorkspaceMembers={setWorkspaceMembers}
               setActiveWorkspaceId={setActiveWorkspaceId}
-              setReminders={setReminders}
-              setPrompts={setPrompts}
-              setPeople={setPeople}
+              setReminders={updateReminders}
+              setPrompts={updatePrompts}
+              setPeople={updatePeople}
               addWorkspace={addWorkspace}
               deleteWorkspaceData={deleteWorkspaceEntries}
               signOut={signOut}
               replayOnboarding={replayOnboarding}
+              appVersion={appVersion}
             />
           ) : null}
         </main>
@@ -495,6 +627,7 @@ function Sidebar({
   activeWorkspaceId,
   setActiveWorkspaceId,
   saveState,
+  saveError,
   mode
 }: {
   activeTab: AppTab;
@@ -503,6 +636,7 @@ function Sidebar({
   activeWorkspaceId: string;
   setActiveWorkspaceId: (id: string) => void;
   saveState: SaveState;
+  saveError: string | null;
   mode: "demo" | "supabase";
 }) {
   return (
@@ -547,7 +681,8 @@ function Sidebar({
           <p className="mt-2 text-sm leading-5 text-warm-gray">
             {mode === "demo" ? "Changes are saved in this browser for review." : "Supabase RLS keeps each workspace private."}
           </p>
-          <SaveStatePill state={saveState} />
+          <SaveStatePill state={saveState} error={saveError} />
+          {saveError ? <p className="mt-2 text-xs leading-5 text-warm-gray">{saveError}</p> : null}
         </div>
       </div>
     </aside>
@@ -956,6 +1091,8 @@ function TodayView({
   people,
   prompts,
   saveState,
+  saveError,
+  canEdit,
   showStarterGuide,
   onUpdateEntry,
   onAddPerson,
@@ -968,6 +1105,8 @@ function TodayView({
   people: PersonTag[];
   prompts: PromptTemplate[];
   saveState: SaveState;
+  saveError: string | null;
+  canEdit: boolean;
   showStarterGuide: boolean;
   onUpdateEntry: (entryId: string, updater: (entry: JournalEntry) => JournalEntry) => void;
   onAddPerson: (name: string) => PersonTag | null;
@@ -1022,9 +1161,11 @@ function TodayView({
           </div>
           <div className="flex items-center gap-2">
             <StreakPill days={summary.current} />
-            <SaveStatePill state={saveState} />
+            <SaveStatePill state={saveState} error={saveError} />
           </div>
         </header>
+
+        {!canEdit ? <ReadOnlyNotice /> : null}
 
         {showStarterGuide ? (
           <StarterGuideCard
@@ -1036,31 +1177,26 @@ function TodayView({
 
         <PhotoHero
           entry={entry}
-          onAddPhoto={(photo) =>
+          canEdit={canEdit}
+          onChangePhotos={(updater) =>
             onUpdateEntry(entry.id, (current) => ({
               ...current,
-              photos: [...current.photos, photo].slice(0, 2),
-              updatedAt: new Date().toISOString()
-            }))
-          }
-          onRemovePhoto={(photoId) =>
-            onUpdateEntry(entry.id, (current) => ({
-              ...current,
-              photos: current.photos.filter((photo) => photo.id !== photoId),
+              photos: normalizePhotoOrder(updater(current.photos)).slice(0, 2),
               updatedAt: new Date().toISOString()
             }))
           }
         />
 
-        <PromptPanel entry={entry} onUpdateEntry={onUpdateEntry} />
-        <PeoplePanel entry={entry} people={people} onUpdateEntry={onUpdateEntry} onAddPerson={onAddPerson} />
-        <LittleDetailsPanel entry={entry} people={people} onUpdateEntry={onUpdateEntry} />
-        <MoodPanel entry={entry} onUpdateEntry={onUpdateEntry} />
+        <PromptPanel entry={entry} canEdit={canEdit} onUpdateEntry={onUpdateEntry} />
+        <PeoplePanel entry={entry} people={people} canEdit={canEdit} onUpdateEntry={onUpdateEntry} onAddPerson={onAddPerson} />
+        <LittleDetailsPanel entry={entry} people={people} canEdit={canEdit} onUpdateEntry={onUpdateEntry} />
+        <MoodPanel entry={entry} canEdit={canEdit} onUpdateEntry={onUpdateEntry} />
       </section>
 
       <aside className="grid content-start gap-5">
         <CompletionCard entry={entry} />
-        <GratitudeGuideCard guide={guide} onUseSuggestion={useGuideSuggestion} />
+        <PickMeUpMemoryCard entries={entries} onOpenEntry={onOpenEntry} />
+        <GratitudeGuideCard guide={guide} canEdit={canEdit} onUseSuggestion={useGuideSuggestion} />
         <MemoryLanePanel matches={matches} entries={entries} onOpenEntry={onOpenEntry} />
         <PromptSnapshot prompts={prompts} />
       </aside>
@@ -1070,9 +1206,11 @@ function TodayView({
 
 function GratitudeGuideCard({
   guide,
+  canEdit,
   onUseSuggestion
 }: {
   guide: ReturnType<typeof gratitudeGuideForEntry>;
+  canEdit: boolean;
   onUseSuggestion: (suggestion: string) => void;
 }) {
   return (
@@ -1084,6 +1222,7 @@ function GratitudeGuideCard({
             key={suggestion}
             type="button"
             onClick={() => onUseSuggestion(suggestion)}
+            disabled={!canEdit}
             className="flex min-h-12 items-center justify-between gap-3 rounded-2xl bg-journal-raised px-3 py-2 text-left text-sm font-semibold leading-5 text-soft-ink transition hover:bg-white hover:shadow-sm"
             aria-label={`Use suggestion: ${suggestion}`}
           >
@@ -1099,20 +1238,25 @@ function GratitudeGuideCard({
 
 function PhotoHero({
   entry,
-  onAddPhoto,
-  onRemovePhoto
+  canEdit,
+  onChangePhotos
 }: {
   entry: JournalEntry;
-  onAddPhoto: (photo: PhotoAttachment) => void;
-  onRemovePhoto: (photoId: string) => void;
+  canEdit: boolean;
+  onChangePhotos: (updater: (photos: PhotoAttachment[]) => PhotoAttachment[]) => void;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const replaceInputRef = useRef<HTMLInputElement | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const heroPhoto = entry.photos[0];
-  const remainingSlots = Math.max(0, 2 - entry.photos.length);
+  const [replacePhotoId, setReplacePhotoId] = useState<string | null>(null);
+  const orderedPhotos = useMemo(() => normalizePhotoOrder(entry.photos), [entry.photos]);
+  const heroPhoto = orderedPhotos[0];
+  const remainingSlots = Math.max(0, 2 - orderedPhotos.length);
+  const hasPhotos = orderedPhotos.length > 0;
 
   async function handleFiles(files: FileList | null) {
+    if (!canEdit) return;
     if (!files) return;
     setError(null);
     const selected = Array.from(files).slice(0, remainingSlots);
@@ -1127,20 +1271,22 @@ function PhotoHero({
     }
 
     try {
+      const newPhotos: PhotoAttachment[] = [];
       for (const file of selected) {
         const previewUrl = await fileToCompressedDataUrl(file);
-        onAddPhoto({
+        newPhotos.push({
           id: crypto.randomUUID(),
           entryId: entry.id,
           storagePath: "",
           thumbnailPath: "",
           previewUrl,
           caption: "",
-          sortOrder: entry.photos.length,
+          sortOrder: orderedPhotos.length + newPhotos.length,
           createdAt: new Date().toISOString()
         });
       }
-      setStatus("Photo saved locally for the beta.");
+      onChangePhotos((current) => [...current, ...newPhotos]);
+      setStatus(newPhotos.length === 1 ? "Photo saved. Future-you gets a little more context." : "Photos saved. Pick the cover that feels most like today.");
     } catch {
       setError("That photo could not be added. Try a smaller image or a different file.");
       setStatus(null);
@@ -1149,12 +1295,79 @@ function PhotoHero({
     }
   }
 
+  async function handleReplaceFile(files: FileList | null) {
+    if (!canEdit) return;
+    const file = files?.[0];
+    const targetId = replacePhotoId;
+    if (!file || !targetId) return;
+    setError(null);
+    setStatus("Replacing photo...");
+
+    try {
+      const previewUrl = await fileToCompressedDataUrl(file);
+      onChangePhotos((current) =>
+        current.map((photo) =>
+          photo.id === targetId
+            ? {
+                ...photo,
+                previewUrl,
+                storagePath: "",
+                thumbnailPath: "",
+                createdAt: new Date().toISOString()
+              }
+            : photo
+        )
+      );
+      setStatus("Photo replaced. Caption and order stayed with the memory.");
+    } catch {
+      setError("That replacement could not be added. Try a smaller image or a different file.");
+      setStatus(null);
+    } finally {
+      setReplacePhotoId(null);
+      if (replaceInputRef.current) replaceInputRef.current.value = "";
+    }
+  }
+
+  function updateCaption(photoId: string, caption: string) {
+    if (!canEdit) return;
+    onChangePhotos((current) => current.map((photo) => (photo.id === photoId ? { ...photo, caption } : photo)));
+  }
+
+  function movePhoto(photoId: string, direction: -1 | 1) {
+    if (!canEdit) return;
+    onChangePhotos((current) => {
+      const next = normalizePhotoOrder(current);
+      const index = next.findIndex((photo) => photo.id === photoId);
+      const targetIndex = index + direction;
+      if (index < 0 || targetIndex < 0 || targetIndex >= next.length) return current;
+      const [photo] = next.splice(index, 1);
+      next.splice(targetIndex, 0, photo);
+      return next;
+    });
+    setStatus(direction < 0 ? "Cover photo updated." : "Photo order updated.");
+  }
+
+  function removePhoto(photoId: string) {
+    if (!canEdit) return;
+    onChangePhotos((current) => current.filter((photo) => photo.id !== photoId));
+    setStatus("Photo removed. The entry is still yours to shape.");
+  }
+
+  function beginReplace(photoId: string) {
+    if (!canEdit) return;
+    setReplacePhotoId(photoId);
+    window.setTimeout(() => replaceInputRef.current?.click(), 0);
+  }
+
   return (
     <section className="overflow-hidden rounded-[28px] bg-ink shadow-photo">
       <button
         type="button"
-        onClick={() => inputRef.current?.click()}
-        className="relative flex min-h-[290px] w-full items-end overflow-hidden p-5 text-left text-white sm:min-h-[470px] sm:p-6"
+        onClick={() => {
+          if (canEdit) inputRef.current?.click();
+        }}
+        disabled={!canEdit}
+        className="relative flex min-h-[300px] w-full items-end overflow-hidden p-5 text-left text-white sm:min-h-[470px] sm:p-6"
       >
         {heroPhoto ? (
           <img
@@ -1166,53 +1379,190 @@ function PhotoHero({
           <div className="absolute inset-0 bg-[linear-gradient(135deg,#8da38e,#e6c392_52%,#b96464)]" />
         )}
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,0.58))]" />
-        <div className="relative max-w-md">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-white/80">Photo of the day</p>
+        <div className="relative max-w-md pr-8">
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-white/80">{hasPhotos ? "Photo of the day" : "Memory starts here"}</p>
           <h2 className="mt-2 text-3xl font-bold leading-tight">
-            {entry.photos.length === 0 ? "Start with one photo, if one moment stands out." : "Let the photo hold most of the story."}
+            {hasPhotos ? heroPhoto.caption.trim() || "Let the photo hold most of the story." : "Start with one photo, if one moment stands out."}
           </h2>
           <p className="mt-2 text-sm text-white/86">
-            {entry.photos.length < 2 ? "One or two photos is plenty. Text is optional." : "Two photos saved. Tap remove if today feels simpler."}
+            {orderedPhotos.length < 2 ? "One or two photos is plenty. Text is optional." : "Two photos saved. Reorder or remove if today feels simpler."}
           </p>
         </div>
       </button>
 
-      <div className="flex flex-wrap items-center gap-3 bg-journal-surface p-4">
+      <div className="grid gap-4 bg-journal-surface p-4">
         <input
           ref={inputRef}
           className="hidden"
           type="file"
           accept="image/*"
           multiple
+          aria-label="Add journal photos"
+          disabled={!canEdit}
           onChange={(event) => handleFiles(event.target.files)}
         />
+        <input
+          ref={replaceInputRef}
+          className="hidden"
+          type="file"
+          accept="image/*"
+          aria-label="Replace selected journal photo"
+          disabled={!canEdit}
+          onChange={(event) => handleReplaceFile(event.target.files)}
+        />
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={!canEdit || remainingSlots === 0}
+            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-rose px-4 text-sm font-bold text-white"
+          >
+            <ImagePlus aria-hidden="true" size={18} />
+            {orderedPhotos.length === 0 ? "Add photo" : remainingSlots > 0 ? "Add one more" : "Two photos saved"}
+          </button>
+          <div className="min-w-[180px] flex-1 text-sm text-warm-gray" aria-live="polite">
+            {error ? <p className="font-semibold text-rose">{error}</p> : <p>{status ?? `${remainingSlots} photo slot${remainingSlots === 1 ? "" : "s"} open.`}</p>}
+          </div>
+        </div>
+
+        {orderedPhotos.length > 0 ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {orderedPhotos.map((photo, index) => (
+              <article key={photo.id} className="grid gap-3 rounded-[22px] border border-journal-line bg-white p-3 shadow-sm">
+                <div className="grid grid-cols-[76px_1fr] gap-3">
+                  <img src={photo.previewUrl} alt="" className="h-[76px] w-[76px] rounded-2xl object-cover" />
+                  <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.12em] text-warm-gray">
+                    {index === 0 ? "Cover caption" : "Second photo caption"}
+                    <input
+                      value={photo.caption}
+                      onChange={(event) => updateCaption(photo.id, event.target.value)}
+                      placeholder={index === 0 ? "What should this photo remember?" : "Add a small note"}
+                      disabled={!canEdit}
+                      className="min-h-10 min-w-0 rounded-2xl border border-journal-line bg-journal-raised px-3 text-sm font-semibold normal-case tracking-normal text-soft-ink outline-none focus:ring-4 focus:ring-rose/15"
+                    />
+                  </label>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => movePhoto(photo.id, -1)}
+                    disabled={!canEdit || index === 0}
+                    className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-journal-raised px-3 text-xs font-bold text-soft-ink"
+                    aria-label="Move photo earlier"
+                  >
+                    <ChevronLeft aria-hidden="true" size={14} />
+                    Earlier
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => movePhoto(photo.id, 1)}
+                    disabled={!canEdit || index === orderedPhotos.length - 1}
+                    className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-journal-raised px-3 text-xs font-bold text-soft-ink"
+                    aria-label="Move photo later"
+                  >
+                    Later
+                    <ChevronRight aria-hidden="true" size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => beginReplace(photo.id)}
+                    disabled={!canEdit}
+                    className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-rose/10 px-3 text-xs font-bold text-rose"
+                    aria-label="Replace photo"
+                  >
+                    <Camera aria-hidden="true" size={14} />
+                    Replace
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removePhoto(photo.id)}
+                    disabled={!canEdit}
+                    className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-journal-raised px-3 text-xs font-bold text-warm-gray"
+                    aria-label="Remove photo"
+                  >
+                    <X aria-hidden="true" size={14} />
+                    Remove
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="grid gap-2 rounded-[22px] border border-dashed border-rose/25 bg-white/72 p-4 text-sm text-warm-gray sm:grid-cols-3">
+            <p><span className="font-bold text-soft-ink">Pick one moment.</span> A meal, a face, the sky, the ordinary proof.</p>
+            <p><span className="font-bold text-soft-ink">Add a caption later.</span> The photo can be the whole entry.</p>
+            <p><span className="font-bold text-soft-ink">Keep it light.</span> Two photos max keeps the ritual calm.</p>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function normalizePhotoOrder(photos: PhotoAttachment[]): PhotoAttachment[] {
+  return [...photos]
+    .sort((left, right) => left.sortOrder - right.sortOrder || left.createdAt.localeCompare(right.createdAt))
+    .map((photo, index) => ({ ...photo, sortOrder: index }));
+}
+
+function PickMeUpMemoryCard({
+  entries,
+  onOpenEntry
+}: {
+  entries: JournalEntry[];
+  onOpenEntry: (entryId: string) => void;
+}) {
+  const memories = useMemo(
+    () =>
+      entries
+        .filter((entry) => entry.localDate !== toLocalDate() && isEntryComplete(entry))
+        .sort((left, right) => Number(right.photos.length > 0) - Number(left.photos.length > 0) || right.localDate.localeCompare(left.localDate)),
+    [entries]
+  );
+  const [index, setIndex] = useState(0);
+  const memory = memories[index % Math.max(1, memories.length)];
+  const photo = memory?.photos[0];
+
+  useEffect(() => {
+    setIndex(0);
+  }, [memories.length]);
+
+  if (!memory) {
+    return (
+      <section className="rounded-journal border border-journal-line bg-journal-surface p-5">
+        <SectionTitle icon={Sparkles} title="Show me something good" subtitle="After a few saved days, this becomes a small pick-me-up button." />
+        <p className="rounded-2xl bg-journal-raised p-4 text-sm text-warm-gray">Save today, then come back when there is a past moment to return to.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-journal border border-journal-line bg-journal-surface p-5">
+      <SectionTitle icon={Sparkles} title="Show me something good" subtitle="A tiny pick-me-up from the archive." />
+      <button
+        type="button"
+        onClick={() => onOpenEntry(memory.id)}
+        className="group overflow-hidden rounded-[22px] bg-journal-raised text-left transition hover:-translate-y-0.5 hover:bg-white hover:shadow-sm"
+      >
+        <JournalPhoto src={photo?.previewUrl} alt={photo?.caption || ""} className="h-32 w-full object-cover" loading="lazy" />
+        <div className="p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-rose">{formatDisplayDate(memory.localDate, "short")}</p>
+          <p className="mt-2 line-clamp-3 text-sm font-semibold leading-5 text-soft-ink">
+            {photo?.caption.trim() || firstResponseExcerpt(memory) || memory.details[0]?.text || "Open this memory"}
+          </p>
+        </div>
+      </button>
+      {memories.length > 1 ? (
         <button
           type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={remainingSlots === 0}
-          className="inline-flex min-h-11 items-center gap-2 rounded-full bg-rose px-4 text-sm font-bold text-white"
+          onClick={() => setIndex((current) => (current + 1) % memories.length)}
+          className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-full bg-rose/10 px-4 text-sm font-bold text-rose"
         >
-          <ImagePlus aria-hidden="true" size={18} />
-          {entry.photos.length === 0 ? "Add photo" : remainingSlots > 0 ? "Add one more" : "Two photos saved"}
+          <Sparkles aria-hidden="true" size={16} />
+          Show another
         </button>
-
-        {entry.photos.map((photo) => (
-          <div key={photo.id} className="group relative">
-            <img src={photo.previewUrl} alt="" className="h-16 w-16 rounded-2xl object-cover" />
-            <button
-              type="button"
-              onClick={() => onRemovePhoto(photo.id)}
-              className="absolute -right-2 -top-2 grid h-7 w-7 place-items-center rounded-full bg-ink text-white shadow"
-              aria-label="Remove photo"
-            >
-              <X aria-hidden="true" size={14} />
-            </button>
-          </div>
-        ))}
-        <div className="min-w-[180px] flex-1 text-sm text-warm-gray">
-          {error ? <p className="font-semibold text-rose">{error}</p> : <p>{status ?? `${remainingSlots} photo slot${remainingSlots === 1 ? "" : "s"} open.`}</p>}
-        </div>
-      </div>
+      ) : null}
     </section>
   );
 }
@@ -1283,9 +1633,11 @@ function StarterGuideCard({
 
 function PromptPanel({
   entry,
+  canEdit,
   onUpdateEntry
 }: {
   entry: JournalEntry;
+  canEdit: boolean;
   onUpdateEntry: (entryId: string, updater: (entry: JournalEntry) => JournalEntry) => void;
 }) {
   const responses = entry.sessions.flatMap((session) => session.responses);
@@ -1330,6 +1682,7 @@ function PromptPanel({
               }}
               rows={1}
               placeholder={["A small good thing", "Another nice moment", "One more, if it fits"][index]}
+              disabled={!canEdit}
               className="min-h-8 flex-1 border-0 bg-transparent text-base outline-none"
             />
           </label>
@@ -1347,6 +1700,7 @@ function PromptPanel({
                   value={response.text}
                   onChange={(event) => updateResponse(response.id, event.target.value)}
                   rows={3}
+                  disabled={!canEdit}
                   className="rounded-2xl border border-journal-line bg-journal-raised p-3 font-normal outline-none focus:ring-4 focus:ring-rose/15"
                   placeholder="Optional"
                 />
@@ -1362,11 +1716,13 @@ function PromptPanel({
 function PeoplePanel({
   entry,
   people,
+  canEdit,
   onUpdateEntry,
   onAddPerson
 }: {
   entry: JournalEntry;
   people: PersonTag[];
+  canEdit: boolean;
   onUpdateEntry: (entryId: string, updater: (entry: JournalEntry) => JournalEntry) => void;
   onAddPerson: (name: string) => PersonTag | null;
 }) {
@@ -1392,7 +1748,7 @@ function PeoplePanel({
   return (
     <section className="rounded-journal border border-journal-line bg-journal-surface p-5">
       <SectionTitle icon={Users} title="People, optional" subtitle="Private labels for anyone woven into this memory." />
-      <PersonChips people={people} selectedIds={entry.personTagIds} onToggle={toggle} />
+      <PersonChips people={people} selectedIds={entry.personTagIds} onToggle={toggle} disabled={!canEdit} />
       <div className="mt-4 flex gap-2">
         <input
           value={name}
@@ -1401,9 +1757,10 @@ function PeoplePanel({
             if (event.key === "Enter") add();
           }}
           placeholder="Add a private person"
+          disabled={!canEdit}
           className="min-h-11 min-w-0 flex-1 rounded-2xl border border-journal-line bg-journal-raised px-3 outline-none focus:ring-4 focus:ring-rose/15"
         />
-        <button onClick={add} className="grid h-11 w-11 place-items-center rounded-full bg-rose/10 text-rose" aria-label="Add person">
+        <button onClick={add} disabled={!canEdit} className="grid h-11 w-11 place-items-center rounded-full bg-rose/10 text-rose" aria-label="Add person">
           <Plus aria-hidden="true" />
         </button>
       </div>
@@ -1414,10 +1771,12 @@ function PeoplePanel({
 function LittleDetailsPanel({
   entry,
   people,
+  canEdit,
   onUpdateEntry
 }: {
   entry: JournalEntry;
   people: PersonTag[];
+  canEdit: boolean;
   onUpdateEntry: (entryId: string, updater: (entry: JournalEntry) => JournalEntry) => void;
 }) {
   const [text, setText] = useState("");
@@ -1465,6 +1824,7 @@ function LittleDetailsPanel({
                     key={option.id}
                     type="button"
                     onClick={() => updateDetail(detail.id, (current) => ({ ...current, category: option.id }))}
+                    disabled={!canEdit}
                     className={clsx(
                       "rounded-full px-3 py-1 text-xs font-bold",
                       active ? "bg-rose/10 text-rose" : "bg-white text-warm-gray"
@@ -1480,6 +1840,7 @@ function LittleDetailsPanel({
               <textarea
                 value={detail.text}
                 onChange={(event) => updateDetail(detail.id, (current) => ({ ...current, text: event.target.value }))}
+                disabled={!canEdit}
                 className="min-h-12 flex-1 border-0 bg-transparent outline-none"
               />
               <button
@@ -1490,6 +1851,7 @@ function LittleDetailsPanel({
                     updatedAt: new Date().toISOString()
                   }))
                 }
+                disabled={!canEdit}
                 className="grid h-9 w-9 place-items-center rounded-full text-warm-gray"
                 aria-label="Remove detail"
               >
@@ -1501,6 +1863,7 @@ function LittleDetailsPanel({
                 compact
                 people={people}
                 selectedIds={detail.personTagIds}
+                disabled={!canEdit}
                 onToggle={(personId) =>
                   updateDetail(detail.id, (current) => ({
                     ...current,
@@ -1524,6 +1887,7 @@ function LittleDetailsPanel({
                 key={option.id}
                 type="button"
                 onClick={() => setCategory(option.id)}
+                disabled={!canEdit}
                 className={clsx(
                   "rounded-full px-3 py-1.5 text-xs font-bold",
                   active ? "bg-rose/10 text-rose" : "bg-journal-raised text-warm-gray"
@@ -1543,9 +1907,10 @@ function LittleDetailsPanel({
             if (event.key === "Enter") addDetail();
           }}
           placeholder="A phrase, phase, favorite, or tiny milestone"
+          disabled={!canEdit}
           className="min-h-11 min-w-0 flex-1 rounded-2xl border border-journal-line bg-journal-raised px-3 outline-none focus:ring-4 focus:ring-rose/15"
         />
-        <button onClick={addDetail} className="grid h-11 w-11 place-items-center rounded-full bg-rose/10 text-rose" aria-label="Add little detail">
+        <button onClick={addDetail} disabled={!canEdit} className="grid h-11 w-11 place-items-center rounded-full bg-rose/10 text-rose" aria-label="Add little detail">
           <Plus aria-hidden="true" />
         </button>
         </div>
@@ -1556,9 +1921,11 @@ function LittleDetailsPanel({
 
 function MoodPanel({
   entry,
+  canEdit,
   onUpdateEntry
 }: {
   entry: JournalEntry;
+  canEdit: boolean;
   onUpdateEntry: (entryId: string, updater: (entry: JournalEntry) => JournalEntry) => void;
 }) {
   return (
@@ -1572,6 +1939,7 @@ function MoodPanel({
             <button
               key={mood.id}
               onClick={() => onUpdateEntry(entry.id, (current) => ({ ...current, mood: mood.id, updatedAt: new Date().toISOString() }))}
+              disabled={!canEdit}
               className={clsx(
                 "grid min-h-16 place-items-center rounded-2xl text-xs font-bold",
                 active ? "bg-rose/10 text-rose" : "bg-journal-raised text-warm-gray"
@@ -1594,7 +1962,8 @@ function MemoriesView({
   onOpenEntry,
   onAddDetail,
   onUpdateDetail,
-  onDeleteDetail
+  onDeleteDetail,
+  canEdit
 }: {
   entries: JournalEntry[];
   people: PersonTag[];
@@ -1603,11 +1972,15 @@ function MemoriesView({
   onAddDetail: (detail: { localDate: string; text: string; category: DetailCategory; personTagIds: string[] }) => void;
   onUpdateDetail: (entryId: string, detailId: string, updater: (detail: MemoryDetail) => MemoryDetail) => void;
   onDeleteDetail: (entryId: string, detailId: string) => void;
+  canEdit: boolean;
 }) {
   const [mode, setMode] = useState<MemoryMode>("entries");
   const [query, setQuery] = useState("");
   const [personId, setPersonId] = useState<string | null>(null);
   const [filter, setFilter] = useState<MemoryFilter>("all");
+  const completeCount = entries.filter(isEntryComplete).length;
+  const photoCount = entries.filter((entry) => entry.photos.length > 0).length;
+  const detailCount = entries.reduce((count, entry) => count + entry.details.filter((detail) => detail.text.trim()).length, 0);
 
   const filtered = useMemo(() => {
     return searchEntries(entries, people, query).filter((entry) => {
@@ -1645,6 +2018,7 @@ function MemoriesView({
         <LittleDetailsRepository
           entries={entries}
           people={people}
+          canEdit={canEdit}
           onOpenEntry={onOpenEntry}
           onAddDetail={onAddDetail}
           onUpdateDetail={onUpdateDetail}
@@ -1652,6 +2026,27 @@ function MemoriesView({
         />
       ) : (
         <>
+      <section className="grid gap-3 sm:grid-cols-3">
+        <MemoryStatPill icon={CheckCircle2} label="Kept" value={`${completeCount}`} />
+        <MemoryStatPill icon={Camera} label="Photo days" value={`${photoCount}`} />
+        <MemoryStatPill icon={Sparkles} label="Details" value={`${detailCount}`} />
+      </section>
+      {completeCount <= 1 ? (
+        <section className="rounded-journal border border-journal-line bg-journal-surface p-5">
+          <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
+            <div>
+              <h2 className="text-xl font-bold">The archive is just beginning.</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-warm-gray">
+                One kept day already counts. Add another photo, line, or little detail when the next small good thing shows up.
+              </p>
+            </div>
+            <button type="button" onClick={onOpenToday} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-rose px-4 text-sm font-bold text-white">
+              <Camera aria-hidden="true" size={17} />
+              Keep today
+            </button>
+          </div>
+        </section>
+      ) : null}
       <div className="rounded-journal border border-journal-line bg-journal-surface p-4">
         <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
           <label className="relative">
@@ -1696,6 +2091,7 @@ function MemoriesView({
 function LittleDetailsRepository({
   entries,
   people,
+  canEdit,
   onOpenEntry,
   onAddDetail,
   onUpdateDetail,
@@ -1703,6 +2099,7 @@ function LittleDetailsRepository({
 }: {
   entries: JournalEntry[];
   people: PersonTag[];
+  canEdit: boolean;
   onOpenEntry: (entryId: string) => void;
   onAddDetail: (detail: { localDate: string; text: string; category: DetailCategory; personTagIds: string[] }) => void;
   onUpdateDetail: (entryId: string, detailId: string, updater: (detail: MemoryDetail) => MemoryDetail) => void;
@@ -1730,6 +2127,7 @@ function LittleDetailsRepository({
   }
 
   function addDetail() {
+    if (!canEdit) return;
     const trimmed = newText.trim();
     if (!trimmed) return;
     onAddDetail({
@@ -1782,12 +2180,14 @@ function LittleDetailsRepository({
             type="date"
             value={newDate}
             onChange={(event) => setNewDate(event.target.value)}
+            disabled={!canEdit}
             className="min-h-12 rounded-2xl border border-journal-line bg-white px-3 font-semibold outline-none focus:ring-4 focus:ring-rose/15"
             aria-label="Detail date"
           />
           <select
             value={newCategory}
             onChange={(event) => setNewCategory(event.target.value as DetailCategory)}
+            disabled={!canEdit}
             className="min-h-12 rounded-2xl border border-journal-line bg-white px-3 font-semibold outline-none"
             aria-label="Detail category"
           >
@@ -1803,12 +2203,14 @@ function LittleDetailsRepository({
             onKeyDown={(event) => {
               if (event.key === "Enter") addDetail();
             }}
+            disabled={!canEdit}
             placeholder="Add a phrase, favorite, routine, milestone, quote, or note"
             className="min-h-12 min-w-0 rounded-2xl border border-journal-line bg-white px-3 outline-none focus:ring-4 focus:ring-rose/15"
           />
           <button
             type="button"
             onClick={addDetail}
+            disabled={!canEdit}
             className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-rose px-5 text-sm font-bold text-white"
           >
             <Plus aria-hidden="true" size={18} />
@@ -1817,7 +2219,7 @@ function LittleDetailsRepository({
         </div>
         {people.length > 0 ? (
           <div className="mt-3">
-            <PersonChips compact people={people} selectedIds={newPersonIds} onToggle={toggleNewPerson} />
+            <PersonChips compact people={people} selectedIds={newPersonIds} onToggle={toggleNewPerson} disabled={!canEdit} />
           </div>
         ) : null}
       </section>
@@ -1872,6 +2274,7 @@ function LittleDetailsRepository({
                   <button
                     type="button"
                     onClick={() => onDeleteDetail(item.entry.id, item.detail.id)}
+                    disabled={!canEdit}
                     className="grid h-9 w-9 place-items-center rounded-full bg-journal-raised text-warm-gray"
                     aria-label="Delete little detail"
                   >
@@ -1889,6 +2292,7 @@ function LittleDetailsRepository({
                       category: event.target.value as DetailCategory
                     }))
                   }
+                  disabled={!canEdit}
                   className="min-h-11 rounded-2xl border border-journal-line bg-white px-3 text-sm font-semibold outline-none"
                   aria-label="Edit detail category"
                 >
@@ -1906,6 +2310,7 @@ function LittleDetailsRepository({
                       text: event.target.value
                     }))
                   }
+                  disabled={!canEdit}
                   className="min-h-16 rounded-2xl border border-journal-line bg-white p-3 outline-none focus:ring-4 focus:ring-rose/15"
                   aria-label="Edit little detail"
                 />
@@ -1917,6 +2322,7 @@ function LittleDetailsRepository({
                     compact
                     people={people}
                     selectedIds={item.detail.personTagIds}
+                    disabled={!canEdit}
                     onToggle={(personIdToToggle) =>
                       onUpdateDetail(item.entry.id, item.detail.id, (detail) => ({
                         ...detail,
@@ -2036,12 +2442,16 @@ function InsightsView({ entries }: { entries: JournalEntry[] }) {
 
 function SettingsView({
   profile,
+  mode,
   workspaces,
   activeWorkspaceId,
+  workspaceMembers,
   reminders,
   prompts,
   people,
   entries,
+  canEdit,
+  setWorkspaceMembers,
   setActiveWorkspaceId,
   setReminders,
   setPrompts,
@@ -2049,15 +2459,20 @@ function SettingsView({
   addWorkspace,
   deleteWorkspaceData,
   signOut,
-  replayOnboarding
+  replayOnboarding,
+  appVersion
 }: {
   profile: { email: string; displayName: string } | null;
+  mode: "demo" | "supabase";
   workspaces: Workspace[];
   activeWorkspaceId: string;
+  workspaceMembers: WorkspaceMember[];
   reminders: ReminderPreferences;
   prompts: PromptTemplate[];
   people: PersonTag[];
   entries: JournalEntry[];
+  canEdit: boolean;
+  setWorkspaceMembers: React.Dispatch<React.SetStateAction<WorkspaceMember[]>>;
   setActiveWorkspaceId: (id: string) => void;
   setReminders: (preferences: ReminderPreferences) => void;
   setPrompts: React.Dispatch<React.SetStateAction<PromptTemplate[]>>;
@@ -2066,7 +2481,10 @@ function SettingsView({
   deleteWorkspaceData: () => void;
   signOut: () => void;
   replayOnboarding: () => void;
+  appVersion: string;
 }) {
+  const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null;
+
   return (
     <div className="mx-auto grid max-w-5xl gap-5">
       <PageHeader title="Settings" subtitle="Plain controls for privacy, prompts, people, export, and household access." />
@@ -2085,6 +2503,11 @@ function SettingsView({
       </SettingsSection>
 
       <SettingsSection title="Workspaces">
+        {activeWorkspace ? (
+          <p className="mb-3 text-sm leading-6 text-warm-gray">
+            {workspaceRoleCopy(activeWorkspace.role)}
+          </p>
+        ) : null}
         <select
           value={activeWorkspaceId}
           onChange={(event) => setActiveWorkspaceId(event.target.value)}
@@ -2102,12 +2525,21 @@ function SettingsView({
         </div>
       </SettingsSection>
 
+      <HouseholdSharingPanel
+        mode={mode}
+        workspace={activeWorkspace}
+        members={workspaceMembers}
+        setWorkspaceMembers={setWorkspaceMembers}
+      />
+
       <SettingsSection title="Reminders">
+        {!canEdit ? <ReadOnlySettingsCopy /> : null}
         <div className="grid gap-3 sm:grid-cols-3">
           <label className="grid gap-1 text-sm font-bold text-soft-ink">
             Cadence
             <select
               value={reminders.cadence}
+              disabled={!canEdit}
               onChange={(event) => setReminders({ ...reminders, cadence: event.target.value as RitualCadence })}
               className="min-h-11 rounded-2xl border border-journal-line bg-white px-3 font-normal outline-none"
             >
@@ -2122,6 +2554,7 @@ function SettingsView({
             <input
               type="time"
               value={reminders.eveningTime}
+              disabled={!canEdit}
               onChange={(event) => setReminders({ ...reminders, eveningTime: event.target.value })}
               className="min-h-11 rounded-2xl border border-journal-line bg-white px-3 font-normal outline-none"
             />
@@ -2131,6 +2564,7 @@ function SettingsView({
             <input
               type="time"
               value={reminders.morningTime}
+              disabled={!canEdit}
               onChange={(event) => setReminders({ ...reminders, morningTime: event.target.value })}
               className="min-h-11 rounded-2xl border border-journal-line bg-white px-3 font-normal outline-none"
             />
@@ -2139,11 +2573,13 @@ function SettingsView({
       </SettingsSection>
 
       <SettingsSection title="Prompts">
+        {!canEdit ? <ReadOnlySettingsCopy /> : null}
         <div className="grid gap-3">
           {prompts.map((prompt) => (
             <input
               key={prompt.id}
               value={prompt.prompt}
+              readOnly={!canEdit}
               onChange={(event) =>
                 setPrompts((current) =>
                   current.map((candidate) => (candidate.id === prompt.id ? { ...candidate, prompt: event.target.value } : candidate))
@@ -2156,11 +2592,13 @@ function SettingsView({
       </SettingsSection>
 
       <SettingsSection title="People Tags">
+        {!canEdit ? <ReadOnlySettingsCopy /> : null}
         <div className="grid gap-2 sm:grid-cols-2">
           {people.map((person) => (
             <input
               key={person.id}
               value={person.name}
+              readOnly={!canEdit}
               onChange={(event) =>
                 setPeople((current) =>
                   current.map((candidate) => (candidate.id === person.id ? { ...candidate, name: event.target.value } : candidate))
@@ -2185,6 +2623,7 @@ function SettingsView({
             onClick={() => {
               if (window.confirm("Delete all entries in this workspace? This cannot be undone in the current beta.")) deleteWorkspaceData();
             }}
+            disabled={!canEdit}
             className="inline-flex min-h-10 items-center gap-2 rounded-full bg-journal-raised px-4 text-sm font-bold text-rose"
           >
             <Trash2 aria-hidden="true" size={16} />
@@ -2192,6 +2631,334 @@ function SettingsView({
           </button>
         </div>
       </SettingsSection>
+
+      <SettingsSection title="Beta">
+        <div className="grid gap-2 text-sm text-warm-gray">
+          <p>
+            App version <span className="font-bold text-soft-ink">{appVersion}</span>
+          </p>
+          <p>Use this version in QA notes when reporting household sharing, sync, or photo issues.</p>
+        </div>
+      </SettingsSection>
+    </div>
+  );
+}
+
+const workspaceRoleLabels: Record<WorkspaceRole, string> = {
+  owner: "Owner",
+  editor: "Editor",
+  viewer: "Viewer"
+};
+
+const workspaceRoleOptions: WorkspaceRole[] = ["owner", "editor", "viewer"];
+
+function workspaceRoleCopy(role: WorkspaceRole) {
+  if (role === "owner") return "Owner access can invite household members, change roles, remove members, and edit journal content.";
+  if (role === "editor") return "Editor access can add and change memories, prompts, people tags, and reminders. Household member controls stay with owners.";
+  return "Viewer access can read this workspace. Editing, deletes, and household member controls are disabled.";
+}
+
+function ReadOnlySettingsCopy() {
+  return <p className="mb-3 text-sm leading-6 text-warm-gray">Viewer access is read-only for this workspace.</p>;
+}
+
+function ReadOnlyNotice() {
+  return (
+    <section className="rounded-journal border border-journal-line bg-journal-surface p-4 text-sm leading-6 text-warm-gray">
+      Viewer access is read-only for this workspace. Memories, prompts, people tags, photos, and deletes are disabled.
+    </section>
+  );
+}
+
+function HouseholdSharingPanel({
+  mode,
+  workspace,
+  members,
+  setWorkspaceMembers
+}: {
+  mode: "demo" | "supabase";
+  workspace: Workspace | null;
+  members: WorkspaceMember[];
+  setWorkspaceMembers: React.Dispatch<React.SetStateAction<WorkspaceMember[]>>;
+}) {
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<WorkspaceRole>("editor");
+  const [busyMemberId, setBusyMemberId] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const canManageMembers = workspace?.role === "owner";
+  const acceptedMembers = members.filter((member) => member.invitationState === "accepted");
+  const pendingInvites = members.filter((member) => member.invitationState === "invited");
+
+  function upsertMember(nextMember: WorkspaceMember) {
+    setWorkspaceMembers((current) => {
+      const withoutMember = current.filter(
+        (member) => !(member.workspaceId === nextMember.workspaceId && member.userId === nextMember.userId)
+      );
+      return [...withoutMember, nextMember];
+    });
+  }
+
+  async function inviteMember() {
+    if (!workspace || !canManageMembers) return;
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setError("Enter an email address.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setStatus(null);
+    setError(null);
+
+    if (mode === "demo") {
+      upsertMember({
+        workspaceId: workspace.id,
+        userId: crypto.randomUUID(),
+        email: normalizedEmail,
+        displayName: normalizedEmail,
+        role,
+        invitationState: "invited",
+        invitedEmail: normalizedEmail,
+        createdAt: new Date().toISOString(),
+        isCurrentUser: false
+      });
+      setEmail("");
+      setStatus("Demo invite added.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/workspaces/${workspace.id}/members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalizedEmail, role })
+      });
+      if (!response.ok) throw new Error(await responseErrorMessage(response, "Invite failed"));
+      const payload = (await response.json()) as { member?: WorkspaceMember | null };
+      if (payload.member) upsertMember(payload.member);
+      setEmail("");
+      setStatus("Member added to this household workspace.");
+    } catch (inviteError) {
+      setError(inviteError instanceof Error ? inviteError.message : "Invite failed");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function updateMemberRole(member: WorkspaceMember, nextRole: WorkspaceRole) {
+    if (!workspace || !canManageMembers || member.isCurrentUser) return;
+    setBusyMemberId(member.userId);
+    setStatus(null);
+    setError(null);
+
+    if (mode === "demo") {
+      setWorkspaceMembers((current) =>
+        current.map((candidate) =>
+          candidate.workspaceId === member.workspaceId && candidate.userId === member.userId
+            ? { ...candidate, role: nextRole }
+            : candidate
+        )
+      );
+      setBusyMemberId(null);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/workspaces/${workspace.id}/members/${member.userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: nextRole })
+      });
+      if (!response.ok) throw new Error(await responseErrorMessage(response, "Role update failed"));
+      setWorkspaceMembers((current) =>
+        current.map((candidate) =>
+          candidate.workspaceId === member.workspaceId && candidate.userId === member.userId
+            ? { ...candidate, role: nextRole }
+            : candidate
+        )
+      );
+      setStatus("Member role updated.");
+    } catch (roleError) {
+      setError(roleError instanceof Error ? roleError.message : "Role update failed");
+    } finally {
+      setBusyMemberId(null);
+    }
+  }
+
+  async function removeMember(member: WorkspaceMember) {
+    if (!workspace || !canManageMembers || member.isCurrentUser) return;
+    setBusyMemberId(member.userId);
+    setStatus(null);
+    setError(null);
+
+    if (mode === "demo") {
+      setWorkspaceMembers((current) =>
+        current.filter((candidate) => !(candidate.workspaceId === member.workspaceId && candidate.userId === member.userId))
+      );
+      setBusyMemberId(null);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/workspaces/${workspace.id}/members/${member.userId}`, { method: "DELETE" });
+      if (!response.ok) throw new Error(await responseErrorMessage(response, "Remove failed"));
+      setWorkspaceMembers((current) =>
+        current.filter((candidate) => !(candidate.workspaceId === member.workspaceId && candidate.userId === member.userId))
+      );
+      setStatus("Member removed.");
+    } catch (removeError) {
+      setError(removeError instanceof Error ? removeError.message : "Remove failed");
+    } finally {
+      setBusyMemberId(null);
+    }
+  }
+
+  return (
+    <SettingsSection title="Household Sharing">
+      <div className="grid gap-4">
+        <div>
+          <p className="text-sm leading-6 text-warm-gray">
+            {workspace?.kind === "household"
+              ? canManageMembers
+                ? "Invite someone by email and choose how much they can change."
+                : "Only owners can invite people or change household roles."
+              : "Household sharing is available from a household journal."}
+          </p>
+          {mode === "supabase" ? (
+            <p className="mt-1 text-xs font-semibold text-warm-gray">
+              Invitees need an existing account in this beta; no service role or auth metadata is used for access decisions.
+            </p>
+          ) : null}
+        </div>
+
+        {workspace?.kind === "household" ? (
+          <div className="grid gap-3 rounded-2xl bg-journal-raised p-3 sm:grid-cols-[1fr_150px_auto]">
+            <input
+              type="email"
+              value={email}
+              disabled={!canManageMembers || isSubmitting}
+              onChange={(event) => setEmail(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") inviteMember();
+              }}
+              placeholder="name@example.com"
+              className="min-h-11 min-w-0 rounded-2xl border border-journal-line bg-white px-3 outline-none focus:ring-4 focus:ring-rose/15"
+            />
+            <select
+              value={role}
+              disabled={!canManageMembers || isSubmitting}
+              onChange={(event) => setRole(event.target.value as WorkspaceRole)}
+              className="min-h-11 rounded-2xl border border-journal-line bg-white px-3 font-semibold outline-none"
+            >
+              {workspaceRoleOptions.map((option) => (
+                <option key={option} value={option}>
+                  {workspaceRoleLabels[option]}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={inviteMember}
+              disabled={!canManageMembers || isSubmitting}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-rose px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-journal-line disabled:text-warm-gray"
+            >
+              <Plus aria-hidden="true" size={16} />
+              Invite
+            </button>
+          </div>
+        ) : null}
+
+        {status ? <p className="text-sm font-semibold text-leaf">{status}</p> : null}
+        {error ? <p className="text-sm font-semibold text-rose">{error}</p> : null}
+
+        <MemberList
+          title="Members"
+          members={acceptedMembers}
+          canManageMembers={canManageMembers}
+          busyMemberId={busyMemberId}
+          onUpdateRole={updateMemberRole}
+          onRemoveMember={removeMember}
+        />
+        <MemberList
+          title="Invites"
+          empty="No pending invites."
+          members={pendingInvites}
+          canManageMembers={canManageMembers}
+          busyMemberId={busyMemberId}
+          onUpdateRole={updateMemberRole}
+          onRemoveMember={removeMember}
+        />
+      </div>
+    </SettingsSection>
+  );
+}
+
+function MemberList({
+  title,
+  empty = "No members yet.",
+  members,
+  canManageMembers,
+  busyMemberId,
+  onUpdateRole,
+  onRemoveMember
+}: {
+  title: string;
+  empty?: string;
+  members: WorkspaceMember[];
+  canManageMembers: boolean;
+  busyMemberId: string | null;
+  onUpdateRole: (member: WorkspaceMember, role: WorkspaceRole) => void;
+  onRemoveMember: (member: WorkspaceMember) => void;
+}) {
+  return (
+    <div>
+      <h3 className="text-sm font-bold uppercase tracking-[0.12em] text-warm-gray">{title}</h3>
+      <div className="mt-2 grid gap-2">
+        {members.length === 0 ? (
+          <p className="rounded-2xl bg-journal-raised p-3 text-sm text-warm-gray">{empty}</p>
+        ) : (
+          members.map((member) => {
+            const isBusy = busyMemberId === member.userId;
+            const canChangeMember = canManageMembers && !member.isCurrentUser && !isBusy;
+            return (
+              <div key={`${member.workspaceId}:${member.userId}`} className="grid gap-3 rounded-2xl bg-journal-raised p-3 sm:grid-cols-[1fr_150px_auto] sm:items-center">
+                <div className="min-w-0">
+                  <p className="truncate font-bold text-soft-ink">
+                    {member.displayName}
+                    {member.isCurrentUser ? <span className="text-warm-gray"> (you)</span> : null}
+                  </p>
+                  <p className="truncate text-sm text-warm-gray">{member.email || member.invitedEmail || "Email hidden by privacy settings"}</p>
+                </div>
+                <select
+                  value={member.role}
+                  disabled={!canChangeMember}
+                  onChange={(event) => onUpdateRole(member, event.target.value as WorkspaceRole)}
+                  className="min-h-10 rounded-2xl border border-journal-line bg-white px-3 text-sm font-semibold outline-none disabled:bg-white/60 disabled:text-warm-gray"
+                  aria-label={`Role for ${member.displayName}`}
+                >
+                  {workspaceRoleOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {workspaceRoleLabels[option]}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={!canChangeMember}
+                  onClick={() => onRemoveMember(member)}
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-white px-3 text-sm font-bold text-rose disabled:cursor-not-allowed disabled:text-warm-gray"
+                >
+                  <Trash2 aria-hidden="true" size={15} />
+                  Remove
+                </button>
+              </div>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }
@@ -2205,7 +2972,10 @@ function MemoryLanePanel({
   entries: JournalEntry[];
   onOpenEntry: (entryId: string) => void;
 }) {
-  const fallback = entries.find((entry) => entry.localDate !== toLocalDate());
+  const fallback = entries
+    .filter((entry) => entry.localDate !== toLocalDate() && isEntryComplete(entry))
+    .sort((left, right) => right.localDate.localeCompare(left.localDate))[0];
+  const completeCount = entries.filter(isEntryComplete).length;
 
   return (
     <section className="rounded-journal border border-journal-line bg-journal-surface p-5">
@@ -2225,7 +2995,7 @@ function MemoryLanePanel({
             })
           : fallback
             ? <MemoryLaneCard entry={fallback} label="Recent memory" onOpen={onOpenEntry} />
-            : <p className="rounded-2xl bg-journal-raised p-4 text-sm text-warm-gray">Older entries will appear here as your journal grows.</p>}
+            : <MemoryLaneEmpty completeCount={completeCount} />}
       </div>
     </section>
   );
@@ -2233,6 +3003,7 @@ function MemoryLanePanel({
 
 function MemoryLaneCard({ entry, label, onOpen }: { entry: JournalEntry; label: string; onOpen: (entryId: string) => void }) {
   const photo = entry.photos[0];
+  const text = photo?.caption.trim() || firstResponseExcerpt(entry) || entry.details.find((detail) => detail.text.trim())?.text || "Open memory";
 
   return (
     <button type="button" onClick={() => onOpen(entry.id)} className="flex gap-3 rounded-2xl bg-journal-raised p-3 text-left transition hover:-translate-y-0.5 hover:bg-white hover:shadow-sm">
@@ -2240,9 +3011,26 @@ function MemoryLaneCard({ entry, label, onOpen }: { entry: JournalEntry; label: 
       <div className="min-w-0">
         <p className="font-bold">{label}</p>
         <p className="text-sm text-warm-gray">{formatDisplayDate(entry.localDate, "short")}</p>
-        <p className="mt-1 line-clamp-2 text-sm text-soft-ink">{firstResponseExcerpt(entry) ?? "Open memory"}</p>
+        <p className="mt-1 line-clamp-2 text-sm text-soft-ink">{text}</p>
       </div>
     </button>
+  );
+}
+
+function MemoryLaneEmpty({ completeCount }: { completeCount: number }) {
+  return (
+    <div className="grid gap-2">
+      <p className="rounded-2xl bg-journal-raised p-4 text-sm leading-6 text-warm-gray">
+        {completeCount === 0
+          ? "Keep one thing today and this space will have somewhere to begin."
+          : "A few more kept days will give this space something older to return."}
+      </p>
+      <div className="grid grid-cols-3 gap-2 text-center text-xs font-bold text-warm-gray">
+        {["1 month", "1 year", "3 years"].map((label) => (
+          <span key={label} className="rounded-2xl bg-white px-2 py-3">{label}</span>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -2260,6 +3048,7 @@ function MemoryCard({
   const tagged = entryPeople(entry, people);
   const detail = entry.details.find((candidate) => candidate.text.trim());
   const photo = entry.photos[0];
+  const primaryText = photo?.caption.trim() || firstResponseExcerpt(entry) || "Open memory";
   return (
     <article className="overflow-hidden rounded-journal border border-journal-line bg-journal-surface shadow-sm transition hover:-translate-y-0.5 hover:shadow-photo">
       <button type="button" onClick={() => onOpen?.(entry.id)} className="block h-full w-full text-left">
@@ -2269,7 +3058,7 @@ function MemoryCard({
           <p className="font-bold">{formatDisplayDate(entry.localDate, "short")}</p>
           {isEntryComplete(entry) ? <CheckCircle2 aria-label="Complete entry" className="text-leaf" size={18} /> : null}
         </div>
-        <p className="mt-2 line-clamp-3 text-sm text-warm-gray">{firstResponseExcerpt(entry) ?? "Open memory"}</p>
+        <p className="mt-2 line-clamp-3 text-sm text-warm-gray">{primaryText}</p>
         {detail ? (
           <p className="mt-3 rounded-2xl bg-journal-raised p-3 text-sm text-soft-ink">
             <span className="font-bold text-rose">Little detail: </span>
@@ -2349,7 +3138,10 @@ function EntryDetailModal({ entry, people, onClose }: { entry: JournalEntry; peo
           {entry.photos.length > 0 ? (
             <div className={clsx("grid gap-3", entry.photos.length > 1 ? "md:grid-cols-2" : "")}>
               {entry.photos.map((photo) => (
-                <JournalPhoto key={photo.id} src={photo.previewUrl} alt={photo.caption || "Journal memory"} className="max-h-[520px] w-full rounded-[24px] object-cover shadow-sm" />
+                <figure key={photo.id} className="grid gap-2">
+                  <JournalPhoto src={photo.previewUrl} alt={photo.caption || "Journal memory"} className="max-h-[520px] w-full rounded-[24px] object-cover shadow-sm" />
+                  {photo.caption.trim() ? <figcaption className="px-1 text-sm font-semibold text-soft-ink">{photo.caption}</figcaption> : null}
+                </figure>
               ))}
             </div>
           ) : (
@@ -2488,6 +3280,7 @@ function CompletionCard({ entry }: { entry: JournalEntry }) {
   const photoText = entry.photos.length ? `${entry.photos.length} photo${entry.photos.length === 1 ? "" : "s"}` : null;
   const detailText = entry.details.length ? `${entry.details.length} little detail${entry.details.length === 1 ? "" : "s"}` : null;
   const responseCount = entry.sessions.flatMap((session) => session.responses).filter((response) => response.text.trim()).length;
+  const captionCount = entry.photos.filter((photo) => photo.caption.trim()).length;
   const savedPieces = [photoText, responseCount ? `${responseCount} reflection${responseCount === 1 ? "" : "s"}` : null, detailText].filter(Boolean);
   return (
     <section className={clsx("rounded-journal border p-5", complete ? "border-leaf/20 bg-leaf/10" : "border-journal-line bg-journal-surface")}>
@@ -2497,9 +3290,16 @@ function CompletionCard({ entry }: { entry: JournalEntry }) {
       </p>
       <p className="mt-2 text-sm text-warm-gray">
         {complete
-          ? `${savedPieces.join(", ") || "A good thing"} saved. You can keep editing, but this day already has a place to live.`
+          ? `${savedPieces.join(", ") || "A good thing"} saved. This day already has a place to live.`
           : "Add one photo or one nice thing when you are ready."}
       </p>
+      {complete ? (
+        <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs font-bold text-soft-ink">
+          <span className="rounded-2xl bg-white/70 px-2 py-3">{entry.photos.length ? "Photo day" : "Text day"}</span>
+          <span className="rounded-2xl bg-white/70 px-2 py-3">{captionCount ? `${captionCount} caption${captionCount === 1 ? "" : "s"}` : "Caption open"}</span>
+          <span className="rounded-2xl bg-white/70 px-2 py-3">{entry.details.length ? "Details kept" : "Details open"}</span>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -2508,12 +3308,14 @@ function PersonChips({
   people,
   selectedIds,
   onToggle,
-  compact = false
+  compact = false,
+  disabled = false
 }: {
   people: PersonTag[];
   selectedIds: string[];
   onToggle: (id: string) => void;
   compact?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <div className="flex flex-wrap gap-2">
@@ -2523,6 +3325,7 @@ function PersonChips({
           <button
             key={person.id}
             onClick={() => onToggle(person.id)}
+            disabled={disabled}
             className={clsx(
               "inline-flex items-center gap-1.5 rounded-full px-3 font-bold",
               compact ? "min-h-8 text-xs" : "min-h-10 text-sm",
@@ -2572,9 +3375,26 @@ function StreakPill({ days }: { days: number }) {
   );
 }
 
-function SaveStatePill({ state }: { state: SaveState }) {
-  const label = state === "saving" ? "Saving" : state === "offline" ? "Saved locally" : "Saved";
-  return <span className="mt-3 inline-flex rounded-full bg-white px-3 py-1.5 text-xs font-bold text-warm-gray">{label}</span>;
+function SaveStatePill({ state, error }: { state: SaveState; error?: string | null }) {
+  const labelByState: Record<SaveState, string> = {
+    saved: "Saved",
+    saving: "Saving",
+    offline: "Offline",
+    error: "Sync issue",
+    local: "Local only",
+    readonly: "Read only"
+  };
+  return (
+    <span
+      title={error ?? undefined}
+      className={clsx(
+        "inline-flex rounded-full px-3 py-1.5 text-xs font-bold",
+        state === "error" ? "bg-rose/10 text-rose" : state === "saved" ? "bg-leaf/10 text-leaf" : "bg-white text-warm-gray"
+      )}
+    >
+      {labelByState[state]}
+    </span>
+  );
 }
 
 function MetricCard({ title, value, suffix }: { title: string; value: string; suffix: string }) {
@@ -2583,6 +3403,20 @@ function MetricCard({ title, value, suffix }: { title: string; value: string; su
       <p className="text-sm font-bold text-warm-gray">{title}</p>
       <p className="mt-2 text-4xl font-bold">{value}</p>
       <p className="text-sm text-warm-gray">{suffix}</p>
+    </section>
+  );
+}
+
+function MemoryStatPill({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
+  return (
+    <section className="flex min-h-16 items-center gap-3 rounded-journal border border-journal-line bg-journal-surface px-4">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-rose/10 text-rose">
+        <Icon aria-hidden="true" size={18} />
+      </span>
+      <div>
+        <p className="text-xs font-bold uppercase tracking-[0.12em] text-warm-gray">{label}</p>
+        <p className="text-xl font-bold">{value}</p>
+      </div>
     </section>
   );
 }
@@ -2668,6 +3502,15 @@ function fileToCompressedDataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
   });
+}
+
+async function responseErrorMessage(response: Response, fallback: string) {
+  try {
+    const data = (await response.json()) as { error?: string };
+    return data.error || fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function downloadJson(filename: string, value: unknown) {

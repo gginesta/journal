@@ -1,6 +1,6 @@
 {
   "name": "photo-gratitude-journal-web",
-  "version": "0.1.0",
+  "version": "0.2.7",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run tests/journal-logic.test.ts --environment node --globals",
+    "test": "vitest run tests/journal-logic.test.ts tests/journal-sync-safety.test.ts --environment node --globals",
     "pretest:e2e": "npm run build",
     "test:e2e": "node scripts/run-e2e.mjs"
   },

@@ -12,12 +12,21 @@ This project uses semantic versioning once releases begin.
 
 ## Source Of Truth
 
-For each release:
+For native iOS releases:
 
 - Update `MARKETING_VERSION` in the Xcode project.
 - Update `CURRENT_PROJECT_VERSION` for the build number.
 - Update `CHANGELOG.md`.
 - Tag the release as `vX.Y.Z`.
+
+For web beta releases:
+
+- Update `web/package.json`.
+- Let `web/package-lock.json` carry the same package version.
+- Confirm Settings > Beta shows the package version in the running app.
+- Update the milestone docs and QA notes with the tested version.
+
+Current web beta version: `0.2.7`.
 
 ## TestFlight Builds
 

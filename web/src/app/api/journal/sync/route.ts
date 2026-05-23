@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { JournalEntry, PersonTag, PromptTemplate, ReminderPreferences } from "@/types/journal";
+import { canMutateWorkspaceRole, isSafeWorkspaceStoragePath, parseImageDataUrl } from "@/lib/journal-sync-safety";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type SyncPayload = {
@@ -8,12 +9,6 @@ type SyncPayload = {
   prompts: PromptTemplate[];
   reminders: ReminderPreferences;
   entries: JournalEntry[];
-};
-
-type DataUrlParts = {
-  contentType: string;
-  buffer: Buffer;
-  extension: string;
 };
 
 export async function POST(request: Request) {
@@ -35,6 +30,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "workspaceId is required" }, { status: 400 });
   }
 
+  const access = await getWorkspaceMutationAccess(payload.workspaceId, user.id);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.message }, { status: access.status });
+  }
+
   const people = payload.people.filter((person) => person.workspaceId === payload.workspaceId);
   const prompts = payload.prompts.filter((prompt) => prompt.workspaceId === payload.workspaceId);
   const entries = payload.entries.filter((entry) => entry.workspaceId === payload.workspaceId);
@@ -50,6 +50,26 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ ok: true });
+}
+
+async function getWorkspaceMutationAccess(workspaceId: string, userId: string): Promise<{ ok: true } | { ok: false; status: number; message: string }> {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return { ok: false, status: 503, message: "Supabase is not configured" };
+
+  const { data, error } = await supabase
+    .from("workspace_members")
+    .select("role")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", userId)
+    .eq("invitation_state", "accepted")
+    .maybeSingle();
+
+  if (error) return { ok: false, status: 500, message: error.message };
+  if (!canMutateWorkspaceRole(data?.role)) {
+    return { ok: false, status: 403, message: "Editor access is required to sync this workspace" };
+  }
+
+  return { ok: true };
 }
 
 async function upsertPeople(workspaceId: string, people: PersonTag[]) {
@@ -139,6 +159,21 @@ async function syncEntryNestedRows(workspaceId: string, entry: JournalEntry) {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return null;
 
+  const photoRows = [];
+  for (const photo of entry.photos) {
+    const uploaded = await ensurePhotoStored(workspaceId, entry.localDate, photo.id, photo.previewUrl, photo.storagePath, photo.thumbnailPath);
+    if (uploaded.error) return uploaded.error;
+    photoRows.push({
+      id: photo.id,
+      entry_id: entry.id,
+      storage_path: uploaded.storagePath,
+      thumbnail_path: uploaded.thumbnailPath,
+      caption: photo.caption,
+      sort_order: photo.sortOrder,
+      byte_size: uploaded.byteSize
+    });
+  }
+
   const deletionError =
     (await supabase.from("entry_person_tags").delete().eq("entry_id", entry.id)).error ??
     (await supabase.from("journal_sessions").delete().eq("entry_id", entry.id)).error ??
@@ -207,22 +242,6 @@ async function syncEntryNestedRows(workspaceId: string, entry: JournalEntry) {
     }
   }
 
-  const photoRows = [];
-  for (const photo of entry.photos) {
-    const uploaded = await ensurePhotoStored(workspaceId, entry.localDate, photo.id, photo.previewUrl, photo.storagePath, photo.thumbnailPath);
-    if (!uploaded) continue;
-    if (uploaded.error) return uploaded.error;
-    photoRows.push({
-      id: photo.id,
-      entry_id: entry.id,
-      storage_path: uploaded.storagePath,
-      thumbnail_path: uploaded.thumbnailPath,
-      caption: photo.caption,
-      sort_order: photo.sortOrder,
-      byte_size: uploaded.byteSize
-    });
-  }
-
   const { error: photoDeleteError } = await supabase.from("photo_attachments").delete().eq("entry_id", entry.id);
   if (photoDeleteError) return photoDeleteError;
 
@@ -241,44 +260,41 @@ async function ensurePhotoStored(
   previewUrl: string,
   storagePath: string,
   thumbnailPath: string
-): Promise<null | { storagePath: string; thumbnailPath: string; byteSize?: number; error?: { message: string } }> {
+): Promise<{ storagePath: string; thumbnailPath: string; byteSize?: number; error?: { message: string } }> {
   const supabase = await createSupabaseServerClient();
-  if (!supabase) return null;
+  if (!supabase) return { storagePath, thumbnailPath, error: { message: "Supabase is not configured" } };
 
   if (storagePath && thumbnailPath) {
+    if (!isSafeWorkspaceStoragePath(storagePath, workspaceId) || !isSafeWorkspaceStoragePath(thumbnailPath, workspaceId)) {
+      return { storagePath, thumbnailPath, error: { message: "Photo storage metadata does not belong to this workspace" } };
+    }
     return { storagePath, thumbnailPath };
   }
 
-  const data = parseDataUrl(previewUrl);
-  if (!data) return null;
+  if (storagePath || thumbnailPath) {
+    return { storagePath, thumbnailPath, error: { message: "Photo storage metadata is incomplete" } };
+  }
+
+  const data = parseImageDataUrl(previewUrl);
+  if (!data) {
+    return { storagePath, thumbnailPath, error: { message: "Photo data is missing or is not a supported image" } };
+  }
+  const buffer = Buffer.from(data.base64, "base64");
 
   const path = `${workspaceId}/${localDate}/${photoId}.${data.extension}`;
   const thumbPath = `${workspaceId}/${localDate}/${photoId}-thumb.${data.extension}`;
 
-  const { error: photoError } = await supabase.storage.from("journal-photos").upload(path, data.buffer, {
+  const { error: photoError } = await supabase.storage.from("journal-photos").upload(path, buffer, {
     contentType: data.contentType,
     upsert: true
   });
   if (photoError) return { storagePath: path, thumbnailPath: thumbPath, error: photoError };
 
-  const { error: thumbError } = await supabase.storage.from("journal-thumbnails").upload(thumbPath, data.buffer, {
+  const { error: thumbError } = await supabase.storage.from("journal-thumbnails").upload(thumbPath, buffer, {
     contentType: data.contentType,
     upsert: true
   });
   if (thumbError) return { storagePath: path, thumbnailPath: thumbPath, error: thumbError };
 
-  return { storagePath: path, thumbnailPath: thumbPath, byteSize: data.buffer.byteLength };
-}
-
-function parseDataUrl(value: string): DataUrlParts | null {
-  const match = value.match(/^data:([^;]+);base64,(.+)$/);
-  if (!match) return null;
-
-  const contentType = match[1] ?? "image/jpeg";
-  const extension = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
-  return {
-    contentType,
-    extension,
-    buffer: Buffer.from(match[2] ?? "", "base64")
-  };
+  return { storagePath: path, thumbnailPath: thumbPath, byteSize: buffer.byteLength };
 }

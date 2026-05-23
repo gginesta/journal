@@ -5,7 +5,7 @@ Use this checklist for the consolidated Guided Gratitude Memory System beta. Run
 Record before testing:
 
 - Surface tested: Web demo / Web Supabase / TestFlight
-- Build number:
+- App version/build number: web `0.2.7` or TestFlight marketing version/build:
 - Device model:
 - OS/browser version:
 - Tester:
@@ -15,11 +15,13 @@ Record before testing:
 
 - Open the deployed web app in a clean browser profile.
 - Confirm demo mode is not being used for real beta data.
+- Open Settings > Beta and confirm app version `0.2.7` is visible.
 - Login with an email magic link.
 - Confirm the default personal workspace appears.
 - Create or open a household workspace.
 - Repeat core checks with a second authenticated account that is an accepted workspace member.
 - Confirm demo localStorage from prior UX review does not overwrite authenticated Supabase data.
+- Keep notes that identify which account and workspace role performed each sharing or sync action.
 
 ## Install And Launch / First Open
 
@@ -49,6 +51,9 @@ Record before testing:
 - Add a second photo if the UI allows it.
 - Preview each added photo if the UI offers preview.
 - Remove one attached photo and confirm the entry still behaves correctly.
+- Create or leave a photo-only entry and confirm the UI treats it as a kept memory without forcing reflection text.
+- Reload after photo add/remove and confirm thumbnails, hero image, and completion copy remain correct.
+- Confirm the beta one-or-two photo limit is explained without blocking text-only journaling.
 - Try importing a photo, cancelling, and returning to Today.
 - Edit or remove a prompt response.
 - Confirm a photo-only or light-text entry still feels accepted by the UI.
@@ -136,6 +141,16 @@ Record before testing:
 - Non-member cannot read workspace rows, journal rows, member rows, Little Details, or private photo objects.
 - A workspace cannot be left without at least one accepted owner.
 - Private photo paths are scoped under the workspace id and malformed paths fail closed.
+- Accepted members can load signed photo previews for the shared workspace.
+- Non-members cannot load signed photo previews or infer private Storage object paths.
+
+## Supabase Sync Safety
+
+- In Supabase mode, create an entry, reload, and confirm server data returns.
+- In a separate demo profile, create conflicting demo-only content, then log in with a real account and confirm authenticated data is not replaced by demo localStorage.
+- With two accepted member accounts, edit different fields on the same entry and record whether the latest saved state is understandable.
+- Temporarily disconnect network during an edit, reconnect, reload, and confirm the app does not duplicate entries or drop already-saved server data.
+- Confirm photo metadata appears only after upload succeeds; failed photo uploads should not leave broken permanent records.
 
 ## Regression Pass
 
@@ -147,6 +162,7 @@ Record before testing:
 ## Pass Criteria
 
 - Owner can create and revisit today's memory with photos, people/theme tags, Gratitude Guide text, and Little Details.
+- Settings > Beta shows the tested app version and QA notes include it.
 - Solo/self, family, and custom onboarding paths all feel valid.
 - Little Details are retrievable from both entry detail and repository/search surfaces.
 - Supabase beta data remains private to accepted workspace members and roles behave as documented.

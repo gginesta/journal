@@ -2,6 +2,8 @@
 
 Production web beta for Photo Gratitude Journal. It uses Next.js, Supabase Auth, Supabase Postgres, Supabase Storage, and Vercel.
 
+Current app version: `0.2.7`. The package version is shown in Settings > Beta and should be included in QA notes.
+
 ## Local Development
 
 ```powershell
@@ -19,6 +21,7 @@ With `NEXT_PUBLIC_DEMO_MODE=false`, authenticated edits autosave through Supabas
 
 1. Create a Supabase project.
 2. Run `supabase/migrations/202605210001_initial_schema.sql`.
+3. Run `supabase/migrations/202605230001_workspace_member_invites.sql`.
 3. Create App URL and redirect URLs:
    - `http://localhost:3000/auth/callback`
    - your Vercel production URL plus `/auth/callback`
@@ -34,4 +37,6 @@ With `NEXT_PUBLIC_DEMO_MODE=false`, authenticated edits autosave through Supabas
 
 ## Scope
 
-The first web beta supports personal and shared household workspaces, daily capture, private photo Storage upload, prompts, people tags, Little Details, Memories, Calendar, Memory Lane, Insights, export, and delete controls. Household invite/member-management UI and Stripe/Premium billing are intentionally deferred.
+The first web beta supports personal and shared household workspaces, household invite/member management, daily capture, private photo Storage upload, prompts, people tags, Little Details, Memories, Calendar, Memory Lane, Insights, export, and delete controls. Stripe/Premium billing is intentionally deferred.
+
+Before widening household testing, verify owner/editor/viewer behavior, non-member denial, demo-vs-authenticated sync separation, and photo add/remove persistence with the checklist in `../docs/QA_TESTFLIGHT.md`.

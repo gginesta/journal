@@ -123,6 +123,41 @@ export function makeDemoBootstrap(): JournalBootstrap {
       { id: "workspace-personal", name: "My journal", kind: "personal", role: "owner" },
       { id: workspaceId, name: "Family journal", kind: "household", role: "owner" }
     ],
+    workspaceMembers: [
+      {
+        workspaceId,
+        userId: "demo-user",
+        email: "demo@photojournal.local",
+        displayName: "Demo User",
+        role: "owner",
+        invitationState: "accepted",
+        invitedEmail: "",
+        createdAt: `${today}T08:00:00.000Z`,
+        isCurrentUser: true
+      },
+      {
+        workspaceId,
+        userId: "demo-partner",
+        email: "partner@photojournal.local",
+        displayName: "Partner",
+        role: "editor",
+        invitationState: "accepted",
+        invitedEmail: "partner@photojournal.local",
+        createdAt: `${today}T08:05:00.000Z`,
+        isCurrentUser: false
+      },
+      {
+        workspaceId,
+        userId: "demo-viewer",
+        email: "grandparent@photojournal.local",
+        displayName: "Grandparent",
+        role: "viewer",
+        invitationState: "invited",
+        invitedEmail: "grandparent@photojournal.local",
+        createdAt: `${today}T08:10:00.000Z`,
+        isCurrentUser: false
+      }
+    ],
     activeWorkspaceId: workspaceId,
     people: demoPeople,
     prompts: demoPrompts,

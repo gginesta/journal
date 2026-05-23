@@ -8,6 +8,12 @@ The core loop is intentionally small: add one or two photos, write one or a few 
 
 The app is inspired by the emotional utility of Five Minute Journal, but the product center is the user's own photos rather than a text-only habit checklist.
 
+## Current Beta Version
+
+- Current web beta app version: `0.2.7`.
+- The web package version is the app version source of truth and is visible in Settings > Beta for QA notes.
+- Manual QA should record this version when testing household sharing, Supabase sync safety, and photo handling.
+
 ## Product Principles
 
 - Photos are the emotional anchor.
@@ -50,7 +56,9 @@ The app is inspired by the emotional utility of Five Minute Journal, but the pro
 - Supabase Postgres and private Storage for journal data and photos.
 - Workspace-based personal and household journals.
 - RLS-protected owner/editor/viewer access model.
+- Shared household workspace verification for accepted members, viewer/editor role limits, and non-member denial.
 - Daily photo-led entry creation with text-only, photo-only, and mixed entries.
+- Photo add/remove polish for one or two photo memories, including photo-only completion.
 - Balanced onboarding for solo, partner, family, and custom memory shapes.
 - Private people/theme tags created during onboarding, entry editing, or Settings.
 - Gratitude Guide prompt packs that suggest gentle starters without requiring AI.
@@ -59,6 +67,7 @@ The app is inspired by the emotional utility of Five Minute Journal, but the pro
 - Little Details repository with search/filter by text, category, date, and person/theme tag.
 - Memories, Calendar, Memory Lane, Insights, Settings, JSON export, and delete controls.
 - Demo mode with browser-local persistence for UX review.
+- Sync-safety checks that authenticated Supabase data remains authoritative over demo localStorage.
 - Beta verification checklist for solo, family, custom, shared workspace, RLS, and Storage behavior.
 
 ### In Scope For Native v1
