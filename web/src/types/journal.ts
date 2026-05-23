@@ -1,5 +1,6 @@
 export type WorkspaceKind = "personal" | "household";
 export type WorkspaceRole = "owner" | "editor" | "viewer";
+export type WorkspaceInvitationState = "invited" | "accepted";
 export type SessionKind = "morning" | "evening" | "anytime";
 export type RitualCadence = "evening" | "once_daily" | "morning_evening" | "anytime";
 export type Mood = "low" | "quiet" | "good" | "bright" | "glowing";
@@ -15,6 +16,18 @@ export type Workspace = {
   name: string;
   kind: WorkspaceKind;
   role: WorkspaceRole;
+};
+
+export type WorkspaceMember = {
+  workspaceId: string;
+  userId: string;
+  email: string;
+  displayName: string;
+  role: WorkspaceRole;
+  invitationState: WorkspaceInvitationState;
+  invitedEmail: string;
+  createdAt: string;
+  isCurrentUser: boolean;
 };
 
 export type PersonTag = {
@@ -96,6 +109,7 @@ export type JournalBootstrap = {
   mode: "demo" | "supabase";
   profile: Profile | null;
   workspaces: Workspace[];
+  workspaceMembers: WorkspaceMember[];
   activeWorkspaceId: string;
   people: PersonTag[];
   prompts: PromptTemplate[];

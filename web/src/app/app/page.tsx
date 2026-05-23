@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import packageJson from "../../../package.json";
 import { isDemoMode } from "@/lib/supabase/env";
 import { loadJournalBootstrap } from "@/lib/bootstrap";
 import { JournalApp } from "@/components/JournalApp";
@@ -10,5 +11,5 @@ export default async function AppPage() {
     redirect("/login");
   }
 
-  return <JournalApp initialData={bootstrap} />;
+  return <JournalApp initialData={bootstrap} appVersion={packageJson.version} />;
 }

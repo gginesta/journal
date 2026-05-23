@@ -2,6 +2,8 @@
 
 The web app lives in `web/` and is the active private-beta path for the consolidated Guided Gratitude Memory System. It is a real Next.js + Supabase app, not just a static prototype, and should be treated as the source of truth for shared household beta behavior.
 
+Current app version: `0.2.7`. The version comes from `web/package.json` and is shown in Settings > Beta for tester reports.
+
 ## Beta Product Path
 
 - The beta validates the daily gratitude loop, private memory retrieval, and shared household model before wider native distribution.
@@ -53,7 +55,16 @@ Demo mode stores changes in browser local storage. This is only for UX review an
 - Photo metadata is written only after Storage upload succeeds, and future page loads use signed URLs for private photo previews.
 - Workspace creation uses the secured `public.create_workspace` database function through `/api/workspaces`.
 - Delete workspace entries uses `/api/journal/delete-workspace-entries` and relies on RLS plus cascade deletes for child rows.
-- Household invitation/member-management UI is still a beta follow-up; `workspace_members` is ready for it at the database layer.
+- Household invitation/member-management lives in Settings. Owners can invite existing signed-in users by email, assign roles, change roles, and remove non-self members.
+
+## Sync Safety Rules
+
+- In Supabase mode, server data is authoritative. Demo localStorage must not restore over authenticated workspace data.
+- Test demo mode and Supabase mode in separate clean browser profiles when possible.
+- Before testing a production-like account, clear stale demo data or use a browser profile that has never run demo mode.
+- Two accepted members editing the same workspace should be treated as a beta risk area until conflict handling is more granular; record which account, role, entry date, and browser performed each edit.
+- Photo metadata should appear only after the private Storage upload succeeds.
+- Signed photo URLs should be treated as temporary previews; do not copy them into product data or docs as stable assets.
 
 ## Product Surfaces To Verify
 
@@ -108,7 +119,8 @@ Do not put `SUPABASE_SERVICE_ROLE_KEY` in browser-readable code. It can exist in
 
 1. Create a Supabase project for the private beta.
 2. Run `web/supabase/migrations/202605210001_initial_schema.sql` in the Supabase SQL editor or through the Supabase CLI.
-3. Confirm the migration created private Storage buckets:
+3. Run `web/supabase/migrations/202605230001_workspace_member_invites.sql` so owner-managed household invites can look up existing signed-in users safely.
+4. Confirm the migrations created private Storage buckets:
    - `journal-photos`
    - `journal-thumbnails`
 4. In Authentication, enable email magic links.
@@ -157,6 +169,7 @@ SUPABASE_THUMBNAILS_BUCKET=journal-thumbnails
 
 ## Beta QA
 
+- Confirm Settings > Beta shows app version `0.2.7`.
 - Login with email magic link.
 - Confirm default personal workspace appears.
 - Create household workspace and switch between workspaces.
@@ -167,8 +180,10 @@ SUPABASE_THUMBNAILS_BUCKET=journal-thumbnails
 - Confirm a viewer can read but cannot write entries, photos, prompts, tags, reminders, or member rows.
 - Confirm an editor can write journal content but cannot update `workspace_members`.
 - Confirm only an owner can update workspace settings or membership.
+- Confirm a non-member cannot read the household workspace, journal rows, member rows, Little Details, or private photo objects.
 - Create a text-only entry.
-- Add one or two photos.
+- Add one photo, add a second photo, remove one photo, reload, and confirm the remaining photo state is correct.
+- Confirm a photo-only entry counts as a kept memory and appears in Memories/Calendar where expected.
 - Add people tags and Little Details.
 - Add a Little Detail from the repository flow if present.
 - Filter Little Details by text, category, and person/theme tag.

@@ -53,7 +53,7 @@ xcrun simctl list devices available
 
 ## Web Beta
 
-The browser app lives in `web/` and is the fastest way to test the product from a PC, iPad browser, or iPhone browser before TestFlight is ready.
+The browser app lives in `web/` and is the fastest way to test the product from a PC, iPad browser, or iPhone browser before TestFlight is ready. The current web beta app version is `0.2.7`, sourced from `web/package.json` and visible in Settings > Beta.
 
 ```powershell
 cd web
@@ -63,6 +63,8 @@ npm.cmd run dev
 ```
 
 Keep `NEXT_PUBLIC_DEMO_MODE=true` for local UX review without Supabase. For the private shared-family beta, deploy `web/` on Vercel, apply the Supabase migration in `web/supabase/migrations`, and use [Web App Operations](docs/WEB_APP.md) as the setup checklist.
+
+When filing beta notes, include app version `0.2.7`, browser/device, workspace role, and whether the pass used demo mode or authenticated Supabase mode.
 
 ## Product Shape
 

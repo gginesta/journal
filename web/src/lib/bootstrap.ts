@@ -1,4 +1,12 @@
-import type { JournalBootstrap, JournalEntry, PersonTag, PromptTemplate, ReminderPreferences, Workspace } from "@/types/journal";
+import type {
+  JournalBootstrap,
+  JournalEntry,
+  PersonTag,
+  PromptTemplate,
+  ReminderPreferences,
+  Workspace,
+  WorkspaceMember
+} from "@/types/journal";
 import { makeDemoBootstrap } from "@/data/demo";
 import { isDemoMode } from "@/lib/supabase/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -8,6 +16,21 @@ type WorkspaceRow = {
   name: string;
   kind: "personal" | "household";
   workspace_members: Array<{ role: "owner" | "editor" | "viewer" }>;
+};
+
+type WorkspaceMemberRow = {
+  workspace_id: string;
+  user_id: string;
+  role: "owner" | "editor" | "viewer";
+  invite_email: string | null;
+  invitation_state: "invited" | "accepted";
+  created_at: string;
+};
+
+type ProfileRow = {
+  id: string;
+  email: string;
+  display_name: string;
 };
 
 type PersonRow = {
@@ -133,7 +156,13 @@ export async function loadJournalBootstrap(): Promise<JournalBootstrap> {
     return makeDemoBootstrap();
   }
 
-  const [peopleResult, promptsResult, entriesResult, remindersResult] = await Promise.all([
+  const workspaceIds = workspaces.map((workspace) => workspace.id);
+  const [membersResult, peopleResult, promptsResult, entriesResult, remindersResult] = await Promise.all([
+    supabase
+      .from("workspace_members")
+      .select("workspace_id,user_id,role,invite_email,invitation_state,created_at")
+      .in("workspace_id", workspaceIds)
+      .order("created_at", { ascending: true }),
     supabase.from("person_tags").select("*").eq("workspace_id", activeWorkspaceId).order("sort_order"),
     supabase.from("prompt_templates").select("*").eq("workspace_id", activeWorkspaceId).order("sort_order"),
     supabase
@@ -153,6 +182,8 @@ export async function loadJournalBootstrap(): Promise<JournalBootstrap> {
 
   const rawEntries = (entriesResult.data ?? []) as EntryRow[];
   const signedPhotoUrls = await createPhotoUrlMap(rawEntries);
+  const memberRows = (membersResult.data ?? []) as WorkspaceMemberRow[];
+  const memberProfiles = await loadMemberProfiles(memberRows.map((member) => member.user_id));
 
   return {
     mode: "supabase",
@@ -162,11 +193,41 @@ export async function loadJournalBootstrap(): Promise<JournalBootstrap> {
       displayName: profileResult.data?.display_name ?? user.email ?? "Journal user"
     },
     workspaces,
+    workspaceMembers: memberRows.map((member) => mapWorkspaceMember(member, memberProfiles, user.id)),
     activeWorkspaceId,
     people: ((peopleResult.data ?? []) as PersonRow[]).map(mapPerson),
     prompts: ((promptsResult.data ?? []) as PromptRow[]).map(mapPrompt),
     entries: rawEntries.map((entry) => mapEntry(entry, signedPhotoUrls)),
     reminders: mapReminders(remindersResult.data as ReminderRow | null)
+  };
+}
+
+async function loadMemberProfiles(userIds: string[]): Promise<Map<string, ProfileRow>> {
+  const supabase = await createSupabaseServerClient();
+  const uniqueIds = Array.from(new Set(userIds));
+  const profiles = new Map<string, ProfileRow>();
+  if (!supabase || uniqueIds.length === 0) return profiles;
+
+  const { data } = await supabase.from("profiles").select("id,email,display_name").in("id", uniqueIds);
+  for (const profile of (data ?? []) as ProfileRow[]) {
+    profiles.set(profile.id, profile);
+  }
+  return profiles;
+}
+
+function mapWorkspaceMember(row: WorkspaceMemberRow, profiles: Map<string, ProfileRow>, currentUserId: string): WorkspaceMember {
+  const profile = profiles.get(row.user_id);
+  const email = row.invite_email ?? profile?.email ?? "";
+  return {
+    workspaceId: row.workspace_id,
+    userId: row.user_id,
+    email,
+    displayName: profile?.display_name || email || "Workspace member",
+    role: row.role,
+    invitationState: row.invitation_state,
+    invitedEmail: row.invite_email ?? "",
+    createdAt: row.created_at,
+    isCurrentUser: row.user_id === currentUserId
   };
 }
 

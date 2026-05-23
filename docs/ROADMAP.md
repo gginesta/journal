@@ -9,6 +9,36 @@ Current beta-readiness docs:
 - TestFlight owner setup: `docs/TESTFLIGHT.md`.
 - Manual beta QA: `docs/QA_TESTFLIGHT.md`.
 
+## Milestone 0.2.7 - Docs, Versioning, And QA Lane
+
+Status: complete for this docs/versioning lane; manual household QA still needs real tester accounts.
+
+Goal: make the private beta version traceable across package metadata, in-app QA surfaces, and milestone docs while tightening the verification path for household sharing, sync safety, and photo polish.
+
+Delivered:
+
+- Web package version set to `0.2.7`.
+- Settings > Beta shows the app version so tester notes can be tied to the exact build under review.
+- PRD, roadmap, web operations, README, and manual QA checklist describe the 0.2.7 beta scope.
+- QA emphasis added for accepted household members, owner/editor/viewer behavior, non-member denial, Storage path safety, and demo-vs-authenticated data separation.
+- Photo polish verification now covers photo-only memories, one-or-two photo limits, add/remove behavior, and reload persistence.
+- Stable Chromium E2E coverage added for Settings version visibility and photo add/remove behavior in demo mode.
+
+Acceptance criteria:
+
+- `web/package.json` and `web/package-lock.json` report version `0.2.7`.
+- The running web app exposes `0.2.7` in Settings > Beta.
+- Manual QA records app version, surface, device/browser, tester, and date before each pass.
+- Household sharing is verified with at least two real authenticated accounts before widening beta access.
+- Demo mode and Supabase mode are tested separately so browser-local demo data cannot mask authenticated server data.
+- Photo-only and mixed entries remain accepted and recoverable after add/remove/reload checks.
+
+Remaining work:
+
+- Run the full Supabase household matrix with owner, editor, viewer, and non-member accounts.
+- Verify concurrent-edit behavior with two accepted members editing the same workspace.
+- Confirm private signed photo URLs load for accepted members and fail for non-members after deployment.
+
 ## Milestone 0.2.5 - Web Private Beta Prototype
 
 Status: complete for private beta testing; Supabase and Vercel are live for the first household testers.
@@ -48,7 +78,7 @@ Acceptance criteria:
 Remaining work:
 
 - Verify RLS and shared household behavior with two real authenticated users.
-- Add household invitation/member-management UI on top of `workspace_members`.
+- Apply and verify the 0.2.7 household member RPC migration in Supabase, then test owner/editor/viewer/non-member behavior with real accounts.
 - Add more granular sync conflict handling for two people editing the same entry at the same time.
 - Run the private beta verification checklist from `docs/WEB_APP.md` after both testers have logged in, including solo, family, custom, Gratitude Guide, Little Details repository, and owner/editor/viewer coverage.
 

@@ -3,9 +3,15 @@ import { expect, type Page, test } from "@playwright/test";
 async function openFreshApp(page: Page) {
   await page.addInitScript(() => {
     window.localStorage.clear();
+    window.sessionStorage.clear();
   });
 
   await page.goto("/app");
+  await page.evaluate(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+  await page.reload({ waitUntil: "domcontentloaded" });
 }
 
 async function continueFromWelcome(page: Page) {
@@ -77,6 +83,8 @@ test("demo user can choose just me and other onboarding shapes without family-on
   await expect(page.getByRole("button", { name: "Solo Tester" }).first()).toBeVisible();
 
   await page.getByRole("button", { name: "Settings" }).first().click();
+  await expect(page.getByRole("heading", { name: "Beta" })).toBeVisible();
+  await expect(page.getByText("App version 0.2.7")).toBeVisible();
   await page.getByRole("button", { name: "Replay welcome" }).click();
   await continueFromWelcome(page);
   await page.getByRole("button", { name: "Other people or themes" }).click();
@@ -115,4 +123,63 @@ test("details repository can find tagged little details when the repository UI i
   await expect(page.getByText(detail)).toBeVisible();
   await page.getByRole("button", { name: tag }).first().click();
   await expect(page.getByText(detail)).toBeVisible();
+});
+
+test("photo polish lets a demo user caption a photo and use the pick-me-up memory", async ({ page }) => {
+  const caption = "Sun on the test table";
+  const tinyPng = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
+    "base64"
+  );
+
+  await openFreshApp(page);
+  await continueFromWelcome(page);
+  await startToday(page);
+
+  await page.locator('input[aria-label="Add journal photos"]').setInputFiles({
+    name: "memory.png",
+    mimeType: "image/png",
+    buffer: tinyPng
+  });
+  await expect(page.getByText("Photo saved. Future-you gets a little more context.")).toBeVisible();
+  await page.getByPlaceholder("What should this photo remember?").fill(caption);
+  await expect(page.getByRole("heading", { name: caption })).toBeVisible();
+  await expect(page.getByText("Photo day")).toBeVisible();
+  await expect(page.getByText("1 caption")).toBeVisible();
+
+  const pickMeUpCard = page.locator("section").filter({ has: page.getByRole("heading", { name: "Show me something good" }) });
+  const pickMeUpButton = pickMeUpCard.getByRole("button").filter({ hasText: "A sunny park loop and a tiny hand holding mine." }).first();
+  await expect(pickMeUpButton).toBeVisible();
+  await pickMeUpButton.click();
+  await expect(page.getByRole("heading", { name: "Memory from this day" })).toBeVisible();
+  await page.getByRole("button", { name: "Close memory" }).click();
+
+  await page.getByRole("button", { name: "Memories" }).first().click();
+  await expect(page.locator("article").filter({ hasText: caption })).toBeVisible();
+});
+
+test("demo user can add and remove a photo without requiring reflection text", async ({ page }) => {
+  const tinyPhoto = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/l7Q5YQAAAABJRU5ErkJggg==",
+    "base64"
+  );
+
+  await openFreshApp(page);
+  await continueFromWelcome(page);
+  await startToday(page);
+
+  await expect(page.getByRole("heading", { name: "Start with one photo, if one moment stands out." })).toBeVisible();
+  await page.getByLabel("Add journal photos").setInputFiles({
+    name: "one-good-moment.png",
+    mimeType: "image/png",
+    buffer: tinyPhoto
+  });
+
+  await expect(page.getByText("Photo saved. Future-you gets a little more context.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Let the photo hold most of the story." })).toBeVisible();
+  await expect(page.getByText(/1 photo.*saved/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Remove photo" }).click();
+  await expect(page.getByRole("heading", { name: "Start with one photo, if one moment stands out." })).toBeVisible();
+  await expect(page.getByText("Photo removed. The entry is still yours to shape.")).toBeVisible();
 });
