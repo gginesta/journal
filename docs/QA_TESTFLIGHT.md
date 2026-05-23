@@ -5,7 +5,7 @@ Use this checklist for the consolidated Guided Gratitude Memory System beta. Run
 Record before testing:
 
 - Surface tested: Web demo / Web Supabase / TestFlight
-- App version/build number: web `0.2.7` or TestFlight marketing version/build:
+- App version/build number: web `0.2.8` or TestFlight marketing version/build:
 - Device model:
 - OS/browser version:
 - Tester:
@@ -15,7 +15,7 @@ Record before testing:
 
 - Open the deployed web app in a clean browser profile.
 - Confirm demo mode is not being used for real beta data.
-- Open Settings > Beta and confirm app version `0.2.7` is visible.
+- Open Settings > Beta and confirm app version `0.2.8` is visible.
 - Login with an email magic link.
 - Confirm the default personal workspace appears.
 - Create or open a household workspace.
@@ -118,6 +118,8 @@ Record before testing:
 - Open an entry from Calendar.
 - Open Memory Lane.
 - Confirm any look-back card opens the correct entry.
+- With a young account, confirm Memory Lane can show early value from yesterday, 3 days ago, 1 week ago, or a recent kept memory instead of only waiting for year-old data.
+- With seeded older data, confirm 1 month, 3 month, 6 month, and yearly look-backs appear when available.
 - Confirm empty or low-data states are calm and not broken.
 
 ## Settings And Privacy

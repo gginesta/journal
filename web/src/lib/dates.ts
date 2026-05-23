@@ -31,6 +31,12 @@ export function addYears(value: string, count: number): string {
   return toLocalDate(date);
 }
 
+export function addDays(value: string, count: number): string {
+  const date = parseLocalDate(value);
+  date.setDate(date.getDate() + count);
+  return toLocalDate(date);
+}
+
 export function dayDistance(lhs: string, rhs: string): number {
   const oneDay = 24 * 60 * 60 * 1000;
   return Math.round((parseLocalDate(lhs).getTime() - parseLocalDate(rhs).getTime()) / oneDay);

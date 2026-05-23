@@ -56,7 +56,7 @@ Photo Gratitude Journal is a local-first SwiftUI app with Apple-native storage, 
 
 - A day is complete when it has at least one non-empty response or at least one photo.
 - `StreakCalculator` computes current streak, longest streak, and completed day count from complete entries.
-- `MemoryLane` searches for entries from 1 month, 1 year, 2 years, and 3 years ago, falling back to the closest entry within plus or minus 3 days.
+- `MemoryLane` progressively searches for useful look-backs as the archive grows: yesterday, 3 days ago, 1 week, 2 weeks, 1 month, 3 months, 6 months, then 1/2/3 year anniversaries. If no target matches, it can fall back to the most recent complete older entry.
 - `PromptSeeder` creates the default prompt set on first launch.
 
 ## Premium
