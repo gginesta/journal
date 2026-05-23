@@ -69,6 +69,18 @@ test("demo user can complete family onboarding, edit today, and find the saved m
   await expect(page.getByRole("heading", { name: "Calendar" })).toBeVisible();
 });
 
+test("welcome tour fits on a phone viewport without horizontal overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openFreshApp(page);
+
+  await expect(page.getByRole("heading", { name: "This is a quiet place to keep one good moment from today." })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Skip tour" })).toBeVisible();
+
+  const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(hasHorizontalOverflow).toBe(false);
+});
+
 test("demo user can choose just me and other onboarding shapes without family-only setup", async ({ page }) => {
   await openFreshApp(page);
   await continueFromWelcome(page);

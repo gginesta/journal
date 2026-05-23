@@ -105,6 +105,13 @@ const detailCategories: Array<{ id: DetailCategory; title: string }> = ([
 
 const storageKey = "photo-gratitude-web-state-v1";
 
+function shortDisplayName(profile: JournalBootstrap["profile"]) {
+  const candidate = profile?.displayName?.trim() || profile?.email?.trim() || "";
+  if (!candidate) return "there";
+  if (candidate.includes("@")) return candidate.split("@")[0] || "there";
+  return candidate.split(/\s+/)[0] || "there";
+}
+
 export function JournalApp({ initialData, appVersion }: { initialData: JournalBootstrap; appVersion: string }) {
   const [tab, setTab] = useState<AppTab>("today");
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
@@ -530,8 +537,8 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
   }
 
   return (
-    <div className="min-h-screen pb-20 text-ink lg:pb-0">
-      <div className="mx-auto grid min-h-screen w-full max-w-[1480px] lg:grid-cols-[280px_1fr]">
+    <div className="min-h-screen overflow-x-hidden pb-20 text-ink lg:pb-0">
+      <div className="mx-auto grid min-h-screen w-full max-w-[1480px] min-w-0 lg:grid-cols-[280px_1fr]">
         <Sidebar
           activeTab={tab}
           setTab={setTab}
@@ -750,7 +757,7 @@ function OnboardingOverlay({
 }) {
   const [step, setStep] = useState(0);
   const [focus, setFocus] = useState<OnboardingFocus>("self");
-  const firstName = profile?.displayName?.split(" ")[0] || "there";
+  const firstName = shortDisplayName(profile);
   const [meName, setMeName] = useState(profile?.displayName ? firstName : "");
   const [partnerName, setPartnerName] = useState(() => findPersonalizedPersonName(people, "Partner"));
   const [childNames, setChildNames] = useState(() => [
@@ -795,10 +802,10 @@ function OnboardingOverlay({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/45 px-4 py-5 backdrop-blur-md lg:items-center">
-      <section className="w-full max-w-5xl overflow-hidden rounded-[32px] bg-journal-surface shadow-photo">
-        <div className="grid lg:grid-cols-[1fr_420px]">
-          <div className="grid content-between gap-8 p-6 sm:p-8 lg:min-h-[640px] lg:p-10">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-x-hidden overflow-y-auto bg-ink/45 px-3 py-4 backdrop-blur-md sm:px-4 sm:py-5 lg:items-center">
+      <section className="w-full max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-[28px] bg-journal-surface shadow-photo sm:max-w-5xl sm:rounded-[32px]">
+        <div className="grid min-w-0 lg:grid-cols-[minmax(0,1fr)_420px]">
+          <div className="grid min-w-0 content-between gap-7 p-5 sm:gap-8 sm:p-8 lg:min-h-[640px] lg:p-10">
             <div>
               <div className="flex items-center justify-between gap-4">
                 <div className="flex gap-2">
@@ -814,8 +821,8 @@ function OnboardingOverlay({
                 </button>
               </div>
 
-              <p className="mt-10 text-sm font-bold uppercase tracking-[0.14em] text-rose">{current.title}</p>
-              <h1 className="mt-3 max-w-2xl text-4xl font-bold leading-[1.03] tracking-normal sm:text-5xl">{current.heading}</h1>
+              <p className="mt-9 max-w-full break-words text-xs font-bold uppercase tracking-[0.14em] text-rose sm:mt-10 sm:text-sm">{current.title}</p>
+              <h1 className="mt-3 max-w-2xl text-[2rem] font-bold leading-[1.04] tracking-normal sm:text-5xl">{current.heading}</h1>
               <p className="mt-4 max-w-xl text-base leading-7 text-warm-gray">{current.body}</p>
 
               {step === 1 ? (
@@ -901,17 +908,17 @@ function OnboardingOverlay({
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <button type="button" onClick={next} className="inline-flex min-h-12 items-center gap-2 rounded-full bg-rose px-5 font-bold text-white shadow-sm">
+              <button type="button" onClick={next} className="inline-flex min-h-12 min-w-[9.75rem] items-center justify-center gap-2 rounded-full bg-rose px-5 font-bold text-white shadow-sm">
                 {step === steps.length - 1 ? "Start today" : "Continue"}
                 <ArrowRight aria-hidden="true" size={17} />
               </button>
-              <button type="button" onClick={onClose} className="min-h-12 rounded-full bg-journal-raised px-5 font-bold text-warm-gray">
+              <button type="button" onClick={onClose} className="min-h-12 min-w-[9.75rem] rounded-full bg-journal-raised px-5 font-bold text-warm-gray sm:min-w-0">
                 Skip tour
               </button>
             </div>
           </div>
 
-          <div className="bg-[linear-gradient(150deg,#f9ece6,#f7fbf2_48%,#fff7f1)] p-5 sm:p-8">
+          <div className="min-w-0 bg-[linear-gradient(150deg,#f9ece6,#f7fbf2_48%,#fff7f1)] p-5 sm:p-8">
             {step === 0 ? <OnboardingTodayPreview /> : null}
             {step === 1 ? <OnboardingPeoplePreview focus={focus} meName={meName} partnerName={partnerName} childNames={childNames} otherNames={otherNames} /> : null}
             {step === 2 ? <OnboardingMemoryPreview focus={focus} childNames={childNames} partnerName={partnerName} otherNames={otherNames} /> : null}
