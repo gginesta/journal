@@ -105,6 +105,12 @@ const detailCategories: Array<{ id: DetailCategory; title: string }> = ([
 
 const storageKey = "photo-gratitude-web-state-v1";
 
+function shortDisplayName(profile: JournalBootstrap["profile"]) {
+  const displayName = profile?.displayName?.trim();
+  if (!displayName || displayName.includes("@")) return "there";
+  return displayName.split(/\s+/)[0] || "there";
+}
+
 export function JournalApp({ initialData, appVersion }: { initialData: JournalBootstrap; appVersion: string }) {
   const [tab, setTab] = useState<AppTab>("today");
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
@@ -530,8 +536,8 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
   }
 
   return (
-    <div className="min-h-screen pb-20 text-ink lg:pb-0">
-      <div className="mx-auto grid min-h-screen w-full max-w-[1480px] lg:grid-cols-[280px_1fr]">
+    <div className="min-h-screen overflow-x-hidden pb-20 text-ink lg:pb-0">
+      <div className="mx-auto grid min-h-screen w-full max-w-[1480px] min-w-0 lg:grid-cols-[280px_1fr]">
         <Sidebar
           activeTab={tab}
           setTab={setTab}
@@ -750,7 +756,7 @@ function OnboardingOverlay({
 }) {
   const [step, setStep] = useState(0);
   const [focus, setFocus] = useState<OnboardingFocus>("self");
-  const firstName = friendlyFirstName(profile);
+  const firstName = shortDisplayName(profile);
   const [meName, setMeName] = useState(firstName === "there" ? "" : firstName);
   const [partnerName, setPartnerName] = useState(() => findPersonalizedPersonName(people, "Partner"));
   const [childNames, setChildNames] = useState(() => [
@@ -795,10 +801,10 @@ function OnboardingOverlay({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-journal-surface sm:bg-ink/45 sm:px-4 sm:py-5 sm:backdrop-blur-md lg:items-center">
-      <section className="min-h-dvh w-full overflow-hidden bg-journal-surface shadow-none sm:min-h-0 sm:max-w-5xl sm:rounded-[32px] sm:shadow-photo">
-        <div className="grid lg:grid-cols-[1fr_420px]">
-          <div className="grid content-start gap-5 p-4 sm:p-8 lg:min-h-[640px] lg:content-between lg:gap-8 lg:p-10">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-x-hidden overflow-y-auto bg-journal-surface sm:bg-ink/45 sm:px-4 sm:py-5 sm:backdrop-blur-md lg:items-center">
+      <section className="min-h-dvh w-full max-w-full overflow-hidden bg-journal-surface shadow-none sm:min-h-0 sm:max-w-5xl sm:rounded-[32px] sm:shadow-photo">
+        <div className="grid min-w-0 lg:grid-cols-[minmax(0,1fr)_420px]">
+          <div className="grid min-w-0 content-start gap-5 p-4 sm:p-8 lg:min-h-[640px] lg:content-between lg:gap-8 lg:p-10">
             <div>
               <div className="flex items-center justify-between gap-4">
                 <div className="flex gap-2">
@@ -911,7 +917,7 @@ function OnboardingOverlay({
             </div>
           </div>
 
-          <div className="bg-[linear-gradient(150deg,#f9ece6,#f7fbf2_48%,#fff7f1)] p-3 sm:p-8">
+          <div className="min-w-0 bg-[linear-gradient(150deg,#f9ece6,#f7fbf2_48%,#fff7f1)] p-3 sm:p-8">
             {step === 0 ? <OnboardingTodayPreview /> : null}
             {step === 1 ? <OnboardingPeoplePreview focus={focus} meName={meName} partnerName={partnerName} childNames={childNames} otherNames={otherNames} /> : null}
             {step === 2 ? <OnboardingMemoryPreview focus={focus} childNames={childNames} partnerName={partnerName} otherNames={otherNames} /> : null}
@@ -920,12 +926,6 @@ function OnboardingOverlay({
       </section>
     </div>
   );
-}
-
-function friendlyFirstName(profile: JournalBootstrap["profile"]) {
-  const displayName = profile?.displayName?.trim();
-  if (!displayName || displayName.includes("@")) return "there";
-  return displayName.split(/\s+/)[0] || "there";
 }
 
 function OnboardingNameField({
