@@ -2,7 +2,7 @@
 
 Production web beta for Photo Gratitude Journal. It uses Next.js, Supabase Auth, Supabase Postgres, Supabase Storage, and Vercel.
 
-Current app version: `0.2.8`. The package version is shown in Settings > Beta and should be included in QA notes.
+Current app version: `0.2.9`. The package version is shown in Settings > Beta and should be included in QA notes.
 
 ## Local Development
 

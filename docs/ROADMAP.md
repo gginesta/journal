@@ -9,6 +9,27 @@ Current beta-readiness docs:
 - TestFlight owner setup: `docs/TESTFLIGHT.md`.
 - Manual beta QA: `docs/QA_TESTFLIGHT.md`.
 
+## Milestone 0.2.9 - Mobile First Impression Polish
+
+Status: complete for implementation; ready for redeploy and family QA.
+
+Goal: make Stephanie's first mobile pass feel calm, legible, and intentional in iPhone browser contexts, especially Gmail/Safari magic-link entry.
+
+Delivered:
+
+- Web package version set to `0.2.9`.
+- Onboarding now avoids showing email addresses as oversized welcome copy.
+- The onboarding overlay uses a phone-first full-screen layout instead of a desktop modal squeezed into mobile.
+- Mobile onboarding, preview cards, login, Today header, starter guide, and photo hero typography/spacing were tightened.
+- Mobile Playwright screenshots were captured for onboarding and Today to verify no horizontal overflow and better first-screen density.
+
+Acceptance criteria:
+
+- A new mobile tester can read onboarding without clipped email text or awkward modal framing.
+- The first viewport explains the ritual without feeling visually overwhelming.
+- Today keeps the "one good thing is enough" guidance visible without pushing the journal experience too far down.
+- Login, onboarding, and Today remain polished on desktop through responsive breakpoints.
+
 ## Milestone 0.2.8 - Progressive Memory Lane
 
 Status: complete for implementation; ready for beta QA after deployment.

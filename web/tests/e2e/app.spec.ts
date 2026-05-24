@@ -84,7 +84,7 @@ test("demo user can choose just me and other onboarding shapes without family-on
 
   await page.getByRole("button", { name: "Settings" }).first().click();
   await expect(page.getByRole("heading", { name: "Beta" })).toBeVisible();
-  await expect(page.getByText("App version 0.2.8")).toBeVisible();
+  await expect(page.getByText("App version 0.2.9")).toBeVisible();
   await page.getByRole("button", { name: "Replay welcome" }).click();
   await continueFromWelcome(page);
   await page.getByRole("button", { name: "Other people or themes" }).click();
