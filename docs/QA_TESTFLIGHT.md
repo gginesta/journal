@@ -5,7 +5,7 @@ Use this checklist for the consolidated Guided Gratitude Memory System beta. Run
 Record before testing:
 
 - Surface tested: Web demo / Web Supabase / TestFlight
-- App version/build number: web `0.2.8` or TestFlight marketing version/build:
+- App version/build number: web `0.2.9` or TestFlight marketing version/build:
 - Device model:
 - OS/browser version:
 - Tester:
@@ -15,7 +15,7 @@ Record before testing:
 
 - Open the deployed web app in a clean browser profile.
 - Confirm demo mode is not being used for real beta data.
-- Open Settings > Beta and confirm app version `0.2.8` is visible.
+- Open Settings > Beta and confirm app version `0.2.9` is visible.
 - Login with an email magic link.
 - Confirm the default personal workspace appears.
 - Create or open a household workspace.

@@ -30,10 +30,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const demo = isDemoMode();
 
   return (
-    <main className="grid min-h-screen place-items-center px-5 py-10">
-      <section className="w-full max-w-5xl overflow-hidden rounded-[34px] border border-journal-line bg-journal-surface shadow-journal">
+    <main className="grid min-h-screen place-items-center px-3 py-4 sm:px-5 sm:py-10">
+      <section className="w-full max-w-5xl overflow-hidden rounded-[26px] border border-journal-line bg-journal-surface shadow-journal sm:rounded-[34px]">
         <div className="grid lg:grid-cols-[1.08fr_0.92fr]">
-          <div className="relative min-h-[560px] bg-[linear-gradient(135deg,#8da38e,#e6c392_52%,#b96464)] p-8 text-white lg:p-12">
+          <div className="relative min-h-[360px] bg-[linear-gradient(135deg,#8da38e,#e6c392_52%,#b96464)] p-6 text-white sm:min-h-[420px] sm:p-8 lg:min-h-[560px] lg:p-12">
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.04),rgba(0,0,0,0.42))]" />
             <div className="relative flex h-full flex-col justify-between">
               <div className="flex items-center gap-3 text-sm font-bold">
@@ -44,27 +44,27 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
               </div>
 
               <div className="max-w-lg">
-                <h1 className="text-5xl font-bold leading-[0.98] tracking-normal sm:text-6xl">
+                <h1 className="text-[2.1rem] font-bold leading-[1.03] tracking-normal sm:text-6xl">
                   Notice the good stuff before it slips by.
                 </h1>
-                <p className="mt-5 max-w-md text-lg leading-7 text-white/86">
+                <p className="mt-4 max-w-md text-base leading-7 text-white/86 sm:mt-5 sm:text-lg">
                   A private, photo-first journal for daily gratitude, family memories, and tiny details worth finding again later.
                 </p>
               </div>
 
-              <div className="grid gap-3 text-sm text-white/88 sm:grid-cols-3">
-                <span className="rounded-2xl bg-white/14 p-4">One or two photos</span>
-                <span className="rounded-2xl bg-white/14 p-4">Private people tags</span>
-                <span className="rounded-2xl bg-white/14 p-4">Memory Lane</span>
+              <div className="grid gap-2 text-sm text-white/88 sm:grid-cols-3 sm:gap-3">
+                <span className="rounded-2xl bg-white/14 p-3 sm:p-4">One or two photos</span>
+                <span className="rounded-2xl bg-white/14 p-3 sm:p-4">Private people tags</span>
+                <span className="rounded-2xl bg-white/14 p-3 sm:p-4">Memory Lane</span>
               </div>
             </div>
           </div>
 
-          <div className="p-8 lg:p-12">
-            <div className="mb-10 inline-flex h-12 w-12 items-center justify-center rounded-full bg-rose/10 text-rose">
+          <div className="p-6 sm:p-8 lg:p-12">
+            <div className="mb-7 inline-flex h-12 w-12 items-center justify-center rounded-full bg-rose/10 text-rose sm:mb-10">
               <Sparkles aria-hidden="true" />
             </div>
-            <h2 className="text-3xl font-bold text-ink">Sign in to your journal</h2>
+            <h2 className="text-2xl font-bold text-ink sm:text-3xl">Sign in to your journal</h2>
             <p className="mt-3 text-warm-gray">
               Use a magic link. No password to manage, and no public profile.
             </p>

@@ -10,7 +10,7 @@ The app is inspired by the emotional utility of Five Minute Journal, but the pro
 
 ## Current Beta Version
 
-- Current web beta app version: `0.2.8`.
+- Current web beta app version: `0.2.9`.
 - The web package version is the app version source of truth and is visible in Settings > Beta for QA notes.
 - Manual QA should record this version when testing household sharing, Supabase sync safety, and photo handling.
 
