@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { Camera, Mail, Sparkles } from "lucide-react";
 import { appUrl, isDemoMode } from "@/lib/supabase/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { magicLinkSentCopy } from "@/lib/auth-email-copy";
 
 async function signIn(formData: FormData) {
   "use server";
@@ -28,6 +29,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const params = await searchParams;
   const sent = params.sent;
   const demo = isDemoMode();
+  const sentCopy = sent ? magicLinkSentCopy(sent) : null;
 
   return (
     <main className="grid min-h-screen place-items-center px-3 py-4 sm:px-5 sm:py-10">
@@ -71,8 +73,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
 
             {sent ? (
               <div className="mt-8 rounded-journal border border-leaf/20 bg-leaf/10 p-5 text-leaf">
-                <p className="font-bold">Check your email</p>
-                <p className="mt-1 text-sm">We sent a sign-in link to {sent}.</p>
+                <p className="font-bold">{sentCopy?.title}</p>
+                <p className="mt-1 text-sm">{sentCopy?.body}</p>
+                <p className="mt-2 text-xs font-semibold text-leaf/80">{sentCopy?.hint}</p>
               </div>
             ) : (
               <form action={signIn} className="mt-8 grid gap-4">

@@ -24,6 +24,7 @@ All notable changes to Photo Gratitude Journal will be documented here.
 - Added a smoother web first-run onboarding flow with a three-step product tour, personal memory-focus choice, starter checklist, direct first-entry affordance, and replay control in Settings.
 - Expanded web onboarding with friendly name collection for self, partner, and children so generic people tags become personal immediately.
 - Added a public science-backed web homepage for private beta testers, with research citation cards, privacy framing, demo/beta CTA routing, and desktop/mobile E2E coverage.
+- Added first-memory celebration, early Memory Lane milestone guidance, context-aware Little Details nudges, shared-journal copy, and tracked Supabase magic-link email copy with unit coverage.
 
 ## [0.1.0] - 2026-05-21
 

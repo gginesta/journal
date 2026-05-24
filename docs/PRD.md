@@ -12,7 +12,7 @@ The web beta also includes a public private-beta homepage at `/` that explains t
 
 ## Current Beta Version
 
-- Current web beta app version: `0.2.9`.
+- Current web beta app version: `0.2.10`.
 - The web package version is the app version source of truth and is visible in Settings > Beta for QA notes.
 - Manual QA should record this version when testing household sharing, Supabase sync safety, and photo handling.
 
@@ -150,6 +150,8 @@ The web beta also includes a public private-beta homepage at `/` that explains t
 - As the archive grows, Today adds 1 month, 3 month, 6 month, 1 year, 2 year, and 3 year look-backs.
 - If an exact date is unavailable, the app may show the closest entry within a small window, with wider windows for month/season targets.
 - If no target matches, Memory Lane can surface the most recent kept memory so the section still creates value.
+- When no look-backs exist yet, the web beta should explain the next Memory Lane milestones instead of feeling empty.
+- When the first meaningful memory is saved, the web beta may celebrate that Memory Lane now has somewhere to begin.
 - Memory cards should prioritize photos and date context.
 - Tapping a memory opens the entry detail.
 - Premium unlocks richer seasonal browsing and proactive look-back notifications.
@@ -190,6 +192,7 @@ The web beta also includes a public private-beta homepage at `/` that explains t
 - The web beta should also support a Little Details repository where users can add, search, filter, edit, and remove details without treating them as a full tracker.
 - Person pages and filters should be able to show both full memories and Little Details associated with that person.
 - Little Details belong in the free core product because they improve memory capture and retrieval.
+- Little Details copy can adapt to the journal shape: solo, partner, family, or custom people/themes.
 
 ### Insights
 

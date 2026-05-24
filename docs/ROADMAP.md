@@ -9,16 +9,17 @@ Current beta-readiness docs:
 - TestFlight owner setup: `docs/TESTFLIGHT.md`.
 - Manual beta QA: `docs/QA_TESTFLIGHT.md`.
 
-## Milestone 0.2.9 - Mobile First Impression Polish
+## Milestone 0.2.10 - Stephanie Wow Pass
 
 Status: complete for implementation; ready for redeploy and family QA.
 
-Goal: make Stephanie's first mobile pass feel calm, legible, and intentional in iPhone browser contexts, especially Gmail/Safari magic-link entry.
+Goal: make Stephanie's first real beta session feel warmer and more rewarding while preserving the mobile first-impression polish.
 
 Delivered:
 
-- Web package version set to `0.2.9`.
+- Web package version set to `0.2.10`.
 - Public root homepage added for private beta testers, with science-backed product positioning, privacy framing, and CTAs into the demo/beta app.
+- First-memory celebration, early Memory Lane milestone guidance, context-aware Little Details nudges, shared-journal copy, and product-specific Supabase magic-link copy were integrated.
 - Onboarding now avoids showing email addresses as oversized welcome copy.
 - The onboarding overlay uses a phone-first full-screen layout instead of a desktop modal squeezed into mobile.
 - Mobile onboarding, preview cards, login, Today header, starter guide, and photo hero typography/spacing were tightened.
@@ -27,10 +28,25 @@ Delivered:
 Acceptance criteria:
 
 - A new tester who opens `/` understands the product loop, research-backed rationale, and privacy model before entering `/app`.
+- A first meaningful memory feels acknowledged, and no-match Memory Lane states explain what will unlock next.
 - A new mobile tester can read onboarding without clipped email text or awkward modal framing.
 - The first viewport explains the ritual without feeling visually overwhelming.
 - Today keeps the "one good thing is enough" guidance visible without pushing the journal experience too far down.
 - Login, onboarding, and Today remain polished on desktop through responsive breakpoints.
+
+## Milestone 0.2.9 - Mobile First Impression Polish
+
+Status: complete for implementation; deployed before the Stephanie wow pass.
+
+Goal: make Stephanie's first mobile pass feel calm, legible, and intentional in iPhone browser contexts, especially Gmail/Safari magic-link entry.
+
+Delivered:
+
+- Web package version set to `0.2.9`.
+- Onboarding avoids showing email addresses as oversized welcome copy.
+- The onboarding overlay uses a phone-first full-screen layout instead of a desktop modal squeezed into mobile.
+- Mobile onboarding, preview cards, login, Today header, starter guide, and photo hero typography/spacing were tightened.
+- Mobile Playwright screenshots verified no horizontal overflow and better first-screen density.
 
 ## Milestone 0.2.8 - Progressive Memory Lane
 

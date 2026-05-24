@@ -54,7 +54,7 @@ xcrun simctl list devices available
 
 ## Web Beta
 
-The browser app lives in `web/` and is the fastest way to test the product from a PC, iPad browser, or iPhone browser before TestFlight is ready. The current web beta app version is `0.2.9`, sourced from `web/package.json` and visible in Settings > Beta.
+The browser app lives in `web/` and is the fastest way to test the product from a PC, iPad browser, or iPhone browser before TestFlight is ready. The current web beta app version is `0.2.10`, sourced from `web/package.json` and visible in Settings > Beta.
 
 The web root `/` is the public private-beta homepage. It explains the product loop, cites the evidence-informed gratitude/savoring/photo-memory/reminiscence basis, and links into `/app`. The actual journal experience remains at `/app`; authenticated beta sign-in remains at `/login`.
 
@@ -67,7 +67,7 @@ npm.cmd run dev
 
 Keep `NEXT_PUBLIC_DEMO_MODE=true` for local UX review without Supabase. For the private shared-family beta, deploy `web/` on Vercel, apply the Supabase migration in `web/supabase/migrations`, and use [Web App Operations](docs/WEB_APP.md) as the setup checklist.
 
-When filing beta notes, include app version `0.2.9`, browser/device, workspace role, and whether the pass used demo mode or authenticated Supabase mode.
+When filing beta notes, include app version `0.2.10`, browser/device, workspace role, and whether the pass used demo mode or authenticated Supabase mode.
 
 ## Product Shape
 
@@ -78,6 +78,7 @@ When filing beta notes, include app version `0.2.9`, browser/device, workspace r
 - Streaks, calendar browsing, mood tracking, and automatic Memory Lane look-backs.
 - Private people tagging so family memories can be browsed by child or loved one.
 - Optional Little Details for tiny phases, personal milestones, routines, favorites, and quotes.
+- First-memory celebration and early Memory Lane guidance so the beta feels rewarding before a large archive exists.
 - First-run beta guidance and Settings feedback flow for the private TestFlight loop.
 - Generous free tier with yearly Premium unlocks for widgets, advanced insights, export, app lock, themes, and richer nostalgia.
 
@@ -108,6 +109,7 @@ The current app schedules local notifications only; remote push notifications ar
 - [v0.3 Design Goal](docs/GOAL_V0_3_DESIGN_SYSTEM.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Web App Operations](docs/WEB_APP.md)
+- [Supabase Auth Email Templates](docs/SUPABASE_AUTH_EMAILS.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Versioning](docs/VERSIONING.md)
 - [TestFlight Owner Checklist](docs/TESTFLIGHT.md)

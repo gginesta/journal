@@ -71,6 +71,15 @@ import {
 import { addSuggestionToReflectionText, gratitudeGuideForEntry } from "@/lib/prompts";
 import { canMutateWorkspaceRole } from "@/lib/journal-sync-safety";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import {
+  firstMemoryCelebrationStorageKey,
+  meaningfulFirstMemoryEntries,
+  shouldShowFirstMemoryCelebration
+} from "@/lib/first-memory-celebration";
+import { FirstMemoryCelebration } from "@/components/wow/FirstMemoryCelebration";
+import { MemoryLaneNoMatches } from "@/components/wow/EarlyMemoryLane";
+import { LittleDetailsNudge } from "@/components/wow/LittleDetailsNudge";
+import { SharedJournalCopy } from "@/components/wow/SharedJournalCopy";
 
 type AppTab = "today" | "memories" | "calendar" | "insights" | "settings";
 type SaveState = "saved" | "saving" | "offline" | "error" | "local" | "readonly";
@@ -126,11 +135,13 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
   const [syncRetryToken, setSyncRetryToken] = useState(0);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showStarterGuide, setShowStarterGuide] = useState(false);
+  const [firstMemoryDismissalValue, setFirstMemoryDismissalValue] = useState<string | null>("true");
   const [isPending, startTransition] = useTransition();
   const didMountPersistence = useRef(false);
   const latestSyncId = useRef(0);
 
   const onboardingKey = useMemo(() => `${onboardingStorageKey}:${initialData.profile?.id ?? "demo"}`, [initialData.profile?.id]);
+  const firstMemoryKey = useMemo(() => firstMemoryCelebrationStorageKey(activeWorkspaceId), [activeWorkspaceId]);
   const activeWorkspace = useMemo(
     () => workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null,
     [workspaces, activeWorkspaceId]
@@ -295,6 +306,10 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
     setShowOnboarding(!completed);
     setShowStarterGuide(completed && !starterDismissed);
   }, [onboardingKey]);
+
+  useEffect(() => {
+    setFirstMemoryDismissalValue(window.localStorage.getItem(firstMemoryKey));
+  }, [firstMemoryKey]);
 
   function markPendingSave() {
     setSaveState("saving");
@@ -517,6 +532,11 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
     setShowStarterGuide(false);
   }
 
+  function dismissFirstMemoryCelebration() {
+    window.localStorage.setItem(firstMemoryKey, "true");
+    setFirstMemoryDismissalValue("true");
+  }
+
   function replayOnboarding() {
     setTab("today");
     setShowOnboarding(true);
@@ -555,16 +575,22 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
               entry={todayEntry}
               entries={workspaceEntries}
               people={workspacePeople}
+              workspace={activeWorkspace}
               prompts={workspacePrompts}
               saveState={saveState}
               saveError={saveError}
               canEdit={canEditActiveWorkspace}
               showStarterGuide={showStarterGuide}
+              showFirstMemoryCelebration={shouldShowFirstMemoryCelebration({
+                entries: workspaceEntries,
+                dismissalStorageValue: firstMemoryDismissalValue
+              })}
               onUpdateEntry={updateEntry}
               onAddPerson={addPerson}
               onOpenEntry={setSelectedEntryId}
               onFocusFirstReflection={focusFirstReflection}
               onDismissStarterGuide={dismissStarterGuide}
+              onDismissFirstMemoryCelebration={dismissFirstMemoryCelebration}
             />
           ) : null}
 
@@ -1095,33 +1121,40 @@ function TodayView({
   entry,
   entries,
   people,
+  workspace,
   prompts,
   saveState,
   saveError,
   canEdit,
   showStarterGuide,
+  showFirstMemoryCelebration,
   onUpdateEntry,
   onAddPerson,
   onOpenEntry,
   onFocusFirstReflection,
-  onDismissStarterGuide
+  onDismissStarterGuide,
+  onDismissFirstMemoryCelebration
 }: {
   entry: JournalEntry;
   entries: JournalEntry[];
   people: PersonTag[];
+  workspace: Workspace | null;
   prompts: PromptTemplate[];
   saveState: SaveState;
   saveError: string | null;
   canEdit: boolean;
   showStarterGuide: boolean;
+  showFirstMemoryCelebration: boolean;
   onUpdateEntry: (entryId: string, updater: (entry: JournalEntry) => JournalEntry) => void;
   onAddPerson: (name: string) => PersonTag | null;
   onOpenEntry: (entryId: string) => void;
   onFocusFirstReflection: () => void;
   onDismissStarterGuide: () => void;
+  onDismissFirstMemoryCelebration: () => void;
 }) {
   const summary = streakSummary(entries);
   const matches = memoryLaneMatches(entries).filter((match) => match.entryId !== entry.id);
+  const firstMeaningfulEntry = meaningfulFirstMemoryEntries(entries)[0] ?? entry;
   const guide = gratitudeGuideForEntry({
     localDate: entry.localDate,
     mood: entry.mood,
@@ -1173,6 +1206,14 @@ function TodayView({
 
         {!canEdit ? <ReadOnlyNotice /> : null}
 
+        {showFirstMemoryCelebration ? (
+          <FirstMemoryCelebration
+            entry={firstMeaningfulEntry}
+            onDismiss={onDismissFirstMemoryCelebration}
+            onOpenMemoryLane={() => onOpenEntry(firstMeaningfulEntry.id ?? entry.id)}
+          />
+        ) : null}
+
         {showStarterGuide ? (
           <StarterGuideCard
             entry={entry}
@@ -1195,7 +1236,7 @@ function TodayView({
 
         <PromptPanel entry={entry} canEdit={canEdit} onUpdateEntry={onUpdateEntry} />
         <PeoplePanel entry={entry} people={people} canEdit={canEdit} onUpdateEntry={onUpdateEntry} onAddPerson={onAddPerson} />
-        <LittleDetailsPanel entry={entry} people={people} canEdit={canEdit} onUpdateEntry={onUpdateEntry} />
+        <LittleDetailsPanel entry={entry} people={people} workspace={workspace} canEdit={canEdit} onUpdateEntry={onUpdateEntry} />
         <MoodPanel entry={entry} canEdit={canEdit} onUpdateEntry={onUpdateEntry} />
       </section>
 
@@ -1777,11 +1818,13 @@ function PeoplePanel({
 function LittleDetailsPanel({
   entry,
   people,
+  workspace,
   canEdit,
   onUpdateEntry
 }: {
   entry: JournalEntry;
   people: PersonTag[];
+  workspace: Workspace | null;
   canEdit: boolean;
   onUpdateEntry: (entryId: string, updater: (entry: JournalEntry) => JournalEntry) => void;
 }) {
@@ -1820,6 +1863,8 @@ function LittleDetailsPanel({
       />
 
       <div className="grid gap-3">
+        {entry.details.length === 0 ? <LittleDetailsNudge workspace={workspace} people={people} /> : null}
+
         {entry.details.map((detail) => (
           <article key={detail.id} className="rounded-2xl bg-journal-raised p-4">
             <div className="mb-3 flex flex-wrap gap-2">
@@ -2509,6 +2554,7 @@ function SettingsView({
       </SettingsSection>
 
       <SettingsSection title="Workspaces">
+        <SharedJournalCopy workspace={activeWorkspace} people={people} />
         {activeWorkspace ? (
           <p className="mb-3 text-sm leading-6 text-warm-gray">
             {workspaceRoleCopy(activeWorkspace.role)}
@@ -2531,12 +2577,13 @@ function SettingsView({
         </div>
       </SettingsSection>
 
-      <HouseholdSharingPanel
-        mode={mode}
-        workspace={activeWorkspace}
-        members={workspaceMembers}
-        setWorkspaceMembers={setWorkspaceMembers}
-      />
+              <HouseholdSharingPanel
+                mode={mode}
+                workspace={activeWorkspace}
+                people={people}
+                members={workspaceMembers}
+                setWorkspaceMembers={setWorkspaceMembers}
+              />
 
       <SettingsSection title="Reminders">
         {!canEdit ? <ReadOnlySettingsCopy /> : null}
@@ -2679,11 +2726,13 @@ function ReadOnlyNotice() {
 function HouseholdSharingPanel({
   mode,
   workspace,
+  people,
   members,
   setWorkspaceMembers
 }: {
   mode: "demo" | "supabase";
   workspace: Workspace | null;
+  people: PersonTag[];
   members: WorkspaceMember[];
   setWorkspaceMembers: React.Dispatch<React.SetStateAction<WorkspaceMember[]>>;
 }) {
@@ -2825,11 +2874,13 @@ function HouseholdSharingPanel({
   return (
     <SettingsSection title="Household Sharing">
       <div className="grid gap-4">
+        <SharedJournalCopy workspace={workspace} people={people} />
+
         <div>
           <p className="text-sm leading-6 text-warm-gray">
             {workspace?.kind === "household"
               ? canManageMembers
-                ? "Invite someone by email and choose how much they can change."
+                ? "Invite someone by email and choose how much they can change. For this beta, ask them to sign in once before you add them."
                 : "Only owners can invite people or change household roles."
               : "Household sharing is available from a household journal."}
           </p>
@@ -3029,20 +3080,7 @@ function MemoryLaneCard({ entry, label, onOpen }: { entry: JournalEntry; label: 
 }
 
 function MemoryLaneEmpty({ completeCount }: { completeCount: number }) {
-  return (
-    <div className="grid gap-2">
-      <p className="rounded-2xl bg-journal-raised p-4 text-sm leading-6 text-warm-gray">
-        {completeCount === 0
-          ? "Keep one thing today and this space will have somewhere to begin."
-          : "A few more kept days will give this space something older to return."}
-      </p>
-      <div className="grid grid-cols-3 gap-2 text-center text-xs font-bold text-warm-gray">
-        {["1 week", "1 month", "3 months"].map((label) => (
-          <span key={label} className="rounded-2xl bg-white px-2 py-3">{label}</span>
-        ))}
-      </div>
-    </div>
-  );
+  return <MemoryLaneNoMatches completedEntryCount={completeCount} />;
 }
 
 function MemoryCard({

@@ -2,7 +2,7 @@
 
 The web app lives in `web/` and is the active private-beta path for the consolidated Guided Gratitude Memory System. It is a real Next.js + Supabase app, not just a static prototype, and should be treated as the source of truth for shared household beta behavior.
 
-Current app version: `0.2.9`. The version comes from `web/package.json` and is shown in Settings > Beta for tester reports.
+Current app version: `0.2.10`. The version comes from `web/package.json` and is shown in Settings > Beta for tester reports.
 
 ## Beta Product Path
 
@@ -11,6 +11,8 @@ Current app version: `0.2.9`. The version comes from `web/package.json` and is s
 - Onboarding should feel balanced for solo/self, partner, family, and custom people/themes. Family/kid memories are important, but they must not dominate the product framing.
 - Gratitude Guide prompt packs provide non-AI writing starters for small gratitude, savoring, appreciation, self-kindness, hard days, and family/relationships.
 - Little Details are first-class retrievable memory fragments. They can live inside an entry and should also be reachable through a repository-style view for search, filtering, editing, and removal.
+- First-memory and early-Memory-Lane moments should make the beta feel rewarding quickly: celebrate the first meaningful memory and explain upcoming look-back milestones when no matches exist yet.
+- Magic-link email copy is tracked in the repo so production Supabase Auth emails name the product clearly.
 - Demo mode is for UX review. Supabase mode is for real beta data and verification.
 
 ## Architecture
@@ -85,6 +87,7 @@ Demo mode stores changes in browser local storage. This is only for UX review an
   - Text-only, photo-only, and mixed entries count as valid beta memories.
   - Gratitude Guide suggestions can be inserted and edited.
   - People/theme tags and Little Details are optional.
+  - The first meaningful entry can show a dismissible celebration that explains Memory Lane return windows.
 - Memories:
   - Search includes dates, prompt text, response text, people/theme tags, and Little Details.
   - Person/theme filters include Little Details tagged directly to that person/theme, not only entry-level tags.
@@ -96,6 +99,7 @@ Demo mode stores changes in browser local storage. This is only for UX review an
   - Repository-created details attach to the selected local date and sync through the same entry/detail tables.
 - Settings:
   - Workspace switching, prompt editing, people tags, reminders, export, delete controls, and sign out remain understandable in both demo and Supabase modes.
+  - Workspace copy reflects solo, partner, family, or custom journal contexts without making family use mandatory.
 
 ## Windows Local Setup
 
@@ -178,7 +182,7 @@ SUPABASE_THUMBNAILS_BUCKET=journal-thumbnails
 
 ## Beta QA
 
-- Confirm Settings > Beta shows app version `0.2.9`.
+- Confirm Settings > Beta shows app version `0.2.10`.
 - Open `/` and confirm the science-backed homepage, research citations, privacy section, and demo/beta CTA render on desktop and mobile without horizontal overflow.
 - Login with email magic link.
 - Confirm default personal workspace appears.
@@ -194,13 +198,17 @@ SUPABASE_THUMBNAILS_BUCKET=journal-thumbnails
 - Create a text-only entry.
 - Add one photo, add a second photo, remove one photo, reload, and confirm the remaining photo state is correct.
 - Confirm a photo-only entry counts as a kept memory and appears in Memories/Calendar where expected.
+- Confirm the first meaningful memory celebration appears once, can be dismissed, and does not return for that workspace after dismissal.
 - Add people tags and Little Details.
+- Confirm Little Details nudges fit the selected journal shape: solo, partner, family, or custom people/themes.
 - Add a Little Detail from the repository flow if present.
 - Filter Little Details by text, category, and person/theme tag.
 - Edit and remove a Little Detail, then reload and confirm persistence.
 - Search Memories by person, prompt text, response text, and detail text.
 - Browse Calendar and Memory Lane.
 - Confirm a young workspace gets useful Memory Lane cards from recent history before year-old data exists.
+- Confirm a workspace with no look-backs sees milestone copy instead of a dead empty state.
+- Send a production magic link and confirm the email subject/body uses the approved Photo Gratitude Journal copy from `docs/SUPABASE_AUTH_EMAILS.md`.
 - Export JSON.
 - Delete workspace entries only after confirming backup/export behavior.
 

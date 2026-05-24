@@ -4,7 +4,7 @@ Production web beta for Photo Gratitude Journal. It uses Next.js, Supabase Auth,
 
 The public root route `/` is a private-beta homepage with research-backed product positioning, a product-loop mockup, privacy framing, and CTAs into the app. The journal product itself lives at `/app`; authenticated sign-in lives at `/login`.
 
-Current app version: `0.2.9`. The package version is shown in Settings > Beta and should be included in QA notes.
+Current app version: `0.2.10`. The package version is shown in Settings > Beta and should be included in QA notes.
 
 ## Local Development
 
@@ -41,6 +41,6 @@ In demo mode, the homepage primary CTA reads `Open the demo`. In Supabase mode, 
 
 ## Scope
 
-The first web beta supports personal and shared household workspaces, household invite/member management, daily capture, private photo Storage upload, prompts, people tags, Little Details, Memories, Calendar, Memory Lane, Insights, export, and delete controls. Stripe/Premium billing is intentionally deferred.
+The first web beta supports personal and shared household workspaces, household invite/member management, daily capture, private photo Storage upload, prompts, people tags, Little Details, first-memory celebration, early Memory Lane guidance, Memories, Calendar, Insights, export, and delete controls. Stripe/Premium billing is intentionally deferred.
 
-Before widening household testing, verify the public homepage, owner/editor/viewer behavior, non-member denial, demo-vs-authenticated sync separation, and photo add/remove persistence with the checklist in `../docs/QA_TESTFLIGHT.md`.
+Before widening household testing, verify the public homepage, first-memory celebration, early Memory Lane empty states, owner/editor/viewer behavior, non-member denial, demo-vs-authenticated sync separation, magic-link email copy, and photo add/remove persistence with the checklist in `../docs/QA_TESTFLIGHT.md`.

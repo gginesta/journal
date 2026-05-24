@@ -5,7 +5,7 @@ Use this checklist for the consolidated Guided Gratitude Memory System beta. Run
 Record before testing:
 
 - Surface tested: Web demo / Web Supabase / TestFlight
-- App version/build number: web `0.2.9` or TestFlight marketing version/build:
+- App version/build number: web `0.2.10` or TestFlight marketing version/build:
 - Device model:
 - OS/browser version:
 - Tester:
@@ -20,7 +20,7 @@ Record before testing:
 - Confirm the homepage science section cites gratitude practice, savoring/noticing, photos and memory, and reminiscence/retrieval without clinical or medical claims.
 - Check the homepage on a phone viewport and confirm there is no horizontal overflow, clipped CTA text, or gray/broken hero imagery.
 - Confirm demo mode is not being used for real beta data.
-- Open Settings > Beta and confirm app version `0.2.9` is visible.
+- Open Settings > Beta and confirm app version `0.2.10` is visible.
 - Login with an email magic link.
 - Confirm the default personal workspace appears.
 - Create or open a household workspace.
@@ -51,6 +51,8 @@ Record before testing:
 ## Today Entry
 
 - Create today's entry with no photo and at least one nice thing.
+- Confirm the first meaningful memory celebration appears after the first text-only, photo-only, or mixed memory and can be dismissed.
+- Confirm dismissing the first meaningful memory celebration keeps it dismissed for that workspace after reload.
 - Reopen Today and confirm the text remains.
 - Add one photo.
 - Add a second photo if the UI allows it.
@@ -85,6 +87,7 @@ Record before testing:
 ## Little Details
 
 - Add at least two Little Details.
+- Before adding details, confirm the Little Details nudge matches the journal shape: solo, partner, family, or custom.
 - Tag one detail to one person and another detail to multiple people.
 - Tag one detail to a custom theme/person where available.
 - Edit a detail.
@@ -123,6 +126,7 @@ Record before testing:
 - Open an entry from Calendar.
 - Open Memory Lane.
 - Confirm any look-back card opens the correct entry.
+- With no eligible look-backs, confirm Memory Lane shows milestone guidance instead of a dead empty state.
 - With a young account, confirm Memory Lane can show early value from yesterday, 3 days ago, 1 week ago, or a recent kept memory instead of only waiting for year-old data.
 - With seeded older data, confirm 1 month, 3 month, 6 month, and yearly look-backs appear when available.
 - Confirm empty or low-data states are calm and not broken.
@@ -135,6 +139,7 @@ Record before testing:
 - Confirm iCloud/private sync copy is understandable.
 - Review app lock, export, delete-all, and Premium surfaces without assuming production readiness.
 - On web, confirm workspace switching, prompt editing, people/theme tags, replay onboarding, export, delete workspace entries, and sign out are understandable.
+- On web, confirm workspace copy adapts to solo, partner, family, and custom contexts without implying public sharing.
 - Open Settings > Beta and confirm the build number is visible.
 - Tap Send beta feedback and confirm it opens a mail draft or the system handles unavailable Mail gracefully.
 - Do not run delete-all on a tester's only useful beta dataset unless explicitly testing deletion.
@@ -158,6 +163,14 @@ Record before testing:
 - With two accepted member accounts, edit different fields on the same entry and record whether the latest saved state is understandable.
 - Temporarily disconnect network during an edit, reconnect, reload, and confirm the app does not duplicate entries or drop already-saved server data.
 - Confirm photo metadata appears only after upload succeeds; failed photo uploads should not leave broken permanent records.
+
+## Supabase Auth Emails
+
+- Send a production magic link to a real tester email.
+- Confirm the subject says `Your Photo Gratitude Journal sign-in link`.
+- Confirm the button text says `Open Photo Gratitude Journal`.
+- Confirm the fallback URL includes the Supabase confirmation URL.
+- Confirm `/login?sent=...` shows product-specific sent-state copy.
 
 ## Regression Pass
 

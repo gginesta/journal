@@ -14,6 +14,8 @@ Photo Gratitude Journal is a local-first SwiftUI app with Apple-native storage, 
 - `/app` owns the interactive journal experience in demo mode or authenticated Supabase mode.
 - `/login` owns email magic-link sign-in when Supabase mode is enabled.
 - The homepage is evidence-informed product positioning only; it should not create journal data, require Supabase state, or make clinical claims.
+- First-memory celebration, early Memory Lane empty-state guidance, shared-journal copy, and Little Details nudges are implemented as small web helpers/components so copy and visibility rules stay testable outside the large journal component.
+- Supabase Auth email copy is tracked in `web/src/lib/auth-email-copy.ts` and documented in `docs/SUPABASE_AUTH_EMAILS.md`; the Supabase dashboard remains the place where the template is applied.
 
 ## Persistence
 

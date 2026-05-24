@@ -62,6 +62,7 @@ The existing Timeline tab should become Memories during the design pass.
 - Little Details should feel like an optional memory helper, not a parenting-only tracker.
 - Completion should feel saved and reassuring, not like a chore checklist.
 - Memory Lane appears as a signature moment after the daily entry area.
+- The first meaningful memory can receive a small celebration that explains future Memory Lane returns without feeling like a gamified achievement.
 
 ### Memories
 
@@ -122,7 +123,9 @@ Build or refine these reusable components:
 - Person filters should preserve the photo-first archive layout.
 - Little Details should support neutral categories such as phrase, favorite, routine, milestone, and quote.
 - Little Details should offer lightweight per-detail person chips so one entry can contain details about Me, each child, partner, or family.
+- Little Details nudges should adapt to solo, partner, family, and custom journal contexts.
 - Memory cards should use exact labels when exact and softer labels when near dates, such as "Around this day in 2025."
+- Empty Memory Lane states should show warm milestone guidance rather than a blank panel.
 - Reminder setup should be optional and reversible.
 
 ## Accessibility

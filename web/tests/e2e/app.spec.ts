@@ -124,7 +124,7 @@ test("demo user can choose just me and other onboarding shapes without family-on
 
   await page.getByRole("button", { name: "Settings" }).first().click();
   await expect(page.getByRole("heading", { name: "Beta" })).toBeVisible();
-  await expect(page.getByText("App version 0.2.9")).toBeVisible();
+  await expect(page.getByText("App version 0.2.10")).toBeVisible();
   await page.getByRole("button", { name: "Replay welcome" }).click();
   await continueFromWelcome(page);
   await page.getByRole("button", { name: "Other people or themes" }).click();
@@ -132,6 +132,29 @@ test("demo user can choose just me and other onboarding shapes without family-on
   await page.getByLabel("Person or theme", { exact: true }).fill("Travel Wins, Work Wins");
   await startToday(page);
   await expect(page.getByRole("button", { name: "Travel Wins" }).first()).toBeVisible();
+});
+
+test("first personal memory gets a soft Memory Lane celebration", async ({ page }) => {
+  const tinyPhoto = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/l7Q5YQAAAABJRU5ErkJggg==",
+    "base64"
+  );
+
+  await openFreshApp(page);
+  await page.getByRole("button", { name: "Skip tour" }).click();
+  await page.getByRole("button", { name: "Settings" }).first().click();
+  await page.getByRole("button", { name: "Add personal journal" }).click();
+  await page.getByRole("button", { name: "Today" }).first().click();
+
+  await page.getByLabel("Add journal photos").setInputFiles({
+    name: "first-memory.png",
+    mimeType: "image/png",
+    buffer: tinyPhoto
+  });
+  await expect(page.getByRole("heading", { name: "This memory is now part of Memory Lane." })).toBeVisible();
+  await expect(page.getByText("tomorrow, next week, or one month")).toBeVisible();
+  await page.getByRole("button", { name: "Dismiss first memory celebration" }).click();
+  await expect(page.getByRole("heading", { name: "This memory is now part of Memory Lane." })).toHaveCount(0);
 });
 
 test("details repository can find tagged little details when the repository UI is present", async ({ page }) => {
