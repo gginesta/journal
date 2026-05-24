@@ -9,7 +9,7 @@ The product goal is simple: make a private, beautiful photo journal that helps p
 This repository contains the first iOS app scaffold and a production web beta:
 
 - SwiftUI iPhone app targeting iOS 17+.
-- Next.js web app under `web/` for PC/mobile browser testing, Supabase-backed private sync, and Vercel deployment.
+- Next.js web app under `web/` for PC/mobile browser testing, Supabase-backed private sync, and Vercel deployment. This is the active private beta path.
 - Public web homepage at `/` for private beta testers, with research-backed positioning and CTAs into the demo/beta app.
 - SwiftData models configured for CloudKit private database sync.
 - Photo import with `PhotosPicker`, app-local protected file storage, and thumbnails.
@@ -21,7 +21,9 @@ This repository contains the first iOS app scaffold and a production web beta:
 - Unit tests for completion rules, streaks, Memory Lane matching, and prompt defaults.
 - GitHub Actions workflow for macOS simulator tests.
 
-The code is ready for first validation on a Mac with Xcode. This Windows workspace cannot run `xcodebuild`, `xcrun`, or iOS Simulator.
+The web beta is deployed and ready for private household testing. The iOS code is ready for first validation on a Mac with Xcode, but this Windows workspace cannot run `xcodebuild`, `xcrun`, or iOS Simulator.
+
+For the fastest orientation, read [Project Context](docs/PROJECT_CONTEXT.md) and [Current Status](docs/CURRENT_STATUS.md). Future Codex sessions should start with [AGENTS.md](AGENTS.md).
 
 ## Requirements
 
@@ -104,6 +106,10 @@ The current app schedules local notifications only; remote push notifications ar
 
 ## Documentation
 
+- [Codex Handoff Guide](AGENTS.md)
+- [Documentation Index](docs/INDEX.md)
+- [Project Context](docs/PROJECT_CONTEXT.md)
+- [Current Status](docs/CURRENT_STATUS.md)
 - [Product Requirements](docs/PRD.md)
 - [Design Direction](docs/DESIGN.md)
 - [v0.3 Design Goal](docs/GOAL_V0_3_DESIGN_SYSTEM.md)
@@ -116,3 +122,16 @@ The current app schedules local notifications only; remote push notifications ar
 - [TestFlight Manual QA](docs/QA_TESTFLIGHT.md)
 - [Contributing](CONTRIBUTING.md)
 - [Changelog](CHANGELOG.md)
+
+## Future-Agent Quick Start
+
+If you are opening this repository in a new Codex session, read these in order:
+
+1. `AGENTS.md`
+2. `docs/INDEX.md`
+3. `docs/PROJECT_CONTEXT.md`
+4. `docs/CURRENT_STATUS.md`
+5. `docs/WEB_APP.md`
+6. `docs/QA_TESTFLIGHT.md`
+
+Do not commit secrets. Supabase credentials, database passwords, service-role keys, and management tokens belong only in private environment configuration.

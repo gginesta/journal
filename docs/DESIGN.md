@@ -1,5 +1,7 @@
 # Design Direction
 
+For the full product context and current beta state, read `docs/PROJECT_CONTEXT.md` and `docs/CURRENT_STATUS.md` before changing the UX direction. The design goal is tied directly to the product thesis: Today helps users notice, Memories helps them rediscover, and Little Details makes small moments searchable over time.
+
 ## Ownership
 
 Codex can own the UX/UI direction, design system, interaction model, and implementation. The user should help with taste calibration at review points: visual direction, emotional tone, icon direction, and whether the app feels like the intended habit.

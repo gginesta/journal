@@ -1,5 +1,7 @@
 # Product Requirements Document
 
+For the full project narrative, current operating context, and future-agent handoff notes, read `docs/PROJECT_CONTEXT.md`, `docs/CURRENT_STATUS.md`, and `AGENTS.md` before making product changes.
+
 ## Product Summary
 
 Photo Gratitude Journal is a private, photo-first Guided Gratitude Memory System that helps users end the day by noticing what was good and preserving the details they will want to find later. The current beta path is a Next.js/Supabase web app for private household testing, with the native iOS app remaining the long-term Apple-native expression of the same product.

@@ -4,6 +4,8 @@ The web app lives in `web/` and is the active private-beta path for the consolid
 
 Current app version: `0.2.10`. The version comes from `web/package.json` and is shown in Settings > Beta for tester reports.
 
+For overall product and operational context, read `docs/PROJECT_CONTEXT.md` first. For the exact beta state, read `docs/CURRENT_STATUS.md`.
+
 ## Beta Product Path
 
 - The beta validates the daily gratitude loop, private memory retrieval, and shared household model before wider native distribution.

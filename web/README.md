@@ -6,6 +6,13 @@ The public root route `/` is a private-beta homepage with research-backed produc
 
 Current app version: `0.2.10`. The package version is shown in Settings > Beta and should be included in QA notes.
 
+For product context and operating status, read:
+
+- `../docs/PROJECT_CONTEXT.md`
+- `../docs/CURRENT_STATUS.md`
+- `../docs/WEB_APP.md`
+- `../AGENTS.md`
+
 ## Local Development
 
 ```powershell

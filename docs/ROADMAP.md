@@ -4,6 +4,8 @@ This roadmap is the execution plan for turning the current scaffold into a produ
 
 Current beta-readiness docs:
 
+- Canonical project context: `docs/PROJECT_CONTEXT.md`.
+- Current beta status: `docs/CURRENT_STATUS.md`.
 - Working beta goal: `docs/GOAL_WORKING_BETA_ROADMAP.md`.
 - Web beta operations: `docs/WEB_APP.md`.
 - TestFlight owner setup: `docs/TESTFLIGHT.md`.

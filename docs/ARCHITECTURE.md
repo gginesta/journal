@@ -1,5 +1,7 @@
 # Architecture
 
+For current beta status and implementation priorities, read `docs/PROJECT_CONTEXT.md`, `docs/CURRENT_STATUS.md`, and `docs/WEB_APP.md` before changing architectural direction.
+
 Photo Gratitude Journal is a local-first SwiftUI app with Apple-native storage, privacy, and monetization primitives. The app should stay small, calm, and heavily biased toward preserving the user's private memories.
 
 ## App Shell

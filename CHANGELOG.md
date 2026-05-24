@@ -25,6 +25,7 @@ All notable changes to Photo Gratitude Journal will be documented here.
 - Expanded web onboarding with friendly name collection for self, partner, and children so generic people tags become personal immediately.
 - Added a public science-backed web homepage for private beta testers, with research citation cards, privacy framing, demo/beta CTA routing, and desktop/mobile E2E coverage.
 - Added first-memory celebration, early Memory Lane milestone guidance, context-aware Little Details nudges, shared-journal copy, and tracked Supabase magic-link email copy with unit coverage.
+- Added canonical project context, current beta status, documentation index, Codex handoff guidance, and GitHub issue/PR templates for future development continuity.
 
 ## [0.1.0] - 2026-05-21
 
