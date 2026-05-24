@@ -33,6 +33,12 @@ The app should feel like opening a private, warm photo album at the end of the d
 
 ## Information Architecture
 
+Recommended web beta public routes:
+
+- `/`: public private-beta homepage with product proof, careful research citations, privacy framing, and CTAs into the demo/beta app.
+- `/app`: authenticated or demo journal experience.
+- `/login`: magic-link sign-in.
+
 Recommended v1 tabs:
 
 - Today: daily ritual and Memory Lane.

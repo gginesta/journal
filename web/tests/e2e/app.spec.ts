@@ -1,5 +1,33 @@
 import { expect, type Page, test } from "@playwright/test";
 
+test("public homepage presents the science-backed beta story", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(page.getByRole("heading", { name: "Photo Gratitude Journal" })).toBeVisible();
+  await expect(page.getByText("A private, photo-first ritual for noticing the good before it slips by.")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Open the (demo|beta)/ }).first()).toHaveAttribute("href", "/app");
+  await expect(page.getByRole("link", { name: "Sign in" }).first()).toHaveAttribute("href", "/login");
+
+  await expect(page.getByRole("heading", { name: "Backed by practices researchers actually study." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Gratitude practice" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Savoring and noticing" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Photos and memory" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Reminiscence and retrieval" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Emmons & McCullough, 2003" })).toHaveAttribute("href", "https://pubmed.ncbi.nlm.nih.gov/12585811/");
+  await expect(page.getByText("Not therapy, diagnosis, or medical advice")).toBeVisible();
+});
+
+test("public homepage fits on a phone viewport without horizontal overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+
+  await expect(page.getByRole("heading", { name: "Photo Gratitude Journal" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Open the (demo|beta)/ }).first()).toBeVisible();
+
+  const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(hasHorizontalOverflow).toBe(false);
+});
+
 async function openFreshApp(page: Page) {
   await page.addInitScript(() => {
     window.localStorage.clear();

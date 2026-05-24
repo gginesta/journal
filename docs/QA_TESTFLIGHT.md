@@ -14,6 +14,11 @@ Record before testing:
 ## Web/Supabase Beta Setup
 
 - Open the deployed web app in a clean browser profile.
+- Open the public root URL `/` before sign-in and confirm it renders the Photo Gratitude Journal homepage, not an immediate redirect.
+- Confirm the homepage primary CTA reads `Open the demo` in demo mode or `Open the beta` in Supabase mode, and that it routes to `/app`.
+- Confirm the homepage Sign in CTA routes to `/login`.
+- Confirm the homepage science section cites gratitude practice, savoring/noticing, photos and memory, and reminiscence/retrieval without clinical or medical claims.
+- Check the homepage on a phone viewport and confirm there is no horizontal overflow, clipped CTA text, or gray/broken hero imagery.
 - Confirm demo mode is not being used for real beta data.
 - Open Settings > Beta and confirm app version `0.2.9` is visible.
 - Login with an email magic link.

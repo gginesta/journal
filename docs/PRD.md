@@ -8,6 +8,8 @@ The core loop is intentionally small: add one or two photos, write one or a few 
 
 The app is inspired by the emotional utility of Five Minute Journal, but the product center is the user's own photos rather than a text-only habit checklist.
 
+The web beta also includes a public private-beta homepage at `/` that explains the product as an evidence-informed ritual. It may cite research on gratitude practice, savoring, intentional photo-taking, and reminiscence, but it must avoid clinical, therapeutic, diagnostic, or guaranteed mental-health claims.
+
 ## Current Beta Version
 
 - Current web beta app version: `0.2.9`.
@@ -52,6 +54,7 @@ The app is inspired by the emotional utility of Five Minute Journal, but the pro
 ### In Scope For Current Web/Supabase Beta
 
 - Next.js web app deployable on Vercel.
+- Public web homepage for private beta testers, with a demo/beta CTA into `/app`, careful research-backed positioning, and privacy-first product framing.
 - Supabase Auth with email magic links.
 - Supabase Postgres and private Storage for journal data and photos.
 - Workspace-based personal and household journals.
@@ -68,7 +71,7 @@ The app is inspired by the emotional utility of Five Minute Journal, but the pro
 - Memories, Calendar, Memory Lane, Insights, Settings, JSON export, and delete controls.
 - Demo mode with browser-local persistence for UX review.
 - Sync-safety checks that authenticated Supabase data remains authoritative over demo localStorage.
-- Beta verification checklist for solo, family, custom, shared workspace, RLS, and Storage behavior.
+- Beta verification checklist for homepage routing, solo, family, custom, shared workspace, RLS, and Storage behavior.
 
 ### In Scope For Native v1
 
@@ -98,6 +101,7 @@ The app is inspired by the emotional utility of Five Minute Journal, but the pro
 - Social sharing feed.
 - Public profiles.
 - AI-generated journaling advice or clinical interpretation.
+- Clinical or medical claims on the homepage or in onboarding.
 - Therapist or clinical mental health positioning.
 - Open self-serve collaboration beyond invited private beta testers.
 - Remote push notifications.

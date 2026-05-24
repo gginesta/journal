@@ -9,6 +9,7 @@ Upgrade the current TestFlight prototype into a stronger working beta for owner/
 The beta should let a tester:
 
 - Understand the app on first launch.
+- Understand the product promise from the public web homepage before entering the beta app.
 - Create today's photo-led gratitude entry.
 - Add, preview, and remove photos.
 - Write three nice things and optional secondary prompts.
@@ -28,6 +29,7 @@ The beta should let a tester:
 - Prompt and cadence polish: better prompt editing/reorder where practical, reminder times, support beta cadence choices in UI and new-entry session creation.
 - Memories and search polish: person filter, lightweight search, photo/text filter, Little Details discoverability.
 - Beta hardening: better empty states, Settings feedback, QA docs, versioning, local tests where practical.
+- Public web first impression: root homepage for private beta testers, with evidence-informed positioning, privacy copy, and CTA routing into `/app`.
 
 ### Out Of Scope
 
@@ -77,6 +79,7 @@ The beta should let a tester:
 
 - GitHub Actions iOS CI passes.
 - App launches to onboarding for a new beta install and then Today.
+- Web root `/` presents the science-backed private-beta homepage and routes testers into `/app`.
 - A tester can create an entry with photo, text, people tags, and Little Details.
 - A tester can preview and remove photos.
 - A tester can find memories by person and search text.

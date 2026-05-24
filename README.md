@@ -10,6 +10,7 @@ This repository contains the first iOS app scaffold and a production web beta:
 
 - SwiftUI iPhone app targeting iOS 17+.
 - Next.js web app under `web/` for PC/mobile browser testing, Supabase-backed private sync, and Vercel deployment.
+- Public web homepage at `/` for private beta testers, with research-backed positioning and CTAs into the demo/beta app.
 - SwiftData models configured for CloudKit private database sync.
 - Photo import with `PhotosPicker`, app-local protected file storage, and thumbnails.
 - Today, Timeline, Calendar, Insights, Settings, Prompt Editor, Entry Detail, and Premium screens.
@@ -55,6 +56,8 @@ xcrun simctl list devices available
 
 The browser app lives in `web/` and is the fastest way to test the product from a PC, iPad browser, or iPhone browser before TestFlight is ready. The current web beta app version is `0.2.9`, sourced from `web/package.json` and visible in Settings > Beta.
 
+The web root `/` is the public private-beta homepage. It explains the product loop, cites the evidence-informed gratitude/savoring/photo-memory/reminiscence basis, and links into `/app`. The actual journal experience remains at `/app`; authenticated beta sign-in remains at `/login`.
+
 ```powershell
 cd web
 copy .env.example .env.local
@@ -69,6 +72,7 @@ When filing beta notes, include app version `0.2.9`, browser/device, workspace r
 ## Product Shape
 
 - Default evening ritual with editable prompts and optional 1-2 photos.
+- Evidence-informed public homepage that positions the ritual carefully without clinical or medical claims.
 - Flexible cadence: once daily, morning/evening, or anytime entries.
 - Photo-first Today and Timeline experiences.
 - Streaks, calendar browsing, mood tracking, and automatic Memory Lane look-backs.

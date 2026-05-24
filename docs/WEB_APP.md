@@ -7,6 +7,7 @@ Current app version: `0.2.9`. The version comes from `web/package.json` and is s
 ## Beta Product Path
 
 - The beta validates the daily gratitude loop, private memory retrieval, and shared household model before wider native distribution.
+- The public root route `/` is the private-beta front door. It should explain the product loop, research-backed rationale, and privacy model before sending testers into `/app`.
 - Onboarding should feel balanced for solo/self, partner, family, and custom people/themes. Family/kid memories are important, but they must not dominate the product framing.
 - Gratitude Guide prompt packs provide non-AI writing starters for small gratitude, savoring, appreciation, self-kindness, hard days, and family/relationships.
 - Little Details are first-class retrievable memory fragments. They can live inside an entry and should also be reachable through a repository-style view for search, filtering, editing, and removal.
@@ -15,6 +16,7 @@ Current app version: `0.2.9`. The version comes from `web/package.json` and is s
 ## Architecture
 
 - Next.js App Router with TypeScript.
+- Static public homepage at `/`; interactive journal app at `/app`; magic-link sign-in at `/login`.
 - Supabase Auth with email magic links.
 - Supabase Postgres for journal data.
 - Supabase Storage for private original photos and thumbnails.
@@ -68,6 +70,12 @@ Demo mode stores changes in browser local storage. This is only for UX review an
 
 ## Product Surfaces To Verify
 
+- Public homepage:
+  - `/` renders the Photo Gratitude Journal homepage instead of redirecting immediately to `/app`.
+  - The primary CTA reads `Open the demo` in demo mode and `Open the beta` when demo mode is disabled.
+  - The primary CTA links to `/app`, and the secondary sign-in CTA links to `/login`.
+  - The science section cites gratitude, savoring, photo-memory, and reminiscence research without making clinical or medical claims.
+  - Desktop and mobile layouts have no horizontal overflow and do not depend on remote images for core visual polish.
 - Onboarding:
   - First-run tour explains the tiny daily loop.
   - Memory-focus choices support solo/self, partner, family, and custom people/themes.
@@ -157,7 +165,8 @@ SUPABASE_THUMBNAILS_BUCKET=journal-thumbnails
 
 5. Add `SUPABASE_SERVICE_ROLE_KEY` only if a server-side beta operation requires it. Never expose it with a `NEXT_PUBLIC_` prefix.
 6. Deploy from `main` after the web PR merges.
-7. After deployment, send one magic link through the production URL and confirm the callback returns to the app.
+7. After deployment, open the production root URL and confirm the homepage CTA reaches `/app`.
+8. Send one magic link through the production URL and confirm the callback returns to the app.
 
 ## Migration Notes
 
@@ -170,6 +179,7 @@ SUPABASE_THUMBNAILS_BUCKET=journal-thumbnails
 ## Beta QA
 
 - Confirm Settings > Beta shows app version `0.2.9`.
+- Open `/` and confirm the science-backed homepage, research citations, privacy section, and demo/beta CTA render on desktop and mobile without horizontal overflow.
 - Login with email magic link.
 - Confirm default personal workspace appears.
 - Create household workspace and switch between workspaces.
@@ -196,7 +206,7 @@ SUPABASE_THUMBNAILS_BUCKET=journal-thumbnails
 
 ## Beta Exit Criteria
 
-- Web lint, typecheck, unit tests, build, and Chromium E2E pass from a clean checkout.
+- Web lint, typecheck, unit tests, build, and Chromium E2E pass from a clean checkout, including the public homepage tests.
 - Manual Supabase beta QA passes with at least two authenticated accounts and two workspace roles beyond owner where practical.
 - No known RLS, Storage, or cross-workspace data-leak issue remains open.
 - Demo mode and Supabase mode have been tested separately, including confirming authenticated data is not overwritten by demo localStorage.

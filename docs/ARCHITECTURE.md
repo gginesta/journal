@@ -8,6 +8,13 @@ Photo Gratitude Journal is a local-first SwiftUI app with Apple-native storage, 
 - Each tab uses its own `NavigationStack` through `RouterPath`, which keeps navigation state independent by tab.
 - Routes are lightweight enum cases. Views are created in `withAppRoutes()` rather than stored in navigation state.
 
+## Web Shell
+
+- The Next.js web beta uses `/` as a static public homepage for private beta testers.
+- `/app` owns the interactive journal experience in demo mode or authenticated Supabase mode.
+- `/login` owns email magic-link sign-in when Supabase mode is enabled.
+- The homepage is evidence-informed product positioning only; it should not create journal data, require Supabase state, or make clinical claims.
+
 ## Persistence
 
 - SwiftData is the app persistence layer.
