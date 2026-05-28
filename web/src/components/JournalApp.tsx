@@ -136,6 +136,7 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showStarterGuide, setShowStarterGuide] = useState(false);
   const [firstMemoryDismissalValue, setFirstMemoryDismissalValue] = useState<string | null>("true");
+  const [workspacesWithClearedEntries, setWorkspacesWithClearedEntries] = useState<Set<string>>(() => new Set());
   const [isPending, startTransition] = useTransition();
   const didMountPersistence = useRef(false);
   const latestSyncId = useRef(0);
@@ -225,6 +226,7 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
     const today = toLocalDate();
     return workspaceEntries.find((entry) => entry.localDate === today) ?? makeEntry(activeWorkspaceId, today, workspacePrompts, reminders.cadence);
   }, [activeWorkspaceId, workspaceEntries, workspacePrompts, reminders.cadence]);
+  const activeWorkspaceWasCleared = workspacesWithClearedEntries.has(activeWorkspaceId);
 
   const selectedEntry = useMemo(
     () => workspaceEntries.find((entry) => entry.id === selectedEntryId) ?? null,
@@ -294,11 +296,12 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
 
   useEffect(() => {
     if (!canEditActiveWorkspace) return;
+    if (activeWorkspaceWasCleared && workspaceEntries.length === 0) return;
     setEntries((current) => {
       if (current.some((entry) => entry.id === todayEntry.id)) return current;
       return [todayEntry, ...current];
     });
-  }, [todayEntry, canEditActiveWorkspace]);
+  }, [todayEntry, canEditActiveWorkspace, activeWorkspaceWasCleared, workspaceEntries.length]);
 
   useEffect(() => {
     const completed = window.localStorage.getItem(onboardingKey) === "complete";
@@ -328,6 +331,7 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
 
   function mutateEntries(updater: (entries: JournalEntry[]) => JournalEntry[]) {
     if (blockReadOnlyMutation()) return;
+    clearWorkspaceEntriesCleared(activeWorkspaceId);
     markPendingSave();
     startTransition(() => {
       setEntries((current) => updater(current));
@@ -353,7 +357,36 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
   };
 
   function updateEntry(entryId: string, updater: (entry: JournalEntry) => JournalEntry) {
-    mutateEntries((current) => current.map((entry) => (entry.id === entryId ? updater(entry) : entry)));
+    mutateEntries((current) => {
+      let didUpdate = false;
+      const updatedEntries = current.map((entry) => {
+        if (entry.id !== entryId) return entry;
+        didUpdate = true;
+        return updater(entry);
+      });
+
+      if (didUpdate) return updatedEntries;
+      if (entryId === todayEntry.id) return [updater(todayEntry), ...current];
+      return current;
+    });
+  }
+
+  function markWorkspaceEntriesCleared(workspaceId: string) {
+    setWorkspacesWithClearedEntries((current) => {
+      if (current.has(workspaceId)) return current;
+      const next = new Set(current);
+      next.add(workspaceId);
+      return next;
+    });
+  }
+
+  function clearWorkspaceEntriesCleared(workspaceId: string) {
+    setWorkspacesWithClearedEntries((current) => {
+      if (!current.has(workspaceId)) return current;
+      const next = new Set(current);
+      next.delete(workspaceId);
+      return next;
+    });
   }
 
   function addRepositoryDetail({
@@ -476,9 +509,11 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
 
   async function deleteWorkspaceEntries() {
     if (blockReadOnlyMutation()) return;
+    const workspaceId = activeWorkspaceId;
     if (initialData.mode !== "supabase") {
       markPendingSave();
-      setEntries((current) => current.filter((entry) => entry.workspaceId !== activeWorkspaceId));
+      markWorkspaceEntriesCleared(workspaceId);
+      setEntries((current) => current.filter((entry) => entry.workspaceId !== workspaceId));
       return;
     }
     if (!navigator.onLine) {
@@ -496,7 +531,8 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
         body: JSON.stringify({ workspaceId: activeWorkspaceId })
       });
       if (!response.ok) throw new Error(await responseErrorMessage(response, "Delete failed"));
-      setEntries((current) => current.filter((entry) => entry.workspaceId !== activeWorkspaceId));
+      markWorkspaceEntriesCleared(workspaceId);
+      setEntries((current) => current.filter((entry) => entry.workspaceId !== workspaceId));
       setSaveState("saved");
     } catch (error) {
       setSaveState(navigator.onLine ? "error" : "offline");

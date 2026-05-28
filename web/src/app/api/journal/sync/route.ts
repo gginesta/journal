@@ -132,8 +132,30 @@ async function syncEntries(workspaceId: string, userId: string, entries: Journal
 
   if (entries.length === 0) return null;
 
-  const { error: entryError } = await supabase.from("journal_entries").upsert(
-    entries.map((entry) => ({
+  const { data: existingEntries, error: existingEntryError } = await supabase
+    .from("journal_entries")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .in(
+      "id",
+      entries.map((entry) => entry.id)
+    );
+  if (existingEntryError) return existingEntryError;
+
+  const existingEntryIds = new Set(existingEntries?.map((entry) => entry.id) ?? []);
+  const existingEntryRows = entries
+    .filter((entry) => existingEntryIds.has(entry.id))
+    .map((entry) => ({
+      id: entry.id,
+      workspace_id: workspaceId,
+      local_date: entry.localDate,
+      mood: entry.mood,
+      note: entry.note,
+      updated_at: entry.updatedAt
+    }));
+  const newEntryRows = entries
+    .filter((entry) => !existingEntryIds.has(entry.id))
+    .map((entry) => ({
       id: entry.id,
       workspace_id: workspaceId,
       local_date: entry.localDate,
@@ -142,10 +164,17 @@ async function syncEntries(workspaceId: string, userId: string, entries: Journal
       created_by: userId,
       created_at: entry.createdAt,
       updated_at: entry.updatedAt
-    })),
-    { onConflict: "id" }
-  );
-  if (entryError) return entryError;
+    }));
+
+  if (newEntryRows.length > 0) {
+    const { error: insertEntryError } = await supabase.from("journal_entries").insert(newEntryRows);
+    if (insertEntryError) return insertEntryError;
+  }
+
+  if (existingEntryRows.length > 0) {
+    const { error: updateEntryError } = await supabase.from("journal_entries").upsert(existingEntryRows, { onConflict: "id" });
+    if (updateEntryError) return updateEntryError;
+  }
 
   for (const entry of entries) {
     const nestedError = await syncEntryNestedRows(workspaceId, entry);
