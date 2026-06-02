@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { JournalEntry, PersonTag, PromptTemplate, ReminderPreferences } from "@/types/journal";
 import { canMutateWorkspaceRole, isSafeWorkspaceStoragePath, parseImageDataUrl } from "@/lib/journal-sync-safety";
+import { makePhotoThumbnail } from "@/lib/photo-thumbnails";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type SyncPayload = {
@@ -309,9 +310,10 @@ async function ensurePhotoStored(
     return { storagePath, thumbnailPath, error: { message: "Photo data is missing or is not a supported image" } };
   }
   const buffer = Buffer.from(data.base64, "base64");
+  const thumbnail = await makePhotoThumbnail(buffer);
 
   const path = `${workspaceId}/${localDate}/${photoId}.${data.extension}`;
-  const thumbPath = `${workspaceId}/${localDate}/${photoId}-thumb.${data.extension}`;
+  const thumbPath = `${workspaceId}/${localDate}/${photoId}-thumb.${thumbnail.extension}`;
 
   const { error: photoError } = await supabase.storage.from("journal-photos").upload(path, buffer, {
     contentType: data.contentType,
@@ -319,8 +321,8 @@ async function ensurePhotoStored(
   });
   if (photoError) return { storagePath: path, thumbnailPath: thumbPath, error: photoError };
 
-  const { error: thumbError } = await supabase.storage.from("journal-thumbnails").upload(thumbPath, buffer, {
-    contentType: data.contentType,
+  const { error: thumbError } = await supabase.storage.from("journal-thumbnails").upload(thumbPath, thumbnail.buffer, {
+    contentType: thumbnail.contentType,
     upsert: true
   });
   if (thumbError) return { storagePath: path, thumbnailPath: thumbPath, error: thumbError };
