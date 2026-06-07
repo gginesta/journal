@@ -65,6 +65,7 @@ import {
   onboardingFocusOptions,
   onboardingStorageKey,
   splitFlexibleTags,
+  workspaceHasMeaningfulData,
   type OnboardingFocus,
   type OnboardingSetup
 } from "@/lib/onboarding";
@@ -134,6 +135,8 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
   const [saveError, setSaveError] = useState<string | null>(null);
   const [syncRetryToken, setSyncRetryToken] = useState(0);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingMode, setOnboardingMode] = useState<"setup" | "welcome-only">("setup");
+  const [forceOnboardingSetup, setForceOnboardingSetup] = useState(false);
   const [showStarterGuide, setShowStarterGuide] = useState(false);
   const [firstMemoryDismissalValue, setFirstMemoryDismissalValue] = useState<string | null>("true");
   const [workspacesWithClearedEntries, setWorkspacesWithClearedEntries] = useState<Set<string>>(() => new Set());
@@ -306,9 +309,20 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
   useEffect(() => {
     const completed = window.localStorage.getItem(onboardingKey) === "complete";
     const starterDismissed = window.localStorage.getItem(`${onboardingKey}:starter-dismissed`) === "true";
-    setShowOnboarding(!completed);
+    const hasData = workspaceHasMeaningfulData({
+      people: workspacePeople,
+      entries: workspaceEntries,
+      workspaceId: activeWorkspaceId
+    });
+    // A member invited into an already-populated household (a non-owner whose
+    // active space already has memories) or a viewer gets the short welcome
+    // instead of the personalization flow — we never overwrite a shared space's
+    // people. Owners always get the full setup. Manual replay forces setup.
+    const welcomeOnly = !forceOnboardingSetup && ((hasData && activeWorkspaceRole !== "owner") || !canEditActiveWorkspace);
+    setOnboardingMode(welcomeOnly ? "welcome-only" : "setup");
+    setShowOnboarding(forceOnboardingSetup || !completed);
     setShowStarterGuide(completed && !starterDismissed);
-  }, [onboardingKey]);
+  }, [onboardingKey, activeWorkspaceId, workspacePeople, workspaceEntries, canEditActiveWorkspace, activeWorkspaceRole, forceOnboardingSetup]);
 
   useEffect(() => {
     setFirstMemoryDismissalValue(window.localStorage.getItem(firstMemoryKey));
@@ -555,9 +569,13 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
   }
 
   function completeOnboarding(setup?: OnboardingSetup) {
-    if (setup) applyOnboardingSetup(setup);
+    if (setup) {
+      applyOnboardingSetup(setup);
+      if (setup.reminders) updateReminders(setup.reminders);
+    }
     window.localStorage.setItem(onboardingKey, "complete");
     window.localStorage.removeItem(`${onboardingKey}:starter-dismissed`);
+    setForceOnboardingSetup(false);
     setShowOnboarding(false);
     setShowStarterGuide(true);
     setTab("today");
@@ -575,6 +593,8 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
 
   function replayOnboarding() {
     setTab("today");
+    setForceOnboardingSetup(true);
+    setOnboardingMode("setup");
     setShowOnboarding(true);
   }
 
@@ -680,6 +700,9 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
         <OnboardingOverlay
           profile={initialData.profile}
           people={workspacePeople}
+          mode={onboardingMode}
+          workspaceName={activeWorkspace?.name ?? "your journal"}
+          reminders={reminders}
           onComplete={completeOnboarding}
           onClose={() => completeOnboarding()}
         />
@@ -805,14 +828,22 @@ function MobileTabs({ activeTab, setTab }: { activeTab: AppTab; setTab: (tab: Ap
   );
 }
 
+type OnboardingStepKind = "welcome" | "people" | "reminders" | "payoff";
+
 function OnboardingOverlay({
   profile,
   people,
+  mode,
+  workspaceName,
+  reminders,
   onComplete,
   onClose
 }: {
   profile: JournalBootstrap["profile"];
   people: PersonTag[];
+  mode: "setup" | "welcome-only";
+  workspaceName: string;
+  reminders: ReminderPreferences;
   onComplete: (setup: OnboardingSetup) => void;
   onClose: () => void;
 }) {
@@ -821,45 +852,69 @@ function OnboardingOverlay({
   const firstName = shortDisplayName(profile);
   const [meName, setMeName] = useState(firstName === "there" ? "" : firstName);
   const [partnerName, setPartnerName] = useState(() => findPersonalizedPersonName(people, "Partner"));
-  const [childNames, setChildNames] = useState(() => [
-    findPersonalizedPersonName(people, "Kid 1"),
-    findPersonalizedPersonName(people, "Kid 2")
-  ]);
+  const [childNames, setChildNames] = useState(() => {
+    const seeded = [findPersonalizedPersonName(people, "Kid 1"), findPersonalizedPersonName(people, "Kid 2")].filter(Boolean);
+    return seeded.length > 0 ? seeded : [""];
+  });
   const [otherNames, setOtherNames] = useState([""]);
+  const [reminderPrefs, setReminderPrefs] = useState<ReminderPreferences>(reminders);
 
-  const steps = [
-    {
-      title: firstName === "there" ? "Welcome." : `Welcome, ${firstName}.`,
-      heading: "This is a quiet place to keep one good moment from today.",
-      body: "The app can hold photos, prompts, people, and memories, but the ritual is intentionally tiny: one photo or one line is enough."
-    },
-    {
-      title: "Choose your shape",
-      heading: "What kind of memories are you starting with?",
-      body: "Tags stay private. Use them for yourself, a partner, family, friends, projects, places, or any theme you might want to find later."
-    },
-    {
-      title: "The aha moment",
-      heading: "Memory Lane starts sooner than you think.",
-      body: "After a few kept days, the app can bring back yesterday, last week, one month ago, then three months and yearly moments as your archive grows."
-    }
-  ];
+  const welcomeStep = {
+    kind: "welcome" as OnboardingStepKind,
+    title: firstName === "there" ? "Welcome." : `Welcome, ${firstName}.`,
+    heading: mode === "welcome-only" ? `You've joined ${workspaceName}.` : "This is a quiet place to keep one good moment from today.",
+    body:
+      mode === "welcome-only"
+        ? "Everything here is already set up. The ritual is intentionally tiny: one photo or one line is enough to keep a day."
+        : "We'll set this up together in under a minute. The ritual is intentionally tiny: one photo or one line is enough."
+  };
+  const payoffStep = {
+    kind: "payoff" as OnboardingStepKind,
+    title: "The payoff",
+    heading: "Memory Lane starts sooner than you think.",
+    body: "After a few kept days, the app brings back yesterday, last week, and one month ago, then three months and yearly moments as your archive grows."
+  };
+
+  const steps =
+    mode === "welcome-only"
+      ? [welcomeStep, payoffStep]
+      : [
+          welcomeStep,
+          {
+            kind: "people" as OnboardingStepKind,
+            title: "Who is this for?",
+            heading: "Let's make this yours.",
+            body: "Add the people or themes you want to remember. These stay private — they just make memories searchable later, and you can change them anytime."
+          },
+          {
+            kind: "reminders" as OnboardingStepKind,
+            title: "A gentle nudge",
+            heading: "Want a quiet reminder?",
+            body: "Pick a rhythm that fits your day. It's completely optional, never naggy, and easy to change or turn off in Settings."
+          },
+          payoffStep
+        ];
   const current = steps[step];
+  const isLastStep = step === steps.length - 1;
 
-  function next() {
-    if (step < steps.length - 1) {
-      setStep((currentStep) => currentStep + 1);
+  function finish() {
+    if (mode === "welcome-only") {
+      onClose();
       return;
     }
     onComplete({
       focus,
-      names: {
-        me: meName,
-        partner: partnerName,
-        children: childNames,
-        others: otherNames
-      }
+      names: { me: meName, partner: partnerName, children: childNames, others: otherNames },
+      reminders: reminderPrefs
     });
+  }
+
+  function next() {
+    if (!isLastStep) {
+      setStep((currentStep) => currentStep + 1);
+      return;
+    }
+    finish();
   }
 
   return (
@@ -886,7 +941,7 @@ function OnboardingOverlay({
               <h1 className="mt-3 max-w-2xl text-[2rem] font-bold leading-[1.04] tracking-normal text-ink sm:text-5xl">{current.heading}</h1>
               <p className="mt-4 max-w-xl text-[0.96rem] leading-6 text-warm-gray sm:text-base sm:leading-7">{current.body}</p>
 
-              {step === 1 ? (
+              {current.kind === "people" ? (
                 <div className="mt-5 grid gap-4">
                   <div className="grid gap-2 sm:grid-cols-2">
                     {onboardingFocusOptions.map((option) => {
@@ -913,14 +968,14 @@ function OnboardingOverlay({
                   </div>
 
                   <div className="rounded-[22px] border border-journal-line bg-white p-4">
-                    <p className="font-bold text-soft-ink">{focus === "other" ? "Tags to start" : "A few names to start"}</p>
+                    <p className="font-bold text-soft-ink">{focus === "other" ? "What should we call these?" : "What should we call them?"}</p>
                     <p className="mt-1 text-sm leading-5 text-warm-gray">
-                      {focus === "other" ? "Add people, places, projects, or themes. Commas work too." : "Leave anything blank. You can edit these tags later."}
+                      {focus === "other" ? "Add people, places, projects, or themes. Commas work too." : "Leave anything blank — you can add or rename people anytime."}
                     </p>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      {focus !== "other" ? <OnboardingNameField label="Me" value={meName} onChange={setMeName} placeholder="Guillermo" /> : null}
+                      {focus !== "other" ? <OnboardingNameField label="You" value={meName} onChange={setMeName} placeholder="Your name" /> : null}
                       {focus === "partner" || focus === "family" ? (
-                        <OnboardingNameField label="Partner" value={partnerName} onChange={setPartnerName} placeholder="Stephanie" />
+                        <OnboardingNameField label="Partner" value={partnerName} onChange={setPartnerName} placeholder="Their name" />
                       ) : null}
                       {focus === "family"
                         ? childNames.map((name, index) => (
@@ -964,13 +1019,21 @@ function OnboardingOverlay({
                       </button>
                     ) : null}
                   </div>
+
+                  <p className="text-sm leading-5 text-warm-gray">
+                    Want to keep a journal together? You can create or join a shared household anytime in Settings.
+                  </p>
                 </div>
+              ) : null}
+
+              {current.kind === "reminders" ? (
+                <OnboardingReminderStep value={reminderPrefs} onChange={setReminderPrefs} />
               ) : null}
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
               <button type="button" onClick={next} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full bg-rose px-5 text-sm font-bold text-white shadow-sm sm:min-h-12 sm:flex-none sm:text-base">
-                {step === steps.length - 1 ? "Start today" : "Continue"}
+                {isLastStep ? (mode === "welcome-only" ? "Start today" : "Add your first memory") : "Continue"}
                 <ArrowRight aria-hidden="true" size={17} />
               </button>
               <button type="button" onClick={onClose} className="min-h-11 flex-1 rounded-full bg-journal-raised px-5 text-sm font-bold text-warm-gray sm:min-h-12 sm:flex-none sm:text-base">
@@ -980,12 +1043,97 @@ function OnboardingOverlay({
           </div>
 
           <div className="min-w-0 bg-[linear-gradient(150deg,#f9ece6,#f7fbf2_48%,#fff7f1)] p-3 sm:p-8">
-            {step === 0 ? <OnboardingTodayPreview /> : null}
-            {step === 1 ? <OnboardingPeoplePreview focus={focus} meName={meName} partnerName={partnerName} childNames={childNames} otherNames={otherNames} /> : null}
-            {step === 2 ? <OnboardingMemoryPreview focus={focus} childNames={childNames} partnerName={partnerName} otherNames={otherNames} /> : null}
+            {current.kind === "welcome" ? <OnboardingTodayPreview /> : null}
+            {current.kind === "people" ? <OnboardingPeoplePreview focus={focus} meName={meName} partnerName={partnerName} childNames={childNames} otherNames={otherNames} /> : null}
+            {current.kind === "reminders" ? <OnboardingTodayPreview /> : null}
+            {current.kind === "payoff" ? <OnboardingMemoryPreview focus={focus} childNames={childNames} partnerName={partnerName} otherNames={otherNames} /> : null}
           </div>
         </div>
       </section>
+    </div>
+  );
+}
+
+function OnboardingReminderStep({
+  value,
+  onChange
+}: {
+  value: ReminderPreferences;
+  onChange: (value: ReminderPreferences) => void;
+}) {
+  const cadenceOptions: Array<{ id: RitualCadence; label: string }> = [
+    { id: "evening", label: "Evening" },
+    { id: "once_daily", label: "Once daily" },
+    { id: "morning_evening", label: "Morning + evening" },
+    { id: "anytime", label: "Anytime" }
+  ];
+  const showMorning = value.cadence === "morning_evening";
+  const showEvening = value.cadence === "evening" || value.cadence === "once_daily" || value.cadence === "morning_evening";
+
+  return (
+    <div className="mt-5 grid gap-4">
+      <label className="flex items-center justify-between gap-4 rounded-[22px] border border-journal-line bg-white p-4">
+        <span>
+          <span className="block font-bold text-soft-ink">Remind me to keep a moment</span>
+          <span className="mt-1 block text-sm leading-5 text-warm-gray">A soft, optional nudge. No streaks lost, no guilt.</span>
+        </span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={value.remindersEnabled}
+          aria-label="Enable reminders"
+          onClick={() => onChange({ ...value, remindersEnabled: !value.remindersEnabled })}
+          className={clsx(
+            "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition",
+            value.remindersEnabled ? "bg-rose" : "bg-journal-line"
+          )}
+        >
+          <span className={clsx("inline-block h-5 w-5 transform rounded-full bg-white shadow transition", value.remindersEnabled ? "translate-x-6" : "translate-x-1")} />
+        </button>
+      </label>
+
+      {value.remindersEnabled ? (
+        <div className="rounded-[22px] border border-journal-line bg-white p-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="grid gap-1 text-sm font-bold text-soft-ink">
+              Rhythm
+              <select
+                value={value.cadence}
+                onChange={(event) => onChange({ ...value, cadence: event.target.value as RitualCadence })}
+                className="min-h-11 rounded-2xl border border-journal-line bg-journal-raised px-3 font-normal outline-none focus:ring-4 focus:ring-rose/15"
+              >
+                {cadenceOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {showMorning ? (
+              <label className="grid gap-1 text-sm font-bold text-soft-ink">
+                Morning
+                <input
+                  type="time"
+                  value={value.morningTime}
+                  onChange={(event) => onChange({ ...value, morningTime: event.target.value })}
+                  className="min-h-11 rounded-2xl border border-journal-line bg-journal-raised px-3 font-normal outline-none focus:ring-4 focus:ring-rose/15"
+                />
+              </label>
+            ) : null}
+            {showEvening ? (
+              <label className="grid gap-1 text-sm font-bold text-soft-ink">
+                Evening
+                <input
+                  type="time"
+                  value={value.eveningTime}
+                  onChange={(event) => onChange({ ...value, eveningTime: event.target.value })}
+                  className="min-h-11 rounded-2xl border border-journal-line bg-journal-raised px-3 font-normal outline-none focus:ring-4 focus:ring-rose/15"
+                />
+              </label>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

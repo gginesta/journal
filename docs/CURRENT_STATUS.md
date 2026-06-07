@@ -1,6 +1,6 @@
 # Current Status
 
-Last updated: 2026-05-24.
+Last updated: 2026-06-07.
 
 ## Summary
 
@@ -9,7 +9,7 @@ Photo Gratitude Journal is in private web beta preparation. The current beta is 
 The active app version is:
 
 ```text
-0.2.10
+0.2.11
 ```
 
 The live URL is:
@@ -64,6 +64,14 @@ Routes:
 - `/auth/callback`: Supabase Auth callback
 
 ## What Was Recently Added
+
+Version `0.2.11` added:
+
+- redesigned, warmer first-run onboarding with real-name personalization (no generic `Kid 1` / `Partner` placeholders)
+- optional reminder-cadence step inside onboarding
+- short "you've joined" welcome for members invited into a populated household
+- stopped seeding generic placeholder person tags for new workspaces, plus a migration that removes unused generic defaults from existing accounts
+- person-tag deletions now persist through workspace sync
 
 Version `0.2.10` added:
 
@@ -158,7 +166,7 @@ Ask Stephanie to test on iPhone first.
 1. Open the URL.
 2. Confirm the homepage feels clear and trustworthy.
 3. Sign in with magic link.
-4. Confirm Settings > Beta shows `0.2.10`.
+4. Confirm Settings > Beta shows `0.2.11`.
 5. Complete onboarding as family/kids, partner, or whichever feels natural.
 6. Add one photo or one line in Today.
 7. Confirm the first-memory celebration appears.

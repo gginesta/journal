@@ -4,6 +4,15 @@ All notable changes to Photo Gratitude Journal will be documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- Redesigned the web first-run onboarding into a warmer, guided flow that collects real names (no "Kid 1 / Kid 2 / Partner" placeholders), adds an optional reminder-cadence step, and ends with a first-memory nudge. New workspaces no longer seed generic placeholder person tags; the personalization step creates the real, named tags instead. Members invited into an already-populated household now get a short welcome instead of the setup flow. Bumped the web beta to `0.2.11`.
+
+### Fixed
+
+- Person-tag removals now persist: workspace sync reconciles deletions for tags that are absent from the synced state and not attached to any entry or detail, so cleaned-up tags no longer reappear on reload. Unattached tag deletion in a shared household remains last-writer-wins for now (a known beta limitation).
+- Added a migration that stops seeding generic placeholder person tags for new accounts and removes unused generic defaults (`Kid 1`, `Kid 2`, `Partner`, `Family`) from existing accounts when they are not referenced by any memory.
+
 ### Added
 
 - Added a full product requirements document.

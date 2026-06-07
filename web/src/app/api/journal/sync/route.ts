@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { JournalEntry, PersonTag, PromptTemplate, ReminderPreferences } from "@/types/journal";
-import { canMutateWorkspaceRole, isSafeWorkspaceStoragePath, parseImageDataUrl } from "@/lib/journal-sync-safety";
+import { canMutateWorkspaceRole, computePersonTagDeletions, isSafeWorkspaceStoragePath, parseImageDataUrl } from "@/lib/journal-sync-safety";
 import { makePhotoThumbnail } from "@/lib/photo-thumbnails";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -75,20 +75,70 @@ async function getWorkspaceMutationAccess(workspaceId: string, userId: string): 
 
 async function upsertPeople(workspaceId: string, people: PersonTag[]) {
   const supabase = await createSupabaseServerClient();
-  if (!supabase || people.length === 0) return null;
+  if (!supabase) return null;
 
-  const { error } = await supabase.from("person_tags").upsert(
-    people.map((person) => ({
-      id: person.id,
-      workspace_id: workspaceId,
-      name: person.name,
-      color_hex: person.color,
-      sort_order: person.sortOrder,
-      is_default: person.isDefault
-    })),
-    { onConflict: "id" }
-  );
-  return error;
+  // Upsert first so newly-created tags exist before entries reference them and so
+  // they are not mistaken for "missing" during deletion reconciliation below.
+  if (people.length > 0) {
+    const { error } = await supabase.from("person_tags").upsert(
+      people.map((person) => ({
+        id: person.id,
+        workspace_id: workspaceId,
+        name: person.name,
+        color_hex: person.color,
+        sort_order: person.sortOrder,
+        is_default: person.isDefault
+      })),
+      { onConflict: "id" }
+    );
+    if (error) return error;
+  }
+
+  return reconcilePersonTagDeletions(workspaceId, people);
+}
+
+// Removing a person tag in the client must persist. Delete workspace tags that
+// are absent from the synced payload and not attached to any entry or detail.
+async function reconcilePersonTagDeletions(workspaceId: string, people: PersonTag[]) {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return null;
+
+  const { data: existing, error: existingError } = await supabase
+    .from("person_tags")
+    .select("id")
+    .eq("workspace_id", workspaceId);
+  if (existingError) return existingError;
+
+  const existingIds = (existing ?? []).map((row) => row.id as string);
+  const candidateIds = computePersonTagDeletions(existingIds, people.map((person) => person.id), []);
+  if (candidateIds.length === 0) return null;
+
+  const { data: entryRefs, error: entryRefError } = await supabase
+    .from("entry_person_tags")
+    .select("person_tag_id")
+    .in("person_tag_id", candidateIds);
+  if (entryRefError) return entryRefError;
+
+  const { data: detailRefs, error: detailRefError } = await supabase
+    .from("detail_person_tags")
+    .select("person_tag_id")
+    .in("person_tag_id", candidateIds);
+  if (detailRefError) return detailRefError;
+
+  const referencedIds = [
+    ...(entryRefs ?? []).map((row) => row.person_tag_id as string),
+    ...(detailRefs ?? []).map((row) => row.person_tag_id as string)
+  ];
+
+  const safeToDelete = computePersonTagDeletions(candidateIds, people.map((person) => person.id), referencedIds);
+  if (safeToDelete.length === 0) return null;
+
+  const { error: deleteError } = await supabase
+    .from("person_tags")
+    .delete()
+    .eq("workspace_id", workspaceId)
+    .in("id", safeToDelete);
+  return deleteError;
 }
 
 async function upsertPrompts(workspaceId: string, prompts: PromptTemplate[]) {

@@ -345,7 +345,7 @@ function HeroJournalMockup() {
               <p className="mt-3 text-sm leading-6 text-soft-ink">Still says &apos;lellow&apos; instead of yellow.</p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs font-bold text-warm-gray">
                 <span className="rounded-full bg-white px-3 py-1.5">phrase</span>
-                <span className="rounded-full bg-white px-3 py-1.5">Kid 1</span>
+                <span className="rounded-full bg-white px-3 py-1.5">Mia</span>
               </div>
             </div>
           </div>

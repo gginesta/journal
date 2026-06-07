@@ -45,13 +45,17 @@ async function openFreshApp(page: Page) {
 async function continueFromWelcome(page: Page) {
   await expect(page.getByRole("heading", { name: "This is a quiet place to keep one good moment from today." })).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("heading", { name: "What kind of memories are you starting with?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Let's make this yours." })).toBeVisible();
 }
 
+// Call this while on the "Let's make this yours." (people) step to advance
+// through the reminders step and finish onboarding.
 async function startToday(page: Page) {
   await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("heading", { name: "Want a quiet reminder?" })).toBeVisible();
+  await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("heading", { name: "Memory Lane starts sooner than you think." })).toBeVisible();
-  await page.getByRole("button", { name: "Start today" }).click();
+  await page.getByRole("button", { name: "Add your first memory" }).click();
   await expect(page.getByRole("heading", { name: "What felt good today?" })).toBeVisible();
 }
 
@@ -118,20 +122,38 @@ test("demo user can choose just me and other onboarding shapes without family-on
   await expect(page.getByRole("button", { name: "Other people or themes" })).toBeVisible();
   await expect(page.getByLabel("Partner")).toHaveCount(0);
 
-  await page.getByLabel("Me", { exact: true }).fill("Solo Tester");
+  await page.getByLabel("You", { exact: true }).fill("Solo Tester");
   await startToday(page);
   await expect(page.getByRole("button", { name: "Solo Tester" }).first()).toBeVisible();
 
   await page.getByRole("button", { name: "Settings" }).first().click();
   await expect(page.getByRole("heading", { name: "Beta" })).toBeVisible();
-  await expect(page.getByText("App version 0.2.10")).toBeVisible();
+  await expect(page.getByText("App version 0.2.11")).toBeVisible();
   await page.getByRole("button", { name: "Replay welcome" }).click();
   await continueFromWelcome(page);
   await page.getByRole("button", { name: "Other people or themes" }).click();
-  await expect(page.getByLabel("Me", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("You", { exact: true })).toHaveCount(0);
   await page.getByLabel("Person or theme", { exact: true }).fill("Travel Wins, Work Wins");
   await startToday(page);
   await expect(page.getByRole("button", { name: "Travel Wins" }).first()).toBeVisible();
+});
+
+test("onboarding reminder step lets a demo user opt into a cadence", async ({ page }) => {
+  await openFreshApp(page);
+  await continueFromWelcome(page);
+  await page.getByLabel("You", { exact: true }).fill("Cadence Tester");
+
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("heading", { name: "Want a quiet reminder?" })).toBeVisible();
+  await page.getByRole("switch", { name: "Enable reminders" }).click();
+  await page.getByLabel("Rhythm").selectOption("morning_evening");
+  await expect(page.getByLabel("Morning", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Evening", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("heading", { name: "Memory Lane starts sooner than you think." })).toBeVisible();
+  await page.getByRole("button", { name: "Add your first memory" }).click();
+  await expect(page.getByRole("heading", { name: "What felt good today?" })).toBeVisible();
 });
 
 test("first personal memory gets a soft Memory Lane celebration", async ({ page }) => {

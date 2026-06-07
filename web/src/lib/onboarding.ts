@@ -1,4 +1,5 @@
-import type { JournalEntry, PersonTag } from "@/types/journal";
+import type { JournalEntry, PersonTag, ReminderPreferences } from "@/types/journal";
+import { isEntryComplete } from "./journal-logic";
 
 export type OnboardingFocus = "self" | "partner" | "family" | "other";
 
@@ -10,6 +11,7 @@ export type OnboardingSetup = {
     children: string[];
     others: string[];
   };
+  reminders?: ReminderPreferences;
 };
 
 export const onboardingFocusOptions: Array<{ id: OnboardingFocus; title: string; text: string }> = [
@@ -19,8 +21,28 @@ export const onboardingFocusOptions: Array<{ id: OnboardingFocus; title: string;
   { id: "other", title: "Other people or themes", text: "Friends, travel, work wins, creative projects, or any thread you want to find again." }
 ];
 
-export const onboardingStorageVersion = "v4";
+export const onboardingStorageVersion = "v5";
 export const onboardingStorageKey = `photo-gratitude-onboarding-${onboardingStorageVersion}`;
+
+/**
+ * True when a workspace already holds real content — any entry, or any person
+ * tag the user created (non-default). Used to skip the personalization flow for
+ * members invited into an already-populated household.
+ */
+export function workspaceHasMeaningfulData({
+  people,
+  entries,
+  workspaceId
+}: {
+  people: PersonTag[];
+  entries: JournalEntry[];
+  workspaceId: string;
+}): boolean {
+  // Ignore the auto-created empty "today" placeholder; only saved memories count.
+  const hasEntries = entries.some((entry) => entry.workspaceId === workspaceId && isEntryComplete(entry));
+  const hasRealPeople = people.some((person) => person.workspaceId === workspaceId && !person.isDefault);
+  return hasEntries || hasRealPeople;
+}
 
 const genericDefaultNames = new Set(["kid 1", "kid 2", "partner", "family"]);
 const colors = ["#5B8DEF", "#E76F51", "#F4A261", "#2A9D8F", "#7C6F64", "#B96464"];
@@ -91,7 +113,6 @@ export function applyOnboardingSetupToPeople({
     setup.names.children.forEach((childName, index) => {
       upsertPerson(childName, [`kid ${index + 1}`, `child ${index + 1}`]);
     });
-    upsertPerson("Family", ["family", "household"]);
   }
 
   if (setup.focus === "other") {

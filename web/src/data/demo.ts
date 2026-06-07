@@ -4,11 +4,11 @@ import { addMonths, addYears, toLocalDate } from "@/lib/dates";
 const workspaceId = "workspace-household";
 
 export const demoPeople: PersonTag[] = [
-  { id: "me", workspaceId, name: "Me", color: "#5B8DEF", sortOrder: 0, isDefault: true },
-  { id: "kid-1", workspaceId, name: "Kid 1", color: "#F4A261", sortOrder: 1, isDefault: true },
-  { id: "kid-2", workspaceId, name: "Kid 2", color: "#2A9D8F", sortOrder: 2, isDefault: true },
-  { id: "partner", workspaceId, name: "Partner", color: "#E76F51", sortOrder: 3, isDefault: true },
-  { id: "family", workspaceId, name: "Family", color: "#7C6F64", sortOrder: 4, isDefault: true }
+  { id: "me", workspaceId, name: "Alex", color: "#5B8DEF", sortOrder: 0, isDefault: false },
+  { id: "kid-1", workspaceId, name: "Mia", color: "#F4A261", sortOrder: 1, isDefault: false },
+  { id: "kid-2", workspaceId, name: "Theo", color: "#2A9D8F", sortOrder: 2, isDefault: false },
+  { id: "partner", workspaceId, name: "Sam", color: "#E76F51", sortOrder: 3, isDefault: false },
+  { id: "family", workspaceId, name: "Whole family", color: "#7C6F64", sortOrder: 4, isDefault: false }
 ];
 
 export const demoPrompts: PromptTemplate[] = [
@@ -139,7 +139,7 @@ export function makeDemoBootstrap(): JournalBootstrap {
         workspaceId,
         userId: "demo-partner",
         email: "partner@photojournal.local",
-        displayName: "Partner",
+        displayName: "Sam",
         role: "editor",
         invitationState: "accepted",
         invitedEmail: "partner@photojournal.local",

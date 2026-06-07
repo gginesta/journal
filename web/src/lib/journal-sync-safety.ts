@@ -18,6 +18,32 @@ export function canMutateWorkspaceRole(role: WorkspaceRole | null | undefined) {
   return Boolean(role && syncMutationRoles.has(role));
 }
 
+/**
+ * Decide which existing person-tag ids should be deleted during a sync.
+ *
+ * A tag is removed only when it is absent from the synced payload AND is not
+ * referenced by any entry or little detail. The reference guard is a product
+ * safeguard: it ensures we never lose a tag the user attached to a memory, even
+ * though the join tables would cascade.
+ */
+export function computePersonTagDeletions(
+  existingIds: Iterable<string>,
+  payloadIds: Iterable<string>,
+  referencedIds: Iterable<string>
+): string[] {
+  const keep = new Set(payloadIds);
+  const referenced = new Set(referencedIds);
+  const deletions: string[] = [];
+  const seen = new Set<string>();
+  for (const id of existingIds) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    if (keep.has(id) || referenced.has(id)) continue;
+    deletions.push(id);
+  }
+  return deletions;
+}
+
 export function isSafeWorkspaceStoragePath(path: string, workspaceId: string) {
   if (!path || !workspaceId) return false;
   if (path.startsWith("/") || path.includes("\\") || path.includes("..")) return false;
