@@ -85,6 +85,7 @@ export function SettingsView({
         ) : null}
         <select
           value={activeWorkspaceId}
+          aria-label="Active workspace"
           onChange={(event) => setActiveWorkspaceId(event.target.value)}
           className="min-h-11 rounded-2xl border border-journal-line bg-white px-3 font-semibold outline-none"
         >
@@ -155,6 +156,7 @@ export function SettingsView({
             <input
               key={prompt.id}
               value={prompt.prompt}
+              aria-label={`Prompt: ${prompt.title}`}
               readOnly={!canEdit}
               onChange={(event) =>
                 setPrompts((current) =>
@@ -174,6 +176,7 @@ export function SettingsView({
             <input
               key={person.id}
               value={person.name}
+              aria-label="Person tag name"
               readOnly={!canEdit}
               onChange={(event) =>
                 setPeople((current) =>
@@ -423,6 +426,7 @@ function HouseholdSharingPanel({
             <input
               type="email"
               value={email}
+              aria-label="Invite email"
               disabled={!canManageMembers || isSubmitting}
               onChange={(event) => setEmail(event.target.value)}
               onKeyDown={(event) => {
@@ -433,6 +437,7 @@ function HouseholdSharingPanel({
             />
             <select
               value={role}
+              aria-label="Invite role"
               disabled={!canManageMembers || isSubmitting}
               onChange={(event) => setRole(event.target.value as WorkspaceRole)}
               className="min-h-11 rounded-2xl border border-journal-line bg-white px-3 font-semibold outline-none"

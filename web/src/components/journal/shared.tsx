@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-img-element -- Journal photos can be local data URLs or private signed storage URLs. */
 
+import { tagChipStyle } from "@/lib/tag-colors";
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { Bell, CheckCircle2, Sparkles } from "lucide-react";
@@ -104,7 +105,7 @@ export function PersonChips({
               compact ? "min-h-8 text-xs" : "min-h-10 text-sm",
               active ? "bg-rose/10 text-rose" : "bg-journal-raised text-warm-gray"
             )}
-            style={active ? { backgroundColor: `${person.color}1f`, color: person.color } : undefined}
+            style={active ? tagChipStyle(person.color) : undefined}
             aria-pressed={active}
           >
             {active ? <CheckCircle2 aria-hidden="true" size={14} /> : null}

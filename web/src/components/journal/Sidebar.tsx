@@ -33,7 +33,7 @@ export function Sidebar({
   mode: "demo" | "supabase";
 }) {
   return (
-    <aside className="sticky top-0 hidden h-screen border-r border-journal-line bg-journal-surface/82 px-5 py-6 backdrop-blur lg:block">
+    <aside aria-label="Journal sidebar" className="sticky top-0 hidden h-screen border-r border-journal-line bg-journal-surface/82 px-5 py-6 backdrop-blur lg:block">
       <div className="flex h-full flex-col">
         <div className="flex items-center gap-3">
           <span className="grid h-11 w-11 place-items-center rounded-full bg-rose/10 text-rose">
@@ -60,7 +60,7 @@ export function Sidebar({
           </select>
         </label>
 
-        <nav className="mt-7 grid gap-2">
+        <nav aria-label="Journal sections" className="mt-7 grid gap-2">
           {tabs.map((item) => (
             <NavButton key={item.id} item={item} active={activeTab === item.id} onClick={() => setTab(item.id)} />
           ))}
@@ -108,7 +108,7 @@ function NavButton({
 
 export function MobileTabs({ activeTab, setTab }: { activeTab: AppTab; setTab: (tab: AppTab) => void }) {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-journal-line bg-journal-surface/95 px-2 py-2 backdrop-blur lg:hidden">
+    <nav aria-label="Journal tabs" className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-journal-line bg-journal-surface/95 px-2 py-2 backdrop-blur lg:hidden">
       {tabs.map((item) => {
         const Icon = item.icon;
         const active = item.id === activeTab;

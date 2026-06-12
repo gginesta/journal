@@ -232,6 +232,12 @@ test("photo polish lets a demo user caption a photo and use the pick-me-up memor
   await expect(page.getByText("Photo day")).toBeVisible();
   await expect(page.getByText("1 caption")).toBeVisible();
 
+  // On phone widths the look-back content sits behind the "More for today" disclosure.
+  const moreForToday = page.getByRole("button", { name: /More for today/ });
+  if (await moreForToday.isVisible()) {
+    await moreForToday.click();
+  }
+
   const pickMeUpCard = page.locator("section").filter({ has: page.getByRole("heading", { name: "Show me something good" }) });
   const pickMeUpButton = pickMeUpCard.getByRole("button").filter({ hasText: "A sunny park loop and a tiny hand holding mine." }).first();
   await expect(pickMeUpButton).toBeVisible();
