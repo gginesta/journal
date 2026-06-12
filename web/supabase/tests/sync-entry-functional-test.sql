@@ -165,3 +165,23 @@ select (public.sync_journal_entry(jsonb_build_object(
 ))->>'status') as test5_expect_applied;
 
 select note as test5_note_updated from public.journal_entries where id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+
+-- TEST 6: inviting a registered email adds the member.
+-- Regression guard: the original function failed every known-email invite
+-- with 'column reference "workspace_id" is ambiguous'.
+select role as test6_expect_editor
+from public.invite_workspace_member(
+  (select wm.workspace_id from public.workspace_members wm
+   where wm.user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' limit 1),
+  'viewer@example.com',
+  'editor'
+);
+
+-- TEST 7: an unknown email returns no rows and no distinct error (no account probe).
+select count(*) as test7_expect_zero
+from public.invite_workspace_member(
+  (select wm.workspace_id from public.workspace_members wm
+   where wm.user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' and wm.role = 'owner' limit 1),
+  'nobody@example.com',
+  'editor'
+);

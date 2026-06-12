@@ -3003,9 +3003,13 @@ function HouseholdSharingPanel({
       });
       if (!response.ok) throw new Error(await responseErrorMessage(response, "Invite failed"));
       const payload = (await response.json()) as { member?: WorkspaceMember | null };
-      if (payload.member) upsertMember(payload.member);
       setEmail("");
-      setStatus("Member added to this household workspace.");
+      if (payload.member) {
+        upsertMember(payload.member);
+        setStatus("Member added to this household workspace.");
+      } else {
+        setStatus("Invite recorded. They'll appear here once their account is connected — if they're new, ask them to sign in once and invite them again.");
+      }
     } catch (inviteError) {
       setError(inviteError instanceof Error ? inviteError.message : "Invite failed");
     } finally {
