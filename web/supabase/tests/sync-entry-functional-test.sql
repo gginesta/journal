@@ -177,11 +177,127 @@ from public.invite_workspace_member(
   'editor'
 );
 
--- TEST 7: an unknown email returns no rows and no distinct error (no account probe).
-select count(*) as test7_expect_zero
-from public.invite_workspace_member(
-  (select wm.workspace_id from public.workspace_members wm
-   where wm.user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' and wm.role = 'owner' limit 1),
-  'nobody@example.com',
-  'editor'
-);
+-- TEST 7: an unknown email gets the same invited-row response as a known one
+-- (no account probe) and records a pending email invite.
+select user_id as test7_expect_null_user, invitation_state as test7_expect_invited
+from public.invite_workspace_member(:'ws_id', 'nobody@example.com', 'editor');
+
+select count(*) as test7_invite_recorded from public.workspace_invites where email = 'nobody@example.com';
+
+-- TEST 8: inviting a registered account creates a pending membership the
+-- invitee can see (but no workspace data access until accepted).
+reset role;
+insert into auth.users (id, email, raw_user_meta_data)
+values ('cccccccc-1111-4ccc-8ccc-cccccccccccc', 'invitee@example.com', '{}');
+
+set role authenticated;
+set request.jwt.claim.sub = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+select invitation_state as test8_expect_invited
+from public.invite_workspace_member(:'ws_id', 'invitee@example.com', 'editor');
+
+set request.jwt.claim.sub = 'cccccccc-1111-4ccc-8ccc-cccccccccccc';
+select 'test8 invitee view' as check,
+  (select count(*) from public.journal_entries where workspace_id = :'ws_id') as entries_hidden_expect_0,
+  (select count(*) from public.workspace_members where workspace_id = :'ws_id' and user_id = 'cccccccc-1111-4ccc-8ccc-cccccccccccc') as own_row_expect_1,
+  (select count(*) from public.workspaces where id = :'ws_id') as workspace_name_visible_expect_1;
+
+-- TEST 9: accepting the invite activates membership and read access.
+select public.respond_to_workspace_invite(:'ws_id', true) as test9_accept;
+select 'test9 after accept' as check,
+  (select invitation_state from public.workspace_members where workspace_id = :'ws_id' and user_id = 'cccccccc-1111-4ccc-8ccc-cccccccccccc') as state_expect_accepted,
+  (select count(*) > 0 from public.journal_entries where workspace_id = :'ws_id') as entries_visible_expect_t;
+
+-- TEST 10: signing up with an email that has a pending invite converts it
+-- into an invited membership.
+reset role;
+insert into auth.users (id, email, raw_user_meta_data)
+values ('dddddddd-1111-4ddd-8ddd-dddddddddddd', 'nobody@example.com', '{}');
+
+select 'test10 signup conversion' as check,
+  (select invitation_state from public.workspace_members where user_id = 'dddddddd-1111-4ddd-8ddd-dddddddddddd' and workspace_id = :'ws_id') as state_expect_invited,
+  (select count(*) from public.workspace_invites where email = 'nobody@example.com') as invite_cleared_expect_0;
+
+-- TEST 11: per-person sessions — two members keep separate reflections on
+-- the same day.
+set role authenticated;
+set request.jwt.claim.sub = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+select (public.sync_journal_entry(jsonb_build_object(
+  'id', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+  'workspace_id', :'ws_id',
+  'local_date', '2026-06-12',
+  'mood', 'bright',
+  'note', 'Shared day',
+  'updated_at', '2026-06-13T08:00:00Z',
+  'base_updated_at', (select updated_at from public.journal_entries where id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee')::text,
+  'person_tag_ids', '[]'::jsonb,
+  'sessions', jsonb_build_array(jsonb_build_object(
+    'id', '11111111-aaaa-4aaa-8aaa-111111111111',
+    'kind', 'evening',
+    'responses', jsonb_build_array(jsonb_build_object(
+      'id', '11111111-bbbb-4bbb-8bbb-111111111111',
+      'prompt_id', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      'prompt_title', 'Nice thing', 'prompt_text', 'One nice thing?', 'prompt_order', 0,
+      'text', 'Owner reflection'
+    ))
+  )),
+  'details', '[]'::jsonb,
+  'photos', '[]'::jsonb
+))->>'status') as test11_owner_sync;
+
+set request.jwt.claim.sub = 'cccccccc-1111-4ccc-8ccc-cccccccccccc';
+select (public.sync_journal_entry(jsonb_build_object(
+  'id', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+  'workspace_id', :'ws_id',
+  'local_date', '2026-06-12',
+  'mood', 'bright',
+  'note', 'Shared day',
+  'updated_at', '2026-06-13T08:05:00Z',
+  'base_updated_at', (select updated_at from public.journal_entries where id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee')::text,
+  'person_tag_ids', '[]'::jsonb,
+  'sessions', jsonb_build_array(jsonb_build_object(
+    'id', '22222222-aaaa-4aaa-8aaa-222222222222',
+    'kind', 'evening',
+    'responses', jsonb_build_array(jsonb_build_object(
+      'id', '22222222-bbbb-4bbb-8bbb-222222222222',
+      'prompt_id', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      'prompt_title', 'Nice thing', 'prompt_text', 'One nice thing?', 'prompt_order', 0,
+      'text', 'Partner reflection'
+    ))
+  )),
+  'details', '[]'::jsonb,
+  'photos', '[]'::jsonb
+))->>'status') as test11_partner_sync;
+
+select 'test11 both sections kept' as check,
+  (select count(*) from public.journal_sessions where entry_id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee') as sessions_expect_2,
+  (select count(*) from public.journal_sessions where entry_id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee' and created_by = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') as owner_session_expect_1,
+  (select count(*) from public.journal_sessions where entry_id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee' and created_by = 'cccccccc-1111-4ccc-8ccc-cccccccccccc') as partner_session_expect_1;
+
+-- TEST 12: the owner resyncing their section leaves the partner's intact.
+set request.jwt.claim.sub = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+select (public.sync_journal_entry(jsonb_build_object(
+  'id', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+  'workspace_id', :'ws_id',
+  'local_date', '2026-06-12',
+  'mood', 'glowing',
+  'note', 'Shared day, edited',
+  'updated_at', '2026-06-13T08:10:00Z',
+  'base_updated_at', (select updated_at from public.journal_entries where id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee')::text,
+  'person_tag_ids', '[]'::jsonb,
+  'sessions', jsonb_build_array(jsonb_build_object(
+    'id', '11111111-aaaa-4aaa-8aaa-111111111111',
+    'kind', 'evening',
+    'responses', jsonb_build_array(jsonb_build_object(
+      'id', '11111111-bbbb-4bbb-8bbb-111111111111',
+      'prompt_id', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      'prompt_title', 'Nice thing', 'prompt_text', 'One nice thing?', 'prompt_order', 0,
+      'text', 'Owner reflection, edited'
+    ))
+  )),
+  'details', '[]'::jsonb,
+  'photos', '[]'::jsonb
+))->>'status') as test12_owner_resync;
+
+select 'test12 partner survives' as check,
+  (select text from public.prompt_responses where id = '22222222-bbbb-4bbb-8bbb-222222222222') as partner_text_expect_kept,
+  (select text from public.prompt_responses where id = '11111111-bbbb-4bbb-8bbb-111111111111') as owner_text_expect_edited;

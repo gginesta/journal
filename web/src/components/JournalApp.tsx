@@ -20,6 +20,7 @@ import {
   type OnboardingSetup
 } from "@/lib/onboarding";
 import { demoStorageFullMessage, writeDemoStateToStorage } from "@/lib/demo-storage";
+import { selectDirtyEntries, serializeEntryForSync } from "@/lib/journal-sync-delta";
 import { canMutateWorkspaceRole } from "@/lib/journal-sync-safety";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
@@ -63,6 +64,10 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
   const [firstMemoryDismissalValue, setFirstMemoryDismissalValue] = useState<string | null>("true");
   const [workspacesWithClearedEntries, setWorkspacesWithClearedEntries] = useState<Set<string>>(() => new Set());
   const [staleEntryIds, setStaleEntryIds] = useState<string[]>([]);
+  const [archiveState, setArchiveState] = useState<Record<string, { hasMore: boolean; loading: boolean }>>({});
+  const [pendingInvites, setPendingInvites] = useState(initialData.pendingInvites ?? []);
+  const [inviteBusyWorkspaceId, setInviteBusyWorkspaceId] = useState<string | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const didMountPersistence = useRef(false);
   const latestSyncId = useRef(0);
@@ -71,6 +76,11 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
   // effect: every applied write bumps the server timestamp.
   const serverEntryBaselines = useRef<Map<string, string>>(
     new Map(initialData.entries.map((entry) => [entry.id, entry.updatedAt]))
+  );
+  // Content the server has acknowledged, keyed by entry id. Only entries that
+  // differ from this are sent (delta sync); also a ref to avoid effect loops.
+  const ackedEntrySerializations = useRef<Map<string, string>>(
+    new Map(initialData.entries.map((entry) => [entry.id, serializeEntryForSync(entry)]))
   );
 
   const onboardingKey = useMemo(() => `${onboardingStorageKey}:${initialData.profile?.id ?? "demo"}`, [initialData.profile?.id]);
@@ -159,17 +169,82 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
     () => workspaceMembers.filter((member) => member.workspaceId === activeWorkspaceId),
     [workspaceMembers, activeWorkspaceId]
   );
+  const memberNames = useMemo(() => {
+    const names: Record<string, string> = {};
+    for (const member of activeWorkspaceMembers) {
+      if (member.userId) names[member.userId] = member.displayName;
+    }
+    if (initialData.profile) names[initialData.profile.id] = initialData.profile.displayName;
+    return names;
+  }, [activeWorkspaceMembers, initialData.profile]);
 
   const todayEntry = useMemo(() => {
     const today = toLocalDate();
-    return workspaceEntries.find((entry) => entry.localDate === today) ?? makeEntry(activeWorkspaceId, today, workspacePrompts, reminders.cadence);
-  }, [activeWorkspaceId, workspaceEntries, workspacePrompts, reminders.cadence]);
+    return (
+      workspaceEntries.find((entry) => entry.localDate === today) ??
+      makeEntry(activeWorkspaceId, today, workspacePrompts, reminders.cadence, initialData.profile?.id ?? null)
+    );
+  }, [activeWorkspaceId, workspaceEntries, workspacePrompts, reminders.cadence, initialData.profile?.id]);
   const activeWorkspaceWasCleared = workspacesWithClearedEntries.has(activeWorkspaceId);
 
   const selectedEntry = useMemo(
     () => workspaceEntries.find((entry) => entry.id === selectedEntryId) ?? null,
     [workspaceEntries, selectedEntryId]
   );
+
+  async function respondToInvite(workspaceId: string, accept: boolean) {
+    setInviteBusyWorkspaceId(workspaceId);
+    setInviteError(null);
+    try {
+      const response = await fetch("/api/workspaces/invites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceId, accept })
+      });
+      if (!response.ok) throw new Error(await responseErrorMessage(response, "The invite could not be updated"));
+      if (accept) {
+        // The accepted workspace needs a full bootstrap (entries, members).
+        window.location.reload();
+        return;
+      }
+      setPendingInvites((current) => current.filter((invite) => invite.workspaceId !== workspaceId));
+    } catch (error) {
+      setInviteError(error instanceof Error ? error.message : "The invite could not be updated");
+    } finally {
+      setInviteBusyWorkspaceId(null);
+    }
+  }
+
+  const archive =
+    initialData.mode === "supabase"
+      ? (archiveState[activeWorkspaceId] ?? { hasMore: true, loading: false })
+      : { hasMore: false, loading: false };
+
+  async function loadOlderEntries() {
+    if (initialData.mode !== "supabase" || archive.loading) return;
+    const workspaceId = activeWorkspaceId;
+    const oldest = workspaceEntries.reduce((min, entry) => (entry.localDate < min ? entry.localDate : min), toLocalDate());
+    setArchiveState((current) => ({ ...current, [workspaceId]: { hasMore: true, loading: true } }));
+    try {
+      const response = await fetch(`/api/journal/entries?workspaceId=${workspaceId}&before=${oldest}`);
+      if (!response.ok) throw new Error(await responseErrorMessage(response, "Older memories could not load"));
+      const payload = (await response.json()) as { entries: JournalEntry[]; hasMore: boolean };
+      for (const entry of payload.entries) {
+        // Register fetched history as server-acknowledged so delta sync does
+        // not immediately re-upload it.
+        serverEntryBaselines.current.set(entry.id, entry.updatedAt);
+        ackedEntrySerializations.current.set(entry.id, serializeEntryForSync(entry));
+      }
+      setEntries((current) => {
+        const known = new Set(current.map((entry) => entry.id));
+        return [...current, ...payload.entries.filter((entry) => !known.has(entry.id))];
+      });
+      setArchiveState((current) => ({ ...current, [workspaceId]: { hasMore: payload.hasMore, loading: false } }));
+    } catch (error) {
+      setArchiveState((current) => ({ ...current, [workspaceId]: { hasMore: true, loading: false } }));
+      setSaveError(error instanceof Error ? error.message : "Older memories could not load");
+    }
+  }
 
   useEffect(() => {
     if (initialData.mode !== "supabase" || !initialData.profile) return;
@@ -196,6 +271,8 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
     setSaveError(null);
     const timeout = window.setTimeout(async () => {
       try {
+        const dirtyEntries = selectDirtyEntries(workspaceEntries, ackedEntrySerializations.current);
+        const sentSerializations = new Map(dirtyEntries.map((entry) => [entry.id, serializeEntryForSync(entry)]));
         const response = await fetch("/api/journal/sync", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -205,7 +282,7 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
             people: workspacePeople,
             prompts: workspacePrompts,
             reminders,
-            entries: workspaceEntries.map((entry) => ({
+            entries: dirtyEntries.map((entry) => ({
               ...entry,
               syncedAt: serverEntryBaselines.current.get(entry.id) ?? null
             }))
@@ -216,6 +293,8 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
         const result = (await response.json()) as { ok?: boolean; applied?: Record<string, string>; stale?: string[] };
         for (const [entryId, serverUpdatedAt] of Object.entries(result.applied ?? {})) {
           serverEntryBaselines.current.set(entryId, serverUpdatedAt);
+          const sent = sentSerializations.get(entryId);
+          if (sent) ackedEntrySerializations.current.set(entryId, sent);
         }
         if (latestSyncId.current === syncId) {
           setStaleEntryIds(result.stale ?? []);
@@ -574,6 +653,36 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
         />
 
         <main className="min-w-0 px-3 py-4 sm:px-6 lg:px-8 lg:py-8">
+          {pendingInvites.length > 0 ? (
+            <section className="mx-auto mb-5 grid max-w-6xl gap-3" aria-label="Pending invitations">
+              {pendingInvites.map((invite) => (
+                <div key={invite.workspaceId} className="flex flex-wrap items-center justify-between gap-3 rounded-journal border border-leaf/25 bg-leaf/10 p-4">
+                  <p className="text-sm leading-6 text-soft-ink">
+                    <span className="font-bold">You&apos;re invited to “{invite.workspaceName}”.</span> Accept to start sharing memories there as {invite.role === "viewer" ? "a viewer" : `an ${invite.role}`}.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={inviteBusyWorkspaceId === invite.workspaceId}
+                      onClick={() => respondToInvite(invite.workspaceId, true)}
+                      className="inline-flex min-h-10 items-center rounded-full bg-leaf px-4 text-sm font-bold text-white disabled:opacity-60"
+                    >
+                      Accept invite
+                    </button>
+                    <button
+                      type="button"
+                      disabled={inviteBusyWorkspaceId === invite.workspaceId}
+                      onClick={() => respondToInvite(invite.workspaceId, false)}
+                      className="inline-flex min-h-10 items-center rounded-full bg-white px-4 text-sm font-bold text-soft-ink disabled:opacity-60"
+                    >
+                      Not now
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {inviteError ? <p className="text-sm text-rose">{inviteError}</p> : null}
+            </section>
+          ) : null}
           {tab === "today" ? (
             <TodayView
               entry={todayEntry}
@@ -584,6 +693,8 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
               saveState={saveState}
               saveError={saveError}
               isEntryStale={staleEntryIds.includes(todayEntry.id)}
+              currentUserId={initialData.profile?.id ?? null}
+              memberNames={memberNames}
               canEdit={canEditActiveWorkspace}
               showStarterGuide={showStarterGuide}
               showFirstMemoryCelebration={shouldShowFirstMemoryCelebration({
@@ -609,6 +720,8 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
               onUpdateDetail={updateRepositoryDetail}
               onDeleteDetail={deleteRepositoryDetail}
               canEdit={canEditActiveWorkspace}
+              archive={archive}
+              onLoadOlder={loadOlderEntries}
             />
           ) : null}
 
@@ -660,7 +773,7 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
   );
 }
 
-function makeEntry(workspaceId: string, localDate: string, prompts: PromptTemplate[], cadence: RitualCadence): JournalEntry {
+function makeEntry(workspaceId: string, localDate: string, prompts: PromptTemplate[], cadence: RitualCadence, createdBy: string | null = null): JournalEntry {
   const sessionKinds = cadence === "morning_evening" ? ["morning", "evening"] : cadence === "evening" ? ["evening"] : ["anytime"];
   return {
     id: crypto.randomUUID(),
@@ -676,6 +789,7 @@ function makeEntry(workspaceId: string, localDate: string, prompts: PromptTempla
     sessions: sessionKinds.map((kind) => ({
       id: crypto.randomUUID(),
       kind: kind as "morning" | "evening" | "anytime",
+      createdBy,
       responses: prompts.filter((prompt) => prompt.isEnabled).map<PromptResponse>((prompt) => ({
         id: crypto.randomUUID(),
         promptId: prompt.id,

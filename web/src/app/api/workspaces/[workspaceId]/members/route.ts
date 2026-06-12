@@ -51,7 +51,30 @@ export async function GET(_request: Request, { params }: RouteContext) {
   const rows = (data ?? []) as WorkspaceMemberRow[];
   const profiles = await loadProfiles(rows.map((member) => member.user_id));
 
-  return NextResponse.json({ members: rows.map((member) => mapMember(member, profiles, user.id)) });
+  // Pending email invites (no account yet) show alongside pending member
+  // invites, indistinguishably, so the list reveals nothing about which
+  // emails have accounts.
+  const { data: inviteRows } = await supabase
+    .from("workspace_invites")
+    .select("workspace_id,email,role,created_at")
+    .eq("workspace_id", workspaceId)
+    .order("created_at", { ascending: true });
+
+  const emailInvites = ((inviteRows ?? []) as Array<{ workspace_id: string; email: string; role: WorkspaceRole; created_at: string }>).map<WorkspaceMember>(
+    (invite) => ({
+      workspaceId: invite.workspace_id,
+      userId: "",
+      email: invite.email,
+      displayName: invite.email,
+      role: invite.role,
+      invitationState: "invited",
+      invitedEmail: invite.email,
+      createdAt: invite.created_at,
+      isCurrentUser: false
+    })
+  );
+
+  return NextResponse.json({ members: [...rows.map((member) => mapMember(member, profiles, user.id)), ...emailInvites] });
 }
 
 export async function POST(request: Request, { params }: RouteContext) {

@@ -38,14 +38,49 @@ export function normalizePhotoOrder(photos: PhotoAttachment[]): PhotoAttachment[
     .map((photo, index) => ({ ...photo, sortOrder: index }));
 }
 
-export function fileToCompressedDataUrl(file: File): Promise<string> {
+const COMPRESS_MAX_SIDE = 1600;
+const COMPRESS_QUALITY = 0.82;
+
+export async function fileToCompressedDataUrl(file: File): Promise<string> {
+  // Preferred path: decode and scale off the main thread so a large camera
+  // photo never freezes the ritual. Falls back to the canvas pipeline (and
+  // ultimately the original file) on older browsers or decode failures.
+  if (typeof createImageBitmap === "function" && typeof OffscreenCanvas === "function") {
+    try {
+      const bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, COMPRESS_MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+      const canvas = new OffscreenCanvas(Math.max(1, Math.round(bitmap.width * scale)), Math.max(1, Math.round(bitmap.height * scale)));
+      const context = canvas.getContext("2d");
+      if (context) {
+        context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        bitmap.close();
+        const blob = await canvas.convertToBlob({ type: "image/jpeg", quality: COMPRESS_QUALITY });
+        return await blobToDataUrl(blob);
+      }
+      bitmap.close();
+    } catch {
+      // Fall through to the main-thread pipeline below.
+    }
+  }
+  return mainThreadCompressedDataUrl(file);
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+function mainThreadCompressedDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
       const image = new Image();
       image.onload = () => {
-        const maxSide = 1600;
-        const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+        const scale = Math.min(1, COMPRESS_MAX_SIDE / Math.max(image.width, image.height));
         const canvas = document.createElement("canvas");
         canvas.width = Math.max(1, Math.round(image.width * scale));
         canvas.height = Math.max(1, Math.round(image.height * scale));
@@ -55,7 +90,7 @@ export function fileToCompressedDataUrl(file: File): Promise<string> {
           return;
         }
         context.drawImage(image, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", 0.82));
+        resolve(canvas.toDataURL("image/jpeg", COMPRESS_QUALITY));
       };
       image.onerror = () => resolve(String(reader.result));
       image.src = String(reader.result);

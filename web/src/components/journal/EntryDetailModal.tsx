@@ -6,9 +6,27 @@ import { formatDisplayDate } from "@/lib/dates";
 import { entryPeople, isEntryComplete } from "@/lib/journal-logic";
 import { JournalPhoto } from "@/components/journal/shared";
 
-export function EntryDetailModal({ entry, people, onClose }: { entry: JournalEntry; people: PersonTag[]; onClose: () => void }) {
+export function EntryDetailModal({
+  entry,
+  people,
+  memberNames = {},
+  onClose
+}: {
+  entry: JournalEntry;
+  people: PersonTag[];
+  memberNames?: Record<string, string>;
+  onClose: () => void;
+}) {
   const tagged = entryPeople(entry, people);
-  const responses = entry.sessions.flatMap((session) => session.responses).filter((response) => response.text.trim());
+  const sections = entry.sessions
+    .map((session) => ({
+      session,
+      responses: session.responses.filter((response) => response.text.trim()),
+      author: session.createdBy ? (memberNames[session.createdBy] ?? "A household member") : null
+    }))
+    .filter((section) => section.responses.length > 0);
+  const hasMultipleAuthors = new Set(sections.map((section) => section.author)).size > 1;
+  const responses = sections.flatMap((section) => section.responses);
 
   return (
     <div className="fixed inset-0 z-50 grid bg-ink/42 p-3 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true" aria-label="Memory detail">
@@ -49,11 +67,20 @@ export function EntryDetailModal({ entry, people, onClose }: { entry: JournalEnt
                 <section className="rounded-journal border border-journal-line bg-white p-5">
                   <h3 className="text-lg font-bold">Reflections</h3>
                   <div className="mt-4 grid gap-4">
-                    {responses.map((response) => (
-                      <article key={response.id} className="rounded-2xl bg-journal-raised p-4">
-                        <p className="text-sm font-bold text-rose">{response.promptText}</p>
-                        <p className="mt-2 whitespace-pre-line text-soft-ink">{response.text}</p>
-                      </article>
+                    {sections.map((section) => (
+                      <div key={section.session.id} className="grid gap-3">
+                        {hasMultipleAuthors ? (
+                          <p className="text-xs font-bold uppercase tracking-[0.12em] text-warm-gray">
+                            {section.author ?? "Shared reflections"}
+                          </p>
+                        ) : null}
+                        {section.responses.map((response) => (
+                          <article key={response.id} className="rounded-2xl bg-journal-raised p-4">
+                            <p className="text-sm font-bold text-rose">{response.promptText}</p>
+                            <p className="mt-2 whitespace-pre-line text-soft-ink">{response.text}</p>
+                          </article>
+                        ))}
+                      </div>
                     ))}
                   </div>
                 </section>

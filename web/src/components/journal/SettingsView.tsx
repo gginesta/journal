@@ -320,12 +320,12 @@ function HouseholdSharingPanel({
       if (!response.ok) throw new Error(await responseErrorMessage(response, "Invite failed"));
       const payload = (await response.json()) as { member?: WorkspaceMember | null };
       setEmail("");
-      if (payload.member) {
-        upsertMember(payload.member);
-        setStatus("Member added to this household workspace.");
-      } else {
-        setStatus("Invite recorded. They'll appear here once their account is connected — if they're new, ask them to sign in once and invite them again.");
-      }
+      if (payload.member?.userId) upsertMember(payload.member);
+      setStatus(
+        payload.member?.invitationState === "accepted"
+          ? "Member updated for this household workspace."
+          : "Invite sent. They'll see it the next time they sign in and can accept from there."
+      );
     } catch (inviteError) {
       setError(inviteError instanceof Error ? inviteError.message : "Invite failed");
     } finally {
@@ -511,7 +511,7 @@ function MemberList({
         ) : (
           members.map((member) => {
             const isBusy = busyMemberId === member.userId;
-            const canChangeMember = canManageMembers && !member.isCurrentUser && !isBusy;
+            const canChangeMember = canManageMembers && !member.isCurrentUser && !isBusy && Boolean(member.userId);
             return (
               <div key={`${member.workspaceId}:${member.userId}`} className="grid gap-3 rounded-2xl bg-journal-raised p-3 sm:grid-cols-[1fr_150px_auto] sm:items-center">
                 <div className="min-w-0">
