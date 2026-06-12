@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { JournalEntry, PersonTag } from "../src/types/journal";
-import { isEntryComplete, memoryLaneMatches, searchEntries, streakSummary } from "../src/lib/journal-logic";
+import { eagerEntryWindows, isEntryComplete, memoryLaneMatches, searchEntries, streakSummary } from "../src/lib/journal-logic";
 import { listMemoryDetails } from "../src/lib/memory-details";
 import { addSuggestionToReflectionText, gratitudeGuideForEntry, gratitudePromptPacks } from "../src/lib/prompts";
 
@@ -175,5 +175,14 @@ describe("gratitude prompts", () => {
     expect(addSuggestionToReflectionText("Already typed\n", "One small comfort")).toBe("Already typed\nOne small comfort");
     expect(addSuggestionToReflectionText("One\nTwo\nThree", "Four")).toBe("One\nTwo\nThree; Four");
     expect(addSuggestionToReflectionText("One small comfort", "One small comfort")).toBe("One small comfort");
+  });
+});
+
+describe("eagerEntryWindows", () => {
+  it("covers the last 12 months and the 2y/3y anniversary slices", () => {
+    const windows = eagerEntryWindows("2026-06-12");
+    expect(windows[0]).toEqual({ from: "2025-06-12" });
+    expect(windows[1]).toEqual({ from: "2024-06-05", to: "2024-06-19" });
+    expect(windows[2]).toEqual({ from: "2023-06-05", to: "2023-06-19" });
   });
 });

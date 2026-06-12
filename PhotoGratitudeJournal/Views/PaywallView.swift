@@ -69,6 +69,10 @@ struct PaywallView: View {
     private func purchase() async {
         isPurchasing = true
         defer { isPurchasing = false }
-        try? await entitlement.purchaseYearly()
+        do {
+            try await entitlement.purchaseYearly()
+        } catch {
+            Persistence.log("Purchase premium", error: error)
+        }
     }
 }

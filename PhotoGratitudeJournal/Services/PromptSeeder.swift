@@ -26,7 +26,7 @@ enum PromptSeeder {
             context.insert(ReminderConfig())
         }
 
-        try? context.save()
+        Persistence.save(context, operation: "Seed prompts")
     }
 
     static func enabledPrompts(in context: ModelContext) -> [PromptTemplate] {

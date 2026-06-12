@@ -62,7 +62,7 @@ Avoid:
 
 ## Current Beta State
 
-Current web beta version: `0.2.10`.
+Current web beta version: see `web/package.json` (shown in Settings > Beta; canonical history in docs/VERSIONING.md).
 
 The live web beta is deployed at:
 
@@ -441,7 +441,7 @@ Before wider private testing:
 6. Stephanie refreshes/logs back in.
 7. Confirm Stephanie sees the shared workspace.
 8. Both users create and view at least one shared memory.
-9. Record issues against app version `0.2.10`.
+9. Record issues against the app version shown in Settings > Beta.
 
 ## Known Risks
 
@@ -456,7 +456,7 @@ Before wider private testing:
 Stephanie can test when:
 
 - Vercel production is green on `main`.
-- Settings > Beta shows `0.2.10`.
+- Settings > Beta shows the version from `web/package.json`.
 - She can receive a magic link.
 - She can complete onboarding on phone.
 - She can create one memory with text or photo.

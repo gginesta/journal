@@ -39,16 +39,25 @@ final class PhotoStore {
     }
 
     func deleteFiles(for attachment: PhotoAttachment) {
-        try? FileManager.default.removeItem(at: imageURL(for: attachment))
-        try? FileManager.default.removeItem(at: thumbnailURL(for: attachment))
+        for url in [imageURL(for: attachment), thumbnailURL(for: attachment)] where FileManager.default.fileExists(atPath: url.path) {
+            do {
+                try FileManager.default.removeItem(at: url)
+            } catch {
+                Persistence.log("Delete photo file", error: error)
+            }
+        }
     }
 
     private func photoDirectory() -> URL {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let directory = support.appendingPathComponent(directoryName, isDirectory: true)
         if !FileManager.default.fileExists(atPath: directory.path) {
-            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            try? FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication], ofItemAtPath: directory.path)
+            do {
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                try FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication], ofItemAtPath: directory.path)
+            } catch {
+                Persistence.log("Create photo directory", error: error)
+            }
         }
         return directory
     }

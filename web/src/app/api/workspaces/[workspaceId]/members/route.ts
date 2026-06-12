@@ -82,7 +82,7 @@ export async function POST(request: Request, { params }: RouteContext) {
   });
 
   if (error) {
-    const status = error.message.includes("Only workspace owners") ? 403 : error.message.includes("needs to sign in") ? 404 : 400;
+    const status = error.message.includes("Only workspace owners") ? 403 : 400;
     return NextResponse.json({ error: error.message }, { status });
   }
 

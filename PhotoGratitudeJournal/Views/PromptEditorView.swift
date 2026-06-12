@@ -33,7 +33,7 @@ struct PromptEditorView: View {
         guard !trimmed.isEmpty else { return }
         let prompt = PromptTemplate(title: "Custom", prompt: trimmed, order: (prompts.map(\.order).max() ?? 0) + 1)
         modelContext.insert(prompt)
-        try? modelContext.save()
+        Persistence.save(modelContext, operation: "Add prompt")
         newPrompt = ""
     }
 
@@ -41,7 +41,7 @@ struct PromptEditorView: View {
         for index in offsets {
             modelContext.delete(prompts[index])
         }
-        try? modelContext.save()
+        Persistence.save(modelContext, operation: "Delete prompt")
     }
 }
 

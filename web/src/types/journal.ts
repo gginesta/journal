@@ -96,6 +96,9 @@ export type JournalEntry = {
   details: MemoryDetail[];
   createdAt: string;
   updatedAt: string;
+  // Server updated_at the client last loaded for this entry; the sync route
+  // uses it as the stale-write baseline. Absent for entries never synced.
+  syncedAt?: string | null;
 };
 
 export type ReminderPreferences = {

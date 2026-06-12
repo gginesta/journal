@@ -8,6 +8,7 @@ import type {
   WorkspaceMember
 } from "@/types/journal";
 import { makeDemoBootstrap } from "@/data/demo";
+import { eagerEntryWindows } from "@/lib/journal-logic";
 import { isDemoMode } from "@/lib/supabase/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -175,8 +176,16 @@ export async function loadJournalBootstrap(): Promise<JournalBootstrap> {
         entry_person_tags(person_tag_id)
       `)
       .eq("workspace_id", activeWorkspaceId)
+      // Eager windows: last 12 months plus the 2y/3y anniversary slices for
+      // Memory Lane. The cap is a runaway-data safety net (~370 daily
+      // entries/year), not an expected limit.
+      .or(
+        eagerEntryWindows()
+          .map((window) => (window.to ? `and(local_date.gte.${window.from},local_date.lte.${window.to})` : `local_date.gte.${window.from}`))
+          .join(",")
+      )
       .order("local_date", { ascending: false })
-      .limit(100),
+      .limit(500),
     supabase.from("reminder_preferences").select("*").eq("workspace_id", activeWorkspaceId).maybeSingle()
   ]);
 
@@ -260,15 +269,10 @@ async function createPhotoUrlMap(entries: EntryRow[]): Promise<Map<string, strin
   const urls = new Map<string, string>();
   if (!supabase || paths.length === 0) return urls;
 
-  const results = await Promise.all(
-    paths.map(async (path) => {
-      const { data } = await supabase.storage.from("journal-photos").createSignedUrl(path, 60 * 60 * 24 * 7);
-      return [path, data?.signedUrl ?? ""] as const;
-    })
-  );
+  const { data } = await supabase.storage.from("journal-photos").createSignedUrls(paths, 60 * 60 * 24 * 7);
 
-  for (const [path, signedUrl] of results) {
-    if (signedUrl) urls.set(path, signedUrl);
+  for (const result of data ?? []) {
+    if (result.path && result.signedUrl && !result.error) urls.set(result.path, result.signedUrl);
   }
   return urls;
 }

@@ -139,3 +139,15 @@ export function searchEntries(entries: JournalEntry[], people: PersonTag[], quer
     return fields.some((field) => field.toLowerCase().includes(normalized));
   });
 }
+
+// Date ranges the app loads eagerly at bootstrap: the last 12 months for the
+// day-to-day surfaces, plus small windows around the 2- and 3-year
+// anniversaries so Memory Lane's deep lookbacks work without loading the
+// whole archive.
+export function eagerEntryWindows(today: string = toLocalDate()): Array<{ from: string; to?: string }> {
+  return [
+    { from: addMonths(today, -12) },
+    { from: addDays(addYears(today, -2), -7), to: addDays(addYears(today, -2), 7) },
+    { from: addDays(addYears(today, -3), -7), to: addDays(addYears(today, -3), 7) }
+  ];
+}

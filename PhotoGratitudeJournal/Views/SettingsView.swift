@@ -106,7 +106,12 @@ struct SettingsView: View {
 
             Section("Data") {
                 Button {
-                    exportURL = try? ExportService.export(entries: entries)
+                    do {
+                        exportURL = try ExportService.export(entries: entries)
+                    } catch {
+                        exportURL = nil
+                        Persistence.report("Export journal", error: error)
+                    }
                 } label: {
                     Label("Prepare JSON export", systemImage: "square.and.arrow.up")
                 }
@@ -250,17 +255,17 @@ struct SettingsView: View {
             }
             modelContext.delete(entry)
         }
-        try? modelContext.save()
+        Persistence.save(modelContext, operation: "Delete entries")
     }
 
     private func ensureReminderConfig() {
         guard reminderConfigs.isEmpty else { return }
         modelContext.insert(ReminderConfig(isEnabled: false))
-        try? modelContext.save()
+        Persistence.save(modelContext, operation: "Create reminder config")
     }
 
     private func saveAndReschedule(_ config: ReminderConfig) {
-        try? modelContext.save()
+        Persistence.save(modelContext, operation: "Update reminders")
         Task { await reminderScheduler.schedule(config: config) }
     }
 

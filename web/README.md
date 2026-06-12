@@ -4,7 +4,7 @@ Production web beta for Photo Gratitude Journal. It uses Next.js, Supabase Auth,
 
 The public root route `/` is a private-beta homepage with research-backed product positioning, a product-loop mockup, privacy framing, and CTAs into the app. The journal product itself lives at `/app`; authenticated sign-in lives at `/login`.
 
-Current app version: `0.2.10`. The package version is shown in Settings > Beta and should be included in QA notes.
+The current app version comes from `package.json` and is shown in Settings > Beta; include it in QA notes.
 
 For product context and operating status, read:
 
