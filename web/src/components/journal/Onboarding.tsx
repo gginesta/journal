@@ -102,7 +102,7 @@ export function OnboardingOverlay({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-x-hidden overflow-y-auto bg-journal-surface sm:bg-ink/45 sm:px-4 sm:py-5 sm:backdrop-blur-md lg:items-center">
+    <div role="dialog" aria-modal="true" aria-label="Welcome tour" className="fixed inset-0 z-50 flex items-start justify-center overflow-x-hidden overflow-y-auto bg-journal-surface sm:bg-ink/45 sm:px-4 sm:py-5 sm:backdrop-blur-md lg:items-center">
       <section className="min-h-dvh w-full max-w-full overflow-hidden bg-journal-surface shadow-none sm:min-h-0 sm:max-w-5xl sm:rounded-[32px] sm:shadow-photo">
         <div className="grid min-w-0 lg:grid-cols-[minmax(0,1fr)_420px]">
           <div className="grid min-w-0 content-start gap-5 p-4 sm:p-8 lg:min-h-[640px] lg:content-between lg:gap-8 lg:p-10">
@@ -145,7 +145,7 @@ export function OnboardingOverlay({
                             {active ? <CheckCircle2 aria-hidden="true" size={16} className="text-rose" /> : null}
                             {option.title}
                           </span>
-                          <span className="mt-1 block text-sm leading-5 text-warm-gray">{option.text}</span>
+                          <span className={clsx("mt-1 block text-sm leading-5", active ? "text-soft-ink" : "text-warm-gray")}>{option.text}</span>
                         </button>
                       );
                     })}

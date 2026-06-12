@@ -1,3 +1,4 @@
+import { tagChipStyle } from "@/lib/tag-colors";
 import clsx from "clsx";
 import { Sparkles, X } from "lucide-react";
 import type { JournalEntry, PersonTag } from "@/types/journal";
@@ -70,7 +71,7 @@ export function EntryDetailModal({ entry, people, onClose }: { entry: JournalEnt
                           {detailPeople.length > 0 ? (
                             <div className="mt-3 flex flex-wrap gap-1.5">
                               {detailPeople.map((person) => (
-                                <span key={person.id} className="rounded-full px-2.5 py-1 text-xs font-bold" style={{ backgroundColor: `${person.color}1f`, color: person.color }}>
+                                <span key={person.id} className="rounded-full px-2.5 py-1 text-xs font-bold" style={tagChipStyle(person.color)}>
                                   {person.name}
                                 </span>
                               ))}
@@ -90,7 +91,7 @@ export function EntryDetailModal({ entry, people, onClose }: { entry: JournalEnt
                 {tagged.length > 0 ? (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {tagged.map((person) => (
-                      <span key={person.id} className="rounded-full px-3 py-1.5 text-sm font-bold" style={{ backgroundColor: `${person.color}1f`, color: person.color }}>
+                      <span key={person.id} className="rounded-full px-3 py-1.5 text-sm font-bold" style={tagChipStyle(person.color)}>
                         {person.name}
                       </span>
                     ))}

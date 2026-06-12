@@ -5,7 +5,9 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        rose: "#c7455c",
+        // Deep enough to pass WCAG AA on its own 10% tint and the page
+        // background (see AUDIT_UX.md UX-T2); was #c7455c at 4.08:1; #ad3145 clears the raised-background chips too.
+        rose: "#ad3145",
         ink: "#212128",
         "soft-ink": "#47454a",
         "warm-gray": "#786e63",

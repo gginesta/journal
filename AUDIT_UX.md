@@ -81,15 +81,15 @@ Healthy overall — one sentence: the voice is consistent, gentle, and concrete 
 
 | ID | Status | Title | Acceptance criteria | Effort |
 |---|---|---|---|---|
-| UX-T1 | todo | Label all form controls | axe reports zero `label`/`select-name` violations on all 8 scanned surfaces; prompt textareas announce their prompt title | S |
-| UX-T2 | todo | Fix rose/chip contrast tokens | axe reports zero `color-contrast` violations on Today, Memories, Settings, onboarding; brand still feels warm (visual check) | S–M |
-| UX-T3 | todo | Restructure Today: ritual first, discovery after | On phone, "Today is kept" (or the empty-state equivalent) is reachable within ~2 viewports; Pick-me-up/Gratitude Guide/Memory Lane render below the completion block or behind a "More for today" disclosure; duplicate "Today's prompts" snapshot removed from mobile (U7) | M |
-| UX-T4 | todo | Text-first memory card | Text-only entries show no empty photo placeholder; card height driven by content; Memories with mixed entries looks intentional (screenshot diff) | S–M |
-| UX-T5 | todo | Memories header compression | Stat pills in one row on phone; first memory visible within 1.5 viewports | S |
-| UX-T6 | todo | Retire photo guidance after first kept photo | Guidance card hidden once any photo has been kept in the workspace; reappears never; copy unchanged | S |
-| UX-T7 | todo | Stale-save visibility | When the server refuses a stale write, the affected entry shows an inline notice (not just the header pill); demo-able in two-tab QA | M |
-| UX-T8 | todo | Touch-target pass | No interactive control under 40 px height; photo row buttons ≥44 px | S |
-| UX-T9 | todo | Onboarding landmarks | axe `region` clean on onboarding steps | S |
+| UX-T1 | done | Label all form controls | axe reports zero `label`/`select-name` violations on all 8 scanned surfaces; prompt textareas announce their prompt title | S |
+| UX-T2 | done | Fix rose/chip contrast tokens | axe reports zero `color-contrast` violations on Today, Memories, Settings, onboarding; brand still feels warm (visual check) | S–M |
+| UX-T3 | done | Restructure Today: ritual first, discovery after | On phone, "Today is kept" (or the empty-state equivalent) is reachable within ~2 viewports; Pick-me-up/Gratitude Guide/Memory Lane render below the completion block or behind a "More for today" disclosure; duplicate "Today's prompts" snapshot removed from mobile (U7) | M |
+| UX-T4 | done | Text-first memory card | Text-only entries show no empty photo placeholder; card height driven by content; Memories with mixed entries looks intentional (screenshot diff) | S–M |
+| UX-T5 | done | Memories header compression | Stat pills in one row on phone; first memory visible within 1.5 viewports | S |
+| UX-T6 | done | Retire photo guidance after first kept photo | Guidance card hidden once any photo has been kept in the workspace; reappears never; copy unchanged | S |
+| UX-T7 | done | Stale-save visibility | When the server refuses a stale write, the affected entry shows an inline notice (not just the header pill); demo-able in two-tab QA | M |
+| UX-T8 | done | Touch-target pass | No interactive control under 40 px height; photo row buttons ≥44 px | S |
+| UX-T9 | done | Onboarding landmarks | axe `region` clean on onboarding steps | S |
 
 **Quick wins:** UX-T1, UX-T5, UX-T6, UX-T8, UX-T9 — all S, three of them erase entire axe violation classes.
 
@@ -106,3 +106,33 @@ Healthy overall — one sentence: the voice is consistent, gentle, and concrete 
 - Today depth measurement: scripted scroll-height probe on iPhone 13 viewport after "Skip tour" → `{"scrollHeight":4331,"viewport":664,"screens":"6.5","sections":13,"buttons":51}`.
 - axe-core via `@axe-core/playwright` (added as devDependency); raw violations recorded per surface during the run.
 - Code checks: `grep focus:` (rings on inputs across views), `grep prefers-reduced-motion` (`globals.css`), `grep min-h-9` (6 hits), `grep aria-pressed` (5 files), global button styles keep default focus outline (`globals.css:36-50`).
+
+
+---
+
+## 8. Execution Log (2026-06-12)
+
+**Goal set:** make the one-minute ritual true and accessible to everyone — zero critical/serious axe violations on all 8 surfaces, Today depth cut ≥30%, text-only memory cards without empty placeholders, no control under 40 px, all proven by re-running the walkthrough with the full test suite green.
+
+**Result: goal met and exceeded. All 9 tasks done.**
+
+| Measure | Before | After |
+|---|---|---|
+| axe violations (8 surfaces, all severities) | label×5 screens, select-name×3, color-contrast on every screen, region×2 | **0** |
+| Today depth (iPhone 13) | 6.5 viewports / 4,331 px / 51 buttons | **4.2 viewports / 2,765 px (−36%)** |
+| Text-only memory card | full-height empty photo placeholder | text-first card, no media block |
+| Touch targets < 40 px | 6 | 0 |
+| Unit / e2e | 68 / 20 green | 68 / 20 green (pick-me-up e2e updated for the disclosure) |
+
+**What changed:**
+- **UX-T2:** brand rose deepened `#c7455c` → `#ad3145` (4.95:1 on its worst tinted background, 6.36:1 white-on-rose); person-tag chips get AA-safe text via new `lib/tag-colors.ts` (`tagChipStyle`, unit-tested), computed against the darkest surface they sit on.
+- **UX-T1:** aria-labels on the prompt textareas ("Nice thing 1–3"), little-detail editor, Memories filter, Settings workspace/prompt/person/invite controls.
+- **UX-T3:** on phones, Pick-me-up, Gratitude Guide, and Memory Lane now sit behind a "More for today" disclosure *after* the "Today is kept" completion moment; the duplicate "Today's prompts" snapshot is desktop-only. Desktop right-rail unchanged.
+- **UX-T4:** Memories cards render text-first when an entry has no usable photo.
+- **UX-T5:** stat pills share one row on phones (icons hidden below `sm`).
+- **UX-T6:** the photo guidance card retires permanently once any photo is kept in the workspace (`showGuidance` on PhotoHero).
+- **UX-T7:** when the server refuses a stale write, Today shows an inline "This day changed on another device" notice (role=status), not just the header pill.
+- **UX-T8:** photo-row buttons `min-h-9` → `min-h-11`.
+- **UX-T9:** onboarding overlay is a labeled modal dialog; sidebar/tab/today landmarks have unique labels.
+
+**Residual (noted, not blocking):** when a photo exists but its URL fails to load (expired signed URL, offline), `JournalPhoto` still shows a full-height placeholder — acceptable signal, could collapse gracefully later. Demo mode depends on remote Unsplash images, which `docs/PROJECT_CONTEXT.md` discourages for the homepage; consider bundling demo photos.

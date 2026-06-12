@@ -1,3 +1,4 @@
+import { tagChipStyle } from "@/lib/tag-colors";
 import { useMemo, useState } from "react";
 import clsx from "clsx";
 import { ArrowRight, CalendarDays, Camera, CheckCircle2, Plus, Search, Sparkles, Trash2 } from "lucide-react";
@@ -84,7 +85,7 @@ export function MemoriesView({
         />
       ) : (
         <>
-      <section className="grid gap-3 sm:grid-cols-3">
+      <section className="grid grid-cols-3 gap-2 sm:gap-3">
         <MemoryStatPill icon={CheckCircle2} label="Kept" value={`${completeCount}`} />
         <MemoryStatPill icon={Camera} label="Photo days" value={`${photoCount}`} />
         <MemoryStatPill icon={Sparkles} label="Details" value={`${detailCount}`} />
@@ -118,6 +119,7 @@ export function MemoriesView({
           </label>
           <select
             value={filter}
+            aria-label="Filter memories"
             onChange={(event) => setFilter(event.target.value as MemoryFilter)}
             className="min-h-12 rounded-2xl border border-journal-line bg-white px-3 font-semibold outline-none"
           >
@@ -314,7 +316,7 @@ function LittleDetailsRepository({
                     <span
                       key={person.id}
                       className="inline-flex min-h-8 items-center rounded-full px-3 text-xs font-bold"
-                      style={{ backgroundColor: `${person.color}1f`, color: person.color }}
+                      style={tagChipStyle(person.color)}
                     >
                       {person.name}
                     </span>
@@ -418,7 +420,9 @@ export function MemoryCard({
   return (
     <article className="overflow-hidden rounded-journal border border-journal-line bg-journal-surface shadow-sm transition hover:-translate-y-0.5 hover:shadow-photo">
       <button type="button" onClick={() => onOpen?.(entry.id)} className="block h-full w-full text-left">
-      <JournalPhoto src={photo?.previewUrl} alt="" className={clsx("w-full object-cover", compact ? "h-40" : "h-60")} loading="lazy" />
+      {photo?.previewUrl ? (
+        <JournalPhoto src={photo.previewUrl} alt="" className={clsx("w-full object-cover", compact ? "h-40" : "h-60")} loading="lazy" />
+      ) : null}
       <div className="p-4">
         <div className="flex items-center justify-between gap-3">
           <p className="font-bold">{formatDisplayDate(entry.localDate, "short")}</p>
@@ -434,7 +438,7 @@ export function MemoryCard({
         {tagged.length > 0 ? (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {tagged.slice(0, 3).map((person) => (
-              <span key={person.id} className="rounded-full px-2.5 py-1 text-xs font-bold" style={{ backgroundColor: `${person.color}1f`, color: person.color }}>
+              <span key={person.id} className="rounded-full px-2.5 py-1 text-xs font-bold" style={tagChipStyle(person.color)}>
                 {person.name}
               </span>
             ))}
@@ -448,8 +452,8 @@ export function MemoryCard({
 
 function MemoryStatPill({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
   return (
-    <section className="flex min-h-16 items-center gap-3 rounded-journal border border-journal-line bg-journal-surface px-4">
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-rose/10 text-rose">
+    <section className="flex min-h-16 items-center gap-3 rounded-journal border border-journal-line bg-journal-surface px-3 sm:px-4">
+      <span className="hidden h-10 w-10 shrink-0 place-items-center rounded-full bg-rose/10 text-rose sm:grid">
         <Icon aria-hidden="true" size={18} />
       </span>
       <div>

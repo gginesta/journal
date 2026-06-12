@@ -8,11 +8,14 @@ import { fileToCompressedDataUrl, normalizePhotoOrder } from "@/components/journ
 export function PhotoHero({
   entry,
   canEdit,
-  onChangePhotos
+  onChangePhotos,
+  showGuidance = true
 }: {
   entry: JournalEntry;
   canEdit: boolean;
   onChangePhotos: (updater: (photos: PhotoAttachment[]) => PhotoAttachment[]) => void;
+  // First-photo guidance retires once the workspace has kept any photo.
+  showGuidance?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const replaceInputRef = useRef<HTMLInputElement | null>(null);
@@ -218,7 +221,7 @@ export function PhotoHero({
                     type="button"
                     onClick={() => movePhoto(photo.id, -1)}
                     disabled={!canEdit || index === 0}
-                    className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-journal-raised px-3 text-xs font-bold text-soft-ink"
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-journal-raised px-3 text-xs font-bold text-soft-ink"
                     aria-label="Move photo earlier"
                   >
                     <ChevronLeft aria-hidden="true" size={14} />
@@ -228,7 +231,7 @@ export function PhotoHero({
                     type="button"
                     onClick={() => movePhoto(photo.id, 1)}
                     disabled={!canEdit || index === orderedPhotos.length - 1}
-                    className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-journal-raised px-3 text-xs font-bold text-soft-ink"
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-journal-raised px-3 text-xs font-bold text-soft-ink"
                     aria-label="Move photo later"
                   >
                     Later
@@ -238,7 +241,7 @@ export function PhotoHero({
                     type="button"
                     onClick={() => beginReplace(photo.id)}
                     disabled={!canEdit}
-                    className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-rose/10 px-3 text-xs font-bold text-rose"
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-rose/10 px-3 text-xs font-bold text-rose"
                     aria-label="Replace photo"
                   >
                     <Camera aria-hidden="true" size={14} />
@@ -248,7 +251,7 @@ export function PhotoHero({
                     type="button"
                     onClick={() => removePhoto(photo.id)}
                     disabled={!canEdit}
-                    className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-journal-raised px-3 text-xs font-bold text-warm-gray"
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-journal-raised px-3 text-xs font-bold text-warm-gray"
                     aria-label="Remove photo"
                   >
                     <X aria-hidden="true" size={14} />
@@ -258,13 +261,13 @@ export function PhotoHero({
               </article>
             ))}
           </div>
-        ) : (
+        ) : showGuidance ? (
           <div className="grid gap-2 rounded-[22px] border border-dashed border-rose/25 bg-white/72 p-4 text-sm text-warm-gray sm:grid-cols-3">
             <p><span className="font-bold text-soft-ink">Pick one moment.</span> A meal, a face, the sky, the ordinary proof.</p>
             <p><span className="font-bold text-soft-ink">Add a caption later.</span> The photo can be the whole entry.</p>
             <p><span className="font-bold text-soft-ink">Keep it light.</span> Two photos max keeps the ritual calm.</p>
           </div>
-        )}
+        ) : null}
       </div>
     </section>
   );

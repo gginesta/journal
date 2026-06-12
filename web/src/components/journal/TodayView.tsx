@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
-import { ArrowRight, CheckCircle2, Heart, Plus, Sparkles, Trash2, Users } from "lucide-react";
+import { ArrowRight, CheckCircle2, ChevronDown, Heart, Plus, Sparkles, Trash2, Users } from "lucide-react";
 import type { JournalEntry, MemoryDetail, PersonTag, PromptTemplate, Workspace } from "@/types/journal";
 import { formatDisplayDate, toLocalDate } from "@/lib/dates";
 import { firstResponseExcerpt, isEntryComplete, memoryLaneMatches, streakSummary } from "@/lib/journal-logic";
@@ -39,6 +39,7 @@ export function TodayView({
   showFirstMemoryCelebration,
   onUpdateEntry,
   onAddPerson,
+  isEntryStale = false,
   onOpenEntry,
   onFocusFirstReflection,
   onDismissStarterGuide,
@@ -60,7 +61,9 @@ export function TodayView({
   onFocusFirstReflection: () => void;
   onDismissStarterGuide: () => void;
   onDismissFirstMemoryCelebration: () => void;
+  isEntryStale?: boolean;
 }) {
+  const [showMoreForToday, setShowMoreForToday] = useState(false);
   const summary = streakSummary(entries);
   const matches = memoryLaneMatches(entries).filter((match) => match.entryId !== entry.id);
   const firstMeaningfulEntry = meaningfulFirstMemoryEntries(entries)[0] ?? entry;
@@ -115,6 +118,15 @@ export function TodayView({
 
         {!canEdit ? <ReadOnlyNotice /> : null}
 
+        {isEntryStale ? (
+          <section className="rounded-journal border border-dawn/40 bg-dawn/10 p-4 text-sm leading-6 text-soft-ink" role="status">
+            <p className="font-bold">This day changed on another device.</p>
+            <p className="mt-1">
+              The newer copy was kept safe. Refresh this page to see it before editing again, so nothing gets lost.
+            </p>
+          </section>
+        ) : null}
+
         {showFirstMemoryCelebration ? (
           <FirstMemoryCelebration
             entry={firstMeaningfulEntry}
@@ -134,6 +146,7 @@ export function TodayView({
         <PhotoHero
           entry={entry}
           canEdit={canEdit}
+          showGuidance={!entries.some((candidate) => candidate.photos.length > 0)}
           onChangePhotos={(updater) =>
             onUpdateEntry(entry.id, (current) => ({
               ...current,
@@ -149,12 +162,25 @@ export function TodayView({
         <MoodPanel entry={entry} canEdit={canEdit} onUpdateEntry={onUpdateEntry} />
       </section>
 
-      <aside className="grid content-start gap-5">
+      <aside aria-label="More for today" className="grid content-start gap-5">
         <CompletionCard entry={entry} />
-        <PickMeUpMemoryCard entries={entries} onOpenEntry={onOpenEntry} />
-        <GratitudeGuideCard guide={guide} canEdit={canEdit} onUseSuggestion={useGuideSuggestion} />
-        <MemoryLanePanel matches={matches} entries={entries} onOpenEntry={onOpenEntry} />
-        <PromptSnapshot prompts={prompts} />
+        <button
+          type="button"
+          onClick={() => setShowMoreForToday((current) => !current)}
+          aria-expanded={showMoreForToday}
+          className="flex min-h-12 items-center justify-between rounded-journal border border-journal-line bg-journal-surface px-5 text-left text-sm font-bold text-soft-ink xl:hidden"
+        >
+          More for today: a look back, gentle starters
+          <ChevronDown aria-hidden="true" size={18} className={clsx("transition", showMoreForToday ? "rotate-180" : "")} />
+        </button>
+        <div className={clsx("grid gap-5", showMoreForToday ? "" : "hidden xl:grid")}>
+          <PickMeUpMemoryCard entries={entries} onOpenEntry={onOpenEntry} />
+          <GratitudeGuideCard guide={guide} canEdit={canEdit} onUseSuggestion={useGuideSuggestion} />
+          <MemoryLanePanel matches={matches} entries={entries} onOpenEntry={onOpenEntry} />
+          <div className="hidden xl:block">
+            <PromptSnapshot prompts={prompts} />
+          </div>
+        </div>
       </aside>
     </div>
   );
@@ -360,6 +386,7 @@ function PromptPanel({
             </span>
             <textarea
               id={index === 0 ? "nice-thing-0" : undefined}
+              aria-label={`Nice thing ${index + 1}`}
               value={lines[index] ?? ""}
               onChange={(event) => {
                 const next = [...lines];
@@ -529,6 +556,7 @@ function LittleDetailsPanel({
             <div className="flex gap-2">
               <textarea
                 value={detail.text}
+                aria-label="Little detail text"
                 onChange={(event) => updateDetail(detail.id, (current) => ({ ...current, text: event.target.value }))}
                 disabled={!canEdit}
                 className="min-h-12 flex-1 border-0 bg-transparent outline-none"

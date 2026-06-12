@@ -62,6 +62,7 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
   const [showStarterGuide, setShowStarterGuide] = useState(false);
   const [firstMemoryDismissalValue, setFirstMemoryDismissalValue] = useState<string | null>("true");
   const [workspacesWithClearedEntries, setWorkspacesWithClearedEntries] = useState<Set<string>>(() => new Set());
+  const [staleEntryIds, setStaleEntryIds] = useState<string[]>([]);
   const [isPending, startTransition] = useTransition();
   const didMountPersistence = useRef(false);
   const latestSyncId = useRef(0);
@@ -217,6 +218,7 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
           serverEntryBaselines.current.set(entryId, serverUpdatedAt);
         }
         if (latestSyncId.current === syncId) {
+          setStaleEntryIds(result.stale ?? []);
           if ((result.stale?.length ?? 0) > 0) {
             setSaveState("error");
             setSaveError(
@@ -581,6 +583,7 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
               prompts={workspacePrompts}
               saveState={saveState}
               saveError={saveError}
+              isEntryStale={staleEntryIds.includes(todayEntry.id)}
               canEdit={canEditActiveWorkspace}
               showStarterGuide={showStarterGuide}
               showFirstMemoryCelebration={shouldShowFirstMemoryCelebration({
