@@ -198,7 +198,7 @@ Statuses all `todo`. Effort: S < 2 h, M ≈ half-day, L ≈ 1–2 days, XL needs
 |---|---|---|---|---|---|---|---|
 | M3-T1 | done | Batch photo URL signing | `bootstrap.ts:262-268` | Single `createSignedUrls` call per bucket; page load makes ≤ 2 storage API calls | S | Low | — |
 | M3-T2 | done | Single source of truth for app version | `README.md:59,72`, `docs/PROJECT_CONTEXT.md:65`, docs guidance | Docs reference Settings > Beta / package.json instead of restating the number; stale `0.2.10` mentions gone | S | Low | — |
-| M3-T3 | todo | iOS error-handling pass (pre-TestFlight gate) | `JournalStore.swift` (16 `try?` sites), `PhotoStore.swift`, views | Persistence failures surface a user-visible alert or logged error; zero bare `try? modelContext.save()` remaining. Blocking for TestFlight per owner decision | M | Low | — |
+| M3-T3 | done | iOS error-handling pass (pre-TestFlight gate) | `JournalStore.swift` (16 `try?` sites), `PhotoStore.swift`, views | Persistence failures surface a user-visible alert or logged error; zero bare `try? modelContext.save()` remaining. Blocking for TestFlight per owner decision | M | Low | — |
 | M3-T4 | todo | Move photo compression off main thread | `JournalApp.tsx:3713-3738` (post-split: photo lib) | `createImageBitmap` + `OffscreenCanvas`/worker; UI stays interactive compressing a 12 MP image | M | Low | M2-T1 |
 | M3-T5 | todo | Dependency hygiene pass | `web/package.json` | `@supabase/ssr` → 0.12.x, minor bumps applied; audit clean; e2e green | S–M | Low | M0-T1 |
 | M3-T6 | todo | SwiftLint in iOS CI | `.github/workflows/ios-ci.yml` | Lint step runs and gates iOS PRs | S | Low | — |
