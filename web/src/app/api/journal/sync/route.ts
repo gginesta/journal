@@ -3,12 +3,18 @@ import type { JournalEntry, PersonTag, PromptTemplate, ReminderPreferences } fro
 import { canMutateWorkspaceRole, computePersonTagDeletions, isSafeWorkspaceStoragePath, parseImageDataUrl } from "@/lib/journal-sync-safety";
 import { validateSyncPayload } from "@/lib/journal-sync-validation";
 import { makePhotoThumbnail } from "@/lib/photo-thumbnails";
+import { logApiFailure } from "@/lib/server-log";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+function fail(status: number, message: string, context: Record<string, string | undefined> = {}) {
+  logApiFailure("journal/sync", status, message, context);
+  return NextResponse.json({ error: message }, { status });
+}
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServerClient();
   if (!supabase) {
-    return NextResponse.json({ error: "Supabase is not configured" }, { status: 503 });
+    return fail(503, "Supabase is not configured");
   }
 
   const {
@@ -16,25 +22,25 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    return fail(401, "Authentication required");
   }
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Sync payload must be valid JSON" }, { status: 400 });
+    return fail(400, "Sync payload must be valid JSON", { user: user.id });
   }
 
   const validation = validateSyncPayload(body);
   if (!validation.ok) {
-    return NextResponse.json({ error: validation.message }, { status: 400 });
+    return fail(400, validation.message, { user: user.id });
   }
   const payload = validation.payload;
 
   const access = await getWorkspaceMutationAccess(payload.workspaceId, user.id);
   if (!access.ok) {
-    return NextResponse.json({ error: access.message }, { status: access.status });
+    return fail(access.status, access.message, { user: user.id, workspace: payload.workspaceId });
   }
 
   const people = payload.people.filter((person) => person.workspaceId === payload.workspaceId);
@@ -47,12 +53,12 @@ export async function POST(request: Request) {
     (await upsertReminders(payload.workspaceId, payload.reminders));
 
   if (firstError) {
-    return NextResponse.json({ error: firstError.message }, { status: 500 });
+    return fail(500, firstError.message, { user: user.id, workspace: payload.workspaceId });
   }
 
   const entryOutcome = await syncEntries(payload.workspaceId, entries);
   if (entryOutcome.error) {
-    return NextResponse.json({ error: entryOutcome.error.message }, { status: 500 });
+    return fail(500, entryOutcome.error.message, { user: user.id, workspace: payload.workspaceId });
   }
 
   return NextResponse.json({ ok: true, applied: entryOutcome.applied, stale: entryOutcome.stale });
