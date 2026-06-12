@@ -496,7 +496,7 @@ private struct LittleDetailRow: View {
                 .onChange(of: detail.text) { _, _ in
                     detail.updatedAt = .now
                     detail.entry?.updatedAt = .now
-                    try? modelContext.save()
+                    Persistence.save(modelContext, operation: "Update detail tags")
                 }
 
             PeopleChipRow(

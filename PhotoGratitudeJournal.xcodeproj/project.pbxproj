@@ -21,6 +21,7 @@
 		A0010000000000000000000C /* StreakCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0020000000000000000000C /* StreakCalculator.swift */; };
 		A0010000000000000000000D /* PromptSeeder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0020000000000000000000D /* PromptSeeder.swift */; };
 		A0010000000000000000000E /* PhotoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0020000000000000000000E /* PhotoStore.swift */; };
+		A001000000000000000000FE /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002000000000000000000FE /* Persistence.swift */; };
 		A0010000000000000000000F /* ReminderScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0020000000000000000000F /* ReminderScheduler.swift */; };
 		A00100000000000000000010 /* EntitlementService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200000000000000000010 /* EntitlementService.swift */; };
 		A00100000000000000000011 /* PrivacyLockService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200000000000000000011 /* PrivacyLockService.swift */; };
@@ -67,6 +68,7 @@
 		A0020000000000000000000C /* StreakCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreakCalculator.swift; sourceTree = "<group>"; };
 		A0020000000000000000000D /* PromptSeeder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptSeeder.swift; sourceTree = "<group>"; };
 		A0020000000000000000000E /* PhotoStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoStore.swift; sourceTree = "<group>"; };
+		A002000000000000000000FE /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
 		A0020000000000000000000F /* ReminderScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderScheduler.swift; sourceTree = "<group>"; };
 		A00200000000000000000010 /* EntitlementService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntitlementService.swift; sourceTree = "<group>"; };
 		A00200000000000000000011 /* PrivacyLockService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyLockService.swift; sourceTree = "<group>"; };
@@ -151,6 +153,7 @@
 				A0020000000000000000000C /* StreakCalculator.swift */,
 				A0020000000000000000000D /* PromptSeeder.swift */,
 				A0020000000000000000000E /* PhotoStore.swift */,
+				A002000000000000000000FE /* Persistence.swift */,
 				A0020000000000000000000F /* ReminderScheduler.swift */,
 				A00200000000000000000010 /* EntitlementService.swift */,
 				A00200000000000000000011 /* PrivacyLockService.swift */,
@@ -309,6 +312,7 @@
 				A0010000000000000000000C /* StreakCalculator.swift in Sources */,
 				A0010000000000000000000D /* PromptSeeder.swift in Sources */,
 				A0010000000000000000000E /* PhotoStore.swift in Sources */,
+				A001000000000000000000FE /* Persistence.swift in Sources */,
 				A0010000000000000000000F /* ReminderScheduler.swift in Sources */,
 				A00100000000000000000010 /* EntitlementService.swift in Sources */,
 				A00100000000000000000011 /* PrivacyLockService.swift in Sources */,

@@ -1,9 +1,11 @@
+import Combine
 import SwiftData
 import SwiftUI
 
 struct RootAppView: View {
     @Environment(PrivacyLockService.self) private var privacyLock
     @AppStorage("hasCompletedFirstLaunchOnboarding") private var hasCompletedFirstLaunchOnboarding = false
+    @State private var showingSaveFailureAlert = false
     @State private var selectedTab: AppTab = .today
     @State private var todayRouter = RouterPath()
     @State private var memoriesRouter = RouterPath()
@@ -46,6 +48,14 @@ struct RootAppView: View {
         .onChange(of: hasCompletedFirstLaunchOnboarding) { _, isCompleted in
             guard isCompleted else { return }
             Task { await privacyLock.lockIfNeeded() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Persistence.saveFailedNotification)) { _ in
+            showingSaveFailureAlert = true
+        }
+        .alert("That change may not have saved", isPresented: $showingSaveFailureAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Something went wrong while saving. It is safe to try again — if this keeps happening, please send beta feedback from Settings.")
         }
     }
 
@@ -219,7 +229,7 @@ private struct FirstLaunchOnboardingView: View {
 
         config.cadence = selectedCadence
         config.isEnabled = wantsReminders
-        try? modelContext.save()
+        Persistence.save(modelContext, operation: "Save onboarding choices")
 
         await reminderScheduler.schedule(config: config)
         onComplete()

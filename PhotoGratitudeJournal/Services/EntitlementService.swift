@@ -40,11 +40,20 @@ final class EntitlementService {
     }
 
     func restorePurchases() async {
-        try? await AppStore.sync()
+        do {
+            try await AppStore.sync()
+        } catch {
+            Persistence.log("Restore purchases", error: error)
+        }
         await refresh()
     }
 
     private func loadProducts() async {
-        products = (try? await Product.products(for: [Self.yearlyProductID])) ?? []
+        do {
+            products = try await Product.products(for: [Self.yearlyProductID])
+        } catch {
+            Persistence.log("Load products", error: error)
+            products = []
+        }
     }
 }

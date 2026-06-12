@@ -26,7 +26,7 @@ enum JournalStore {
             makeSession(kind: kind, prompts: prompts, offset: index)
         }
         context.insert(entry)
-        try? context.save()
+        Persistence.save(context, operation: "Create entry")
         return entry
     }
 
@@ -44,7 +44,7 @@ enum JournalStore {
             ))
         }
 
-        try? context.save()
+        Persistence.save(context, operation: "Seed person tags")
     }
 
     static func allPersonTags(in context: ModelContext) -> [PersonTag] {
@@ -73,7 +73,7 @@ enum JournalStore {
             sortOrder: nextSortOrder
         )
         context.insert(tag)
-        try? context.save()
+        Persistence.save(context, operation: "Add person tag")
         return tag
     }
 
@@ -91,19 +91,19 @@ enum JournalStore {
         sessions.append(session)
         entry.sessions = sessions
         entry.updatedAt = .now
-        try? context.save()
+        Persistence.save(context, operation: "Add session")
     }
 
     static func updateResponse(_ response: PromptResponse, text: String, in context: ModelContext) {
         response.text = text
         response.updatedAt = .now
-        try? context.save()
+        Persistence.save(context, operation: "Update response")
     }
 
     static func updateMood(_ entry: JournalEntry, mood: Mood, in context: ModelContext) {
         entry.mood = mood
         entry.updatedAt = .now
-        try? context.save()
+        Persistence.save(context, operation: "Update mood")
     }
 
     static func addPhoto(_ photo: PhotoAttachment, to entry: JournalEntry, in context: ModelContext) {
@@ -111,14 +111,14 @@ enum JournalStore {
         photos.append(photo)
         entry.photos = photos
         entry.updatedAt = .now
-        try? context.save()
+        Persistence.save(context, operation: "Add photo")
     }
 
     static func removePhoto(_ photo: PhotoAttachment, from entry: JournalEntry, in context: ModelContext) {
         entry.photos = (entry.photos ?? []).filter { $0.id != photo.id }
         entry.updatedAt = .now
         context.delete(photo)
-        try? context.save()
+        Persistence.save(context, operation: "Remove photo")
     }
 
     static func assignPersonTag(_ person: PersonTag, to entry: JournalEntry, in context: ModelContext) {
@@ -130,7 +130,7 @@ enum JournalStore {
         links.append(link)
         entry.personLinks = links
         entry.updatedAt = .now
-        try? context.save()
+        Persistence.save(context, operation: "Tag entry")
     }
 
     static func removePersonTag(_ person: PersonTag, from entry: JournalEntry, in context: ModelContext) {
@@ -139,7 +139,7 @@ enum JournalStore {
         entry.personLinks = (entry.personLinks ?? []).filter { $0.id != link.id }
         entry.updatedAt = .now
         context.delete(link)
-        try? context.save()
+        Persistence.save(context, operation: "Untag entry")
     }
 
     static func entries(_ entries: [JournalEntry], taggedWith person: PersonTag?) -> [JournalEntry] {
@@ -171,7 +171,7 @@ enum JournalStore {
         }
 
         entry.updatedAt = .now
-        try? context.save()
+        Persistence.save(context, operation: "Add little detail")
         return detail
     }
 
@@ -180,7 +180,7 @@ enum JournalStore {
 
         detail.updatedAt = .now
         detail.entry?.updatedAt = .now
-        try? context.save()
+        Persistence.save(context, operation: "Tag detail")
     }
 
     static func removePersonTag(_ person: PersonTag, from detail: MemoryDetail, in context: ModelContext) {
@@ -190,14 +190,14 @@ enum JournalStore {
         detail.updatedAt = .now
         detail.entry?.updatedAt = .now
         context.delete(link)
-        try? context.save()
+        Persistence.save(context, operation: "Untag detail")
     }
 
     static func removeLittleDetail(_ detail: MemoryDetail, from entry: JournalEntry, in context: ModelContext) {
         entry.details = (entry.details ?? []).filter { $0.id != detail.id }
         entry.updatedAt = .now
         context.delete(detail)
-        try? context.save()
+        Persistence.save(context, operation: "Remove little detail")
     }
 
     static func sortedEntries(_ entries: [JournalEntry]) -> [JournalEntry] {
