@@ -44,14 +44,18 @@ export async function POST(request: Request) {
   const firstError =
     (await upsertPeople(payload.workspaceId, people)) ??
     (await upsertPrompts(payload.workspaceId, prompts)) ??
-    (await upsertReminders(payload.workspaceId, payload.reminders)) ??
-    (await syncEntries(payload.workspaceId, user.id, entries));
+    (await upsertReminders(payload.workspaceId, payload.reminders));
 
   if (firstError) {
     return NextResponse.json({ error: firstError.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true });
+  const entryOutcome = await syncEntries(payload.workspaceId, entries);
+  if (entryOutcome.error) {
+    return NextResponse.json({ error: entryOutcome.error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, applied: entryOutcome.applied, stale: entryOutcome.stale });
 }
 
 async function getWorkspaceMutationAccess(workspaceId: string, userId: string): Promise<{ ok: true } | { ok: false; status: number; message: string }> {
@@ -178,160 +182,81 @@ async function upsertReminders(workspaceId: string, reminders: ReminderPreferenc
   return error;
 }
 
-async function syncEntries(workspaceId: string, userId: string, entries: JournalEntry[]) {
+type EntrySyncOutcome = {
+  error: { message: string } | null;
+  // entry id -> authoritative server updated_at, the client's next stale-write baseline
+  applied: Record<string, string>;
+  // entry ids refused because the server row changed since the client loaded it
+  stale: string[];
+};
+
+async function syncEntries(workspaceId: string, entries: JournalEntry[]): Promise<EntrySyncOutcome> {
   const supabase = await createSupabaseServerClient();
-  if (!supabase) return null;
-
-  if (entries.length === 0) return null;
-
-  const { data: existingEntries, error: existingEntryError } = await supabase
-    .from("journal_entries")
-    .select("id")
-    .eq("workspace_id", workspaceId)
-    .in(
-      "id",
-      entries.map((entry) => entry.id)
-    );
-  if (existingEntryError) return existingEntryError;
-
-  const existingEntryIds = new Set(existingEntries?.map((entry) => entry.id) ?? []);
-  const existingEntryRows = entries
-    .filter((entry) => existingEntryIds.has(entry.id))
-    .map((entry) => ({
-      id: entry.id,
-      workspace_id: workspaceId,
-      local_date: entry.localDate,
-      mood: entry.mood,
-      note: entry.note,
-      updated_at: entry.updatedAt
-    }));
-  const newEntryRows = entries
-    .filter((entry) => !existingEntryIds.has(entry.id))
-    .map((entry) => ({
-      id: entry.id,
-      workspace_id: workspaceId,
-      local_date: entry.localDate,
-      mood: entry.mood,
-      note: entry.note,
-      created_by: userId,
-      created_at: entry.createdAt,
-      updated_at: entry.updatedAt
-    }));
-
-  if (newEntryRows.length > 0) {
-    const { error: insertEntryError } = await supabase.from("journal_entries").insert(newEntryRows);
-    if (insertEntryError) return insertEntryError;
-  }
-
-  if (existingEntryRows.length > 0) {
-    const { error: updateEntryError } = await supabase.from("journal_entries").upsert(existingEntryRows, { onConflict: "id" });
-    if (updateEntryError) return updateEntryError;
-  }
+  const applied: Record<string, string> = {};
+  const stale: string[] = [];
+  if (!supabase || entries.length === 0) return { error: null, applied, stale };
 
   for (const entry of entries) {
-    const nestedError = await syncEntryNestedRows(workspaceId, entry);
-    if (nestedError) return nestedError;
-  }
+    // Storage uploads are not transactional, so they happen before the entry
+    // rewrite; a failure after upload leaves an unreferenced object at worst.
+    const photoRows = [];
+    for (const photo of entry.photos) {
+      const uploaded = await ensurePhotoStored(workspaceId, entry.localDate, photo.id, photo.previewUrl, photo.storagePath, photo.thumbnailPath);
+      if (uploaded.error) return { error: uploaded.error, applied, stale };
+      photoRows.push({
+        id: photo.id,
+        storage_path: uploaded.storagePath,
+        thumbnail_path: uploaded.thumbnailPath,
+        caption: photo.caption,
+        sort_order: photo.sortOrder,
+        byte_size: uploaded.byteSize ?? null
+      });
+    }
 
-  return null;
-}
-
-async function syncEntryNestedRows(workspaceId: string, entry: JournalEntry) {
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) return null;
-
-  const photoRows = [];
-  for (const photo of entry.photos) {
-    const uploaded = await ensurePhotoStored(workspaceId, entry.localDate, photo.id, photo.previewUrl, photo.storagePath, photo.thumbnailPath);
-    if (uploaded.error) return uploaded.error;
-    photoRows.push({
-      id: photo.id,
-      entry_id: entry.id,
-      storage_path: uploaded.storagePath,
-      thumbnail_path: uploaded.thumbnailPath,
-      caption: photo.caption,
-      sort_order: photo.sortOrder,
-      byte_size: uploaded.byteSize
+    const { data, error } = await supabase.rpc("sync_journal_entry", {
+      entry: {
+        id: entry.id,
+        workspace_id: workspaceId,
+        local_date: entry.localDate,
+        mood: entry.mood,
+        note: entry.note,
+        created_at: entry.createdAt,
+        updated_at: entry.updatedAt,
+        base_updated_at: entry.syncedAt ?? null,
+        person_tag_ids: entry.personTagIds,
+        sessions: entry.sessions.map((session) => ({
+          id: session.id,
+          kind: session.kind,
+          responses: session.responses.map((response) => ({
+            id: response.id,
+            prompt_id: response.promptId,
+            prompt_title: response.promptTitle,
+            prompt_text: response.promptText,
+            prompt_order: response.promptOrder,
+            text: response.text
+          }))
+        })),
+        details: entry.details.map((detail) => ({
+          id: detail.id,
+          text: detail.text,
+          category: detail.category,
+          sort_order: detail.sortOrder,
+          person_tag_ids: detail.personTagIds
+        })),
+        photos: photoRows
+      }
     });
-  }
+    if (error) return { error, applied, stale };
 
-  const deletionError =
-    (await supabase.from("entry_person_tags").delete().eq("entry_id", entry.id)).error ??
-    (await supabase.from("journal_sessions").delete().eq("entry_id", entry.id)).error ??
-    (await supabase.from("memory_details").delete().eq("entry_id", entry.id)).error;
-  if (deletionError) return deletionError;
-
-  if (entry.personTagIds.length > 0) {
-    const { error } = await supabase.from("entry_person_tags").insert(
-      entry.personTagIds.map((personTagId) => ({
-        entry_id: entry.id,
-        person_tag_id: personTagId
-      }))
-    );
-    if (error) return error;
-  }
-
-  if (entry.sessions.length > 0) {
-    const { error: sessionError } = await supabase.from("journal_sessions").insert(
-      entry.sessions.map((session) => ({
-        id: session.id,
-        entry_id: entry.id,
-        kind: session.kind
-      }))
-    );
-    if (sessionError) return sessionError;
-
-    const responses = entry.sessions.flatMap((session) =>
-      session.responses.map((response) => ({
-        id: response.id,
-        session_id: session.id,
-        prompt_id: response.promptId,
-        prompt_title: response.promptTitle,
-        prompt_text: response.promptText,
-        prompt_order: response.promptOrder,
-        text: response.text
-      }))
-    );
-
-    if (responses.length > 0) {
-      const { error } = await supabase.from("prompt_responses").insert(responses);
-      if (error) return error;
+    const result = data as { status?: string; server_updated_at?: string } | null;
+    if (result?.status === "stale") {
+      stale.push(entry.id);
+    } else if (result?.server_updated_at) {
+      applied[entry.id] = result.server_updated_at;
     }
   }
 
-  if (entry.details.length > 0) {
-    const { error: detailsError } = await supabase.from("memory_details").insert(
-      entry.details.map((detail) => ({
-        id: detail.id,
-        entry_id: entry.id,
-        text: detail.text,
-        category: detail.category,
-        sort_order: detail.sortOrder
-      }))
-    );
-    if (detailsError) return detailsError;
-
-    const detailLinks = entry.details.flatMap((detail) =>
-      detail.personTagIds.map((personTagId) => ({
-        detail_id: detail.id,
-        person_tag_id: personTagId
-      }))
-    );
-    if (detailLinks.length > 0) {
-      const { error } = await supabase.from("detail_person_tags").insert(detailLinks);
-      if (error) return error;
-    }
-  }
-
-  const { error: photoDeleteError } = await supabase.from("photo_attachments").delete().eq("entry_id", entry.id);
-  if (photoDeleteError) return photoDeleteError;
-
-  if (photoRows.length > 0) {
-    const { error } = await supabase.from("photo_attachments").insert(photoRows);
-    if (error) return error;
-  }
-
-  return null;
+  return { error: null, applied, stale };
 }
 
 async function ensurePhotoStored(

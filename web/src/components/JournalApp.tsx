@@ -144,6 +144,12 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
   const [isPending, startTransition] = useTransition();
   const didMountPersistence = useRef(false);
   const latestSyncId = useRef(0);
+  // Server updated_at per entry id, used as the stale-write baseline. Kept in
+  // a ref (not state) so recording a sync ack does not retrigger the sync
+  // effect: every applied write bumps the server timestamp.
+  const serverEntryBaselines = useRef<Map<string, string>>(
+    new Map(initialData.entries.map((entry) => [entry.id, entry.updatedAt]))
+  );
 
   const onboardingKey = useMemo(() => `${onboardingStorageKey}:${initialData.profile?.id ?? "demo"}`, [initialData.profile?.id]);
   const firstMemoryKey = useMemo(() => firstMemoryCelebrationStorageKey(activeWorkspaceId), [activeWorkspaceId]);
@@ -277,13 +283,25 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
             people: workspacePeople,
             prompts: workspacePrompts,
             reminders,
-            entries: workspaceEntries
+            entries: workspaceEntries.map((entry) => ({
+              ...entry,
+              syncedAt: serverEntryBaselines.current.get(entry.id) ?? null
+            }))
           })
         });
 
         if (!response.ok) throw new Error(await responseErrorMessage(response, "Sync failed"));
+        const result = (await response.json()) as { ok?: boolean; applied?: Record<string, string>; stale?: string[] };
+        for (const [entryId, serverUpdatedAt] of Object.entries(result.applied ?? {})) {
+          serverEntryBaselines.current.set(entryId, serverUpdatedAt);
+        }
         if (latestSyncId.current === syncId) {
-          if (navigator.onLine) {
+          if ((result.stale?.length ?? 0) > 0) {
+            setSaveState("error");
+            setSaveError(
+              "Some memories changed on another device since this screen loaded, so the newer copy was kept. Refresh to see the latest before editing again."
+            );
+          } else if (navigator.onLine) {
             setSaveState("saved");
             setSaveError(null);
           } else {

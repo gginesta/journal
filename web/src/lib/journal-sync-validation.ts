@@ -172,6 +172,7 @@ function isJournalEntry(value: unknown): value is JournalEntry {
     isText(value.note, syncLimits.longText) &&
     isText(value.createdAt, 64) &&
     isText(value.updatedAt, 64) &&
+    (value.syncedAt === undefined || value.syncedAt === null || isText(value.syncedAt, 64)) &&
     isUuidArray(value.personTagIds, syncLimits.tagIdsPerItem) &&
     Array.isArray(value.sessions) &&
     value.sessions.length <= syncLimits.sessionsPerEntry &&

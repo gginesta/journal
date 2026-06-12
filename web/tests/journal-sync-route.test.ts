@@ -19,6 +19,7 @@ type TableResult = { data?: unknown; error?: { message: string } | null };
 
 // Awaitable stub builder: every query method chains, and awaiting the builder
 // resolves to the next queued result for its table (or an empty success).
+// RPC results queue under "rpc:<functionName>".
 function createFakeSupabase(options: { user?: { id: string } | null; role?: string | null; results?: Record<string, TableResult[]> }) {
   const calls: Array<{ table: string; method: string; args: unknown[] }> = [];
   const queues = new Map(Object.entries(options.results ?? {}));
@@ -28,6 +29,9 @@ function createFakeSupabase(options: { user?: { id: string } | null; role?: stri
     if (queue && queue.length > 0) return queue.shift() as TableResult;
     if (table === "workspace_members") {
       return { data: options.role ? { role: options.role } : null, error: null };
+    }
+    if (table.startsWith("rpc:")) {
+      return { data: { status: "applied", server_updated_at: "2026-06-12T20:00:01.000Z" }, error: null };
     }
     return { data: [], error: null };
   }
@@ -51,6 +55,10 @@ function createFakeSupabase(options: { user?: { id: string } | null; role?: stri
         getUser: async () => ({ data: { user: options.user === undefined ? { id: userId } : options.user } })
       },
       from: (table: string) => builderFor(table),
+      rpc: async (fn: string, args: unknown) => {
+        calls.push({ table: `rpc:${fn}`, method: "rpc", args: [args] });
+        return nextResult(`rpc:${fn}`);
+      },
       storage: {
         from: () => ({
           upload: async () => ({ error: null })
@@ -140,19 +148,47 @@ describe("POST /api/journal/sync", () => {
     expect(response.status).toBe(403);
   });
 
-  it("syncs a valid editor payload and reports ok", async () => {
+  it("syncs a valid editor payload through the transactional RPC and acks the server timestamp", async () => {
     const fake = useFake(createFakeSupabase({ role: "editor" }));
     const response = await POST(syncRequest(makePayload()));
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true });
-    expect(fake.calls.some((call) => call.table === "journal_entries" && call.method === "insert")).toBe(true);
+    const body = await response.json();
+    expect(body.ok).toBe(true);
+    expect(body.stale).toEqual([]);
+    expect(body.applied["44444444-4444-4444-8444-444444444444"]).toBe("2026-06-12T20:00:01.000Z");
+    expect(fake.calls.some((call) => call.table === "rpc:sync_journal_entry")).toBe(true);
+  });
+
+  it("passes the client baseline to the RPC for the stale-write guard", async () => {
+    const fake = useFake(createFakeSupabase({ role: "editor" }));
+    await POST(syncRequest(makePayload({ entries: [makeEntry({ syncedAt: "2026-06-11T09:00:00.000Z" })] })));
+    const rpcCall = fake.calls.find((call) => call.table === "rpc:sync_journal_entry");
+    expect(rpcCall).toBeDefined();
+    const args = rpcCall?.args[0] as { entry: { base_updated_at: string | null } };
+    expect(args.entry.base_updated_at).toBe("2026-06-11T09:00:00.000Z");
+  });
+
+  it("reports entries the server refused as stale instead of overwriting", async () => {
+    useFake(
+      createFakeSupabase({
+        role: "editor",
+        results: {
+          "rpc:sync_journal_entry": [{ data: { status: "stale", server_updated_at: "2026-06-12T21:00:00.000Z" }, error: null }]
+        }
+      })
+    );
+    const response = await POST(syncRequest(makePayload()));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.stale).toEqual(["44444444-4444-4444-8444-444444444444"]);
+    expect(body.applied).toEqual({});
   });
 
   it("filters out entries that belong to a different workspace", async () => {
     const fake = useFake(createFakeSupabase({ role: "editor" }));
     const response = await POST(syncRequest(makePayload({ entries: [makeEntry({ workspaceId: otherWorkspaceId })] })));
     expect(response.status).toBe(200);
-    expect(fake.calls.some((call) => call.table === "journal_entries" && call.method === "insert")).toBe(false);
+    expect(fake.calls.some((call) => call.table === "rpc:sync_journal_entry")).toBe(false);
   });
 
   it("rejects photo storage paths that do not belong to the workspace", async () => {
@@ -178,16 +214,13 @@ describe("POST /api/journal/sync", () => {
       createFakeSupabase({
         role: "editor",
         results: {
-          journal_entries: [
-            { data: [], error: null },
-            { data: null, error: { message: "insert failed" } }
-          ]
+          "rpc:sync_journal_entry": [{ data: null, error: { message: "entry rewrite failed" } }]
         }
       })
     );
     const response = await POST(syncRequest(makePayload()));
     expect(response.status).toBe(500);
     const body = await response.json();
-    expect(body.error).toBe("insert failed");
+    expect(body.error).toBe("entry rewrite failed");
   });
 });
