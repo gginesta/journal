@@ -20,6 +20,7 @@ import {
   type OnboardingSetup
 } from "@/lib/onboarding";
 import { demoStorageFullMessage, writeDemoStateToStorage } from "@/lib/demo-storage";
+import { selectDirtyEntries, serializeEntryForSync } from "@/lib/journal-sync-delta";
 import { canMutateWorkspaceRole } from "@/lib/journal-sync-safety";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
@@ -63,6 +64,7 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
   const [firstMemoryDismissalValue, setFirstMemoryDismissalValue] = useState<string | null>("true");
   const [workspacesWithClearedEntries, setWorkspacesWithClearedEntries] = useState<Set<string>>(() => new Set());
   const [staleEntryIds, setStaleEntryIds] = useState<string[]>([]);
+  const [archiveState, setArchiveState] = useState<Record<string, { hasMore: boolean; loading: boolean }>>({});
   const [isPending, startTransition] = useTransition();
   const didMountPersistence = useRef(false);
   const latestSyncId = useRef(0);
@@ -71,6 +73,11 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
   // effect: every applied write bumps the server timestamp.
   const serverEntryBaselines = useRef<Map<string, string>>(
     new Map(initialData.entries.map((entry) => [entry.id, entry.updatedAt]))
+  );
+  // Content the server has acknowledged, keyed by entry id. Only entries that
+  // differ from this are sent (delta sync); also a ref to avoid effect loops.
+  const ackedEntrySerializations = useRef<Map<string, string>>(
+    new Map(initialData.entries.map((entry) => [entry.id, serializeEntryForSync(entry)]))
   );
 
   const onboardingKey = useMemo(() => `${onboardingStorageKey}:${initialData.profile?.id ?? "demo"}`, [initialData.profile?.id]);
@@ -171,6 +178,37 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
     [workspaceEntries, selectedEntryId]
   );
 
+  const archive =
+    initialData.mode === "supabase"
+      ? (archiveState[activeWorkspaceId] ?? { hasMore: true, loading: false })
+      : { hasMore: false, loading: false };
+
+  async function loadOlderEntries() {
+    if (initialData.mode !== "supabase" || archive.loading) return;
+    const workspaceId = activeWorkspaceId;
+    const oldest = workspaceEntries.reduce((min, entry) => (entry.localDate < min ? entry.localDate : min), toLocalDate());
+    setArchiveState((current) => ({ ...current, [workspaceId]: { hasMore: true, loading: true } }));
+    try {
+      const response = await fetch(`/api/journal/entries?workspaceId=${workspaceId}&before=${oldest}`);
+      if (!response.ok) throw new Error(await responseErrorMessage(response, "Older memories could not load"));
+      const payload = (await response.json()) as { entries: JournalEntry[]; hasMore: boolean };
+      for (const entry of payload.entries) {
+        // Register fetched history as server-acknowledged so delta sync does
+        // not immediately re-upload it.
+        serverEntryBaselines.current.set(entry.id, entry.updatedAt);
+        ackedEntrySerializations.current.set(entry.id, serializeEntryForSync(entry));
+      }
+      setEntries((current) => {
+        const known = new Set(current.map((entry) => entry.id));
+        return [...current, ...payload.entries.filter((entry) => !known.has(entry.id))];
+      });
+      setArchiveState((current) => ({ ...current, [workspaceId]: { hasMore: payload.hasMore, loading: false } }));
+    } catch (error) {
+      setArchiveState((current) => ({ ...current, [workspaceId]: { hasMore: true, loading: false } }));
+      setSaveError(error instanceof Error ? error.message : "Older memories could not load");
+    }
+  }
+
   useEffect(() => {
     if (initialData.mode !== "supabase" || !initialData.profile) return;
     if (!canEditActiveWorkspace) {
@@ -196,6 +234,8 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
     setSaveError(null);
     const timeout = window.setTimeout(async () => {
       try {
+        const dirtyEntries = selectDirtyEntries(workspaceEntries, ackedEntrySerializations.current);
+        const sentSerializations = new Map(dirtyEntries.map((entry) => [entry.id, serializeEntryForSync(entry)]));
         const response = await fetch("/api/journal/sync", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -205,7 +245,7 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
             people: workspacePeople,
             prompts: workspacePrompts,
             reminders,
-            entries: workspaceEntries.map((entry) => ({
+            entries: dirtyEntries.map((entry) => ({
               ...entry,
               syncedAt: serverEntryBaselines.current.get(entry.id) ?? null
             }))
@@ -216,6 +256,8 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
         const result = (await response.json()) as { ok?: boolean; applied?: Record<string, string>; stale?: string[] };
         for (const [entryId, serverUpdatedAt] of Object.entries(result.applied ?? {})) {
           serverEntryBaselines.current.set(entryId, serverUpdatedAt);
+          const sent = sentSerializations.get(entryId);
+          if (sent) ackedEntrySerializations.current.set(entryId, sent);
         }
         if (latestSyncId.current === syncId) {
           setStaleEntryIds(result.stale ?? []);
@@ -609,6 +651,8 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
               onUpdateDetail={updateRepositoryDetail}
               onDeleteDetail={deleteRepositoryDetail}
               canEdit={canEditActiveWorkspace}
+              archive={archive}
+              onLoadOlder={loadOlderEntries}
             />
           ) : null}
 

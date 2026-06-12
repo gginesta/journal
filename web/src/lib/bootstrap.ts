@@ -92,7 +92,7 @@ type DetailRow = {
   detail_person_tags?: PersonLinkRow[];
 };
 
-type EntryRow = {
+export type EntryRow = {
   id: string;
   workspace_id: string;
   local_date: string;
@@ -263,7 +263,7 @@ function mapPrompt(row: PromptRow): PromptTemplate {
   };
 }
 
-async function createPhotoUrlMap(entries: EntryRow[]): Promise<Map<string, string>> {
+export async function createPhotoUrlMap(entries: EntryRow[]): Promise<Map<string, string>> {
   const supabase = await createSupabaseServerClient();
   const paths = entries.flatMap((entry) => (entry.photo_attachments ?? []).map((photo) => photo.storage_path).filter(Boolean));
   const urls = new Map<string, string>();
@@ -277,7 +277,7 @@ async function createPhotoUrlMap(entries: EntryRow[]): Promise<Map<string, strin
   return urls;
 }
 
-function mapEntry(row: EntryRow, signedPhotoUrls = new Map<string, string>()): JournalEntry {
+export function mapEntry(row: EntryRow, signedPhotoUrls = new Map<string, string>()): JournalEntry {
   return {
     id: row.id,
     workspaceId: row.workspace_id,

@@ -22,7 +22,9 @@ export function MemoriesView({
   onAddDetail,
   onUpdateDetail,
   onDeleteDetail,
-  canEdit
+  canEdit,
+  archive,
+  onLoadOlder
 }: {
   entries: JournalEntry[];
   people: PersonTag[];
@@ -32,6 +34,8 @@ export function MemoriesView({
   onUpdateDetail: (entryId: string, detailId: string, updater: (detail: MemoryDetail) => MemoryDetail) => void;
   onDeleteDetail: (entryId: string, detailId: string) => void;
   canEdit: boolean;
+  archive?: { hasMore: boolean; loading: boolean };
+  onLoadOlder?: () => void;
 }) {
   const [mode, setMode] = useState<MemoryMode>("entries");
   const [query, setQuery] = useState("");
@@ -142,6 +146,16 @@ export function MemoriesView({
           ))}
         </div>
       )}
+      {archive?.hasMore && onLoadOlder ? (
+        <button
+          type="button"
+          onClick={onLoadOlder}
+          disabled={archive.loading}
+          className="mx-auto inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-journal-line bg-journal-surface px-5 text-sm font-bold text-soft-ink disabled:opacity-60"
+        >
+          {archive.loading ? "Bringing back older days…" : "Load older memories"}
+        </button>
+      ) : null}
         </>
       )}
     </div>
