@@ -76,6 +76,7 @@ type PromptResponseRow = {
 type SessionRow = {
   id: string;
   kind: "morning" | "evening" | "anytime";
+  created_by?: string | null;
   prompt_responses?: PromptResponseRow[];
 };
 
@@ -126,12 +127,13 @@ export async function loadJournalBootstrap(): Promise<JournalBootstrap> {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { ...makeDemoBootstrap(), mode: "supabase", profile: null };
+    return { ...makeDemoBootstrap(), mode: "supabase", profile: null, pendingInvites: [] };
   }
 
   const [
     profileResult,
-    workspaceResult
+    workspaceResult,
+    pendingInviteResult
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -142,8 +144,25 @@ export async function loadJournalBootstrap(): Promise<JournalBootstrap> {
       .from("workspaces")
       .select("id,name,kind,workspace_members!inner(role)")
       .eq("workspace_members.user_id", user.id)
+      .eq("workspace_members.invitation_state", "accepted")
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("workspace_members")
+      .select("workspace_id,role,workspaces(name)")
+      .eq("user_id", user.id)
+      .eq("invitation_state", "invited")
       .order("created_at", { ascending: true })
   ]);
+
+  type PendingInviteRow = { workspace_id: string; role: Workspace["role"]; workspaces: { name: string } | Array<{ name: string }> | null };
+  const pendingInvites = ((pendingInviteResult.data ?? []) as unknown as PendingInviteRow[]).map((invite) => {
+    const workspaceRelation = Array.isArray(invite.workspaces) ? invite.workspaces[0] : invite.workspaces;
+    return {
+      workspaceId: invite.workspace_id,
+      workspaceName: workspaceRelation?.name ?? "A shared journal",
+      role: invite.role
+    };
+  });
 
   const workspaces = ((workspaceResult.data ?? []) as WorkspaceRow[]).map<Workspace>((workspace) => ({
     id: workspace.id,
@@ -196,6 +215,7 @@ export async function loadJournalBootstrap(): Promise<JournalBootstrap> {
 
   return {
     mode: "supabase",
+    pendingInvites,
     profile: {
       id: user.id,
       email: user.email ?? profileResult.data?.email ?? "",
@@ -300,6 +320,7 @@ export function mapEntry(row: EntryRow, signedPhotoUrls = new Map<string, string
     sessions: (row.journal_sessions ?? []).map((session) => ({
       id: session.id,
       kind: session.kind,
+      createdBy: session.created_by ?? null,
       responses: (session.prompt_responses ?? []).map((response) => ({
         id: response.id,
         promptId: response.prompt_id,

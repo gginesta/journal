@@ -159,6 +159,32 @@ describe("POST /api/journal/sync", () => {
     expect(fake.calls.some((call) => call.table === "rpc:sync_journal_entry")).toBe(true);
   });
 
+  it("sends only the caller's own and legacy sessions to the RPC", async () => {
+    const fake = useFake(createFakeSupabase({ role: "editor" }));
+    const ownSession = {
+      id: "66666666-6666-4666-8666-666666666666",
+      kind: "evening" as const,
+      createdBy: userId,
+      responses: []
+    };
+    const legacySession = {
+      id: "77777777-7777-4777-8777-777777777777",
+      kind: "morning" as const,
+      createdBy: null,
+      responses: []
+    };
+    const partnerSession = {
+      id: "88888888-8888-4888-8888-888888888888",
+      kind: "anytime" as const,
+      createdBy: "99999999-9999-4999-8999-999999999999",
+      responses: []
+    };
+    await POST(syncRequest(makePayload({ entries: [makeEntry({ sessions: [ownSession, legacySession, partnerSession] })] })));
+    const rpcCall = fake.calls.find((call) => call.table === "rpc:sync_journal_entry");
+    const args = rpcCall?.args[0] as { entry: { sessions: Array<{ id: string }> } };
+    expect(args.entry.sessions.map((session) => session.id)).toEqual([ownSession.id, legacySession.id]);
+  });
+
   it("passes the client baseline to the RPC for the stale-write guard", async () => {
     const fake = useFake(createFakeSupabase({ role: "editor" }));
     await POST(syncRequest(makePayload({ entries: [makeEntry({ syncedAt: "2026-06-11T09:00:00.000Z" })] })));

@@ -186,11 +186,11 @@ Statuses all `todo`. Effort: S < 2 h, M ≈ half-day, L ≈ 1–2 days, XL needs
 | ID | Status | Title | Files/areas | Acceptance criteria | Effort | Risk | Deps |
 |---|---|---|---|---|---|---|---|
 | M2-T1 | done | Split `JournalApp.tsx` into modules | `web/src/components/` (new: `views/TodayView.tsx`, `views/MemoriesView.tsx`, `views/CalendarView.tsx`, `views/InsightsView.tsx`, `views/SettingsView.tsx`, `onboarding/`, `household/`, hooks) | `JournalApp.tsx` ≤ 500 lines; no behavior change (e2e suite green); no file > 800 lines | XL → break into one PR per view | Medium | M0-T1 (e2e in CI first) |
-| M2-T2 | todo | Delta sync: send only dirty entries | `JournalApp.tsx` sync effect (:239-298), sync route | Payload contains only entries changed since last ack; payload size constant w.r.t. journal size in a 200-entry fixture; conflict guard (M1-T2) still holds | M | Medium | M1-T1, M1-T2 |
-| M2-T3 | partial | Lift the 100-entry bootstrap cap (12-month window) | `web/src/lib/bootstrap.ts:179`, calendar/memories data paths | Last 12 months load eagerly, older entries fetch on demand; Memory Lane reaches 1-year lookbacks with a 400-entry fixture; initial load < 2 s | M | Medium | M2-T2 preferred |
+| M2-T2 | done | Delta sync: send only dirty entries | `JournalApp.tsx` sync effect (:239-298), sync route | Payload contains only entries changed since last ack; payload size constant w.r.t. journal size in a 200-entry fixture; conflict guard (M1-T2) still holds | M | Medium | M1-T1, M1-T2 |
+| M2-T3 | done | Lift the 100-entry bootstrap cap (12-month window) | `web/src/lib/bootstrap.ts:179`, calendar/memories data paths | Last 12 months load eagerly, older entries fetch on demand; Memory Lane reaches 1-year lookbacks with a 400-entry fixture; initial load < 2 s | M | Medium | M2-T2 preferred |
 | M2-T4 | done | Server-side error logging for sync/API failures | API routes, `bootstrap.ts` | Every 4xx/5xx logs a structured line (route, workspace, error class — no journal content) visible in Vercel logs; documented in `docs/WEB_APP.md` | S | Low | — |
-| M2-T5 | todo | Pending-invite consent flow | new migration (use `invitation_state='invited'`), `202605230001`, members routes, `JournalApp.tsx` household panel | Invitee sees pending invite on next sign-in and must accept before membership activates; RLS already excludes non-accepted members (no policy change needed); unknown emails get the same caller response as known ones (closes S2 fully); e2e covers invite→accept→shared-workspace | L | Medium | M1-T4 |
-| M2-T6 | todo | Per-person day sections | new migration (`created_by` on `journal_sessions`), sync route/RPC, Today + entry detail views | Each member's responses live in their own session; both partners editing the same day never touch the same response rows; entry detail shows both sections attributed; conflict guard (M1-T2) remains the backstop for shared fields (mood, photos, tags) | L | Medium | M1-T1, M1-T2, M2-T1 |
+| M2-T5 | done | Pending-invite consent flow | new migration (use `invitation_state='invited'`), `202605230001`, members routes, `JournalApp.tsx` household panel | Invitee sees pending invite on next sign-in and must accept before membership activates; RLS already excludes non-accepted members (no policy change needed); unknown emails get the same caller response as known ones (closes S2 fully); e2e covers invite→accept→shared-workspace | L | Medium | M1-T4 |
+| M2-T6 | done | Per-person day sections | new migration (`created_by` on `journal_sessions`), sync route/RPC, Today + entry detail views | Each member's responses live in their own session; both partners editing the same day never touch the same response rows; entry detail shows both sections attributed; conflict guard (M1-T2) remains the backstop for shared fields (mood, photos, tags) | L | Medium | M1-T1, M1-T2, M2-T1 |
 
 ### Milestone M3 — Quality & polish
 
@@ -199,9 +199,9 @@ Statuses all `todo`. Effort: S < 2 h, M ≈ half-day, L ≈ 1–2 days, XL needs
 | M3-T1 | done | Batch photo URL signing | `bootstrap.ts:262-268` | Single `createSignedUrls` call per bucket; page load makes ≤ 2 storage API calls | S | Low | — |
 | M3-T2 | done | Single source of truth for app version | `README.md:59,72`, `docs/PROJECT_CONTEXT.md:65`, docs guidance | Docs reference Settings > Beta / package.json instead of restating the number; stale `0.2.10` mentions gone | S | Low | — |
 | M3-T3 | done | iOS error-handling pass (pre-TestFlight gate) | `JournalStore.swift` (16 `try?` sites), `PhotoStore.swift`, views | Persistence failures surface a user-visible alert or logged error; zero bare `try? modelContext.save()` remaining. Blocking for TestFlight per owner decision | M | Low | — |
-| M3-T4 | todo | Move photo compression off main thread | `JournalApp.tsx:3713-3738` (post-split: photo lib) | `createImageBitmap` + `OffscreenCanvas`/worker; UI stays interactive compressing a 12 MP image | M | Low | M2-T1 |
+| M3-T4 | done | Move photo compression off main thread | `JournalApp.tsx:3713-3738` (post-split: photo lib) | `createImageBitmap` + `OffscreenCanvas`/worker; UI stays interactive compressing a 12 MP image | M | Low | M2-T1 |
 | M3-T5 | todo | Dependency hygiene pass | `web/package.json` | `@supabase/ssr` → 0.12.x, minor bumps applied; audit clean; e2e green | S–M | Low | M0-T1 |
-| M3-T6 | todo | SwiftLint in iOS CI | `.github/workflows/ios-ci.yml` | Lint step runs and gates iOS PRs | S | Low | — |
+| M3-T6 | done | SwiftLint in iOS CI | `.github/workflows/ios-ci.yml` | Lint step runs and gates iOS PRs | S | Low | — |
 
 ### Quick wins (high impact, S effort)
 **M0-T1** (e2e in CI), **M0-T2** (branch filters), **M0-T3** (audit fix), **M0-T5** (quota guard), **M3-T1** (batch signing), **M3-T2** (version drift).
@@ -276,3 +276,24 @@ Plan execution on branch `claude/exciting-rubin-oh519q`. All work verified by th
 2. `web/supabase/migrations/202606120002_invite_without_account_probe.sql` (fixes household invites)
 
 **Still open:** M2-T1 (split `JournalApp.tsx` — one PR per view), M2-T2 (delta sync), M2-T5 (pending-invite consent flow), M2-T6 (per-person day sections), M2-T3 remainder (older-archive on demand), M3-T3 (iOS error pass — pre-TestFlight gate), M3-T4/T5/T6.
+
+
+---
+
+## 9. Execution Log — final pass (2026-06-13)
+
+All remaining plan items are done except M3-T5, which stays deliberately deferred.
+
+- **M2-T2 Delta sync:** the client sends only entries whose content differs from the server's last acknowledgment (`lib/journal-sync-delta.ts`, tested). Payload size is now proportional to the edit.
+- **M2-T3 complete:** `GET /api/journal/entries` pages history older than the eager window (120/page, signed URLs); Memories gains "Load older memories"; fetched history registers as acked so delta sync never re-uploads it.
+- **M2-T5 Pending invites (migration `202606130001`):** invites create `invitation_state='invited'` memberships; unknown emails are recorded in the new `workspace_invites` table and converted on signup by `handle_new_user`; both paths return identical invited rows and both kinds appear identically in the member list (fully closes the S2 enumeration oracle). Invitees see their own membership row and the workspace name (new policies + `has_workspace_membership_row`), get an accept/decline banner in the app (`/api/workspaces/invites` → `respond_to_workspace_invite`), and gain data access only after accepting. Re-inviting never downgrades an accepted member.
+- **M2-T6 Per-person sections (migration `202606130002`):** `journal_sessions.created_by` added; `sync_journal_entry` rewrites only the caller's (or unowned legacy) sessions, so household members never clobber each other's reflections. The route filters sessions server-side; the client writes into its own section, creates one on a day the partner started, and shows partner reflections read-only with attribution (Today + entry detail). Stale-write guard remains the backstop for shared fields.
+- **M3-T4:** photo compression runs off the main thread via `createImageBitmap` + `OffscreenCanvas`, falling back to the canvas pipeline on older browsers.
+- **M3-T6:** SwiftLint config (`.swiftlint.yml`, calibrated to house style — no error-level violations exist) + gating step in iOS CI.
+- **M3-T5 (deferred, intentionally):** `@supabase/ssr` 0.6→0.12 changes auth cookie handling and needs a live magic-link login QA pass that only the operator can do.
+
+Verified: 78/78 unit tests, 20/20 Playwright e2e, 12/12 Postgres functional tests (invite lifecycle: invited→no access→accept→access; signup conversion; per-person: partner sessions survive each other's syncs), zero axe violations on all 8 surfaces, lint + typecheck clean.
+
+**Operator actions:**
+1. Apply `web/supabase/migrations/202606130001_pending_invites.sql` then `202606130002_per_person_sessions.sql` in Supabase **before** deploying this change to production.
+2. M3-T5 when convenient: bump `@supabase/ssr`, then verify a real magic-link login on a preview deploy.

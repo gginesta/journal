@@ -114,6 +114,7 @@ export function makeDemoBootstrap(): JournalBootstrap {
 
   return {
     mode: "demo",
+    pendingInvites: [],
     profile: {
       id: "demo-user",
       email: "demo@photojournal.local",

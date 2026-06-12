@@ -127,6 +127,7 @@ function isJournalSession(value: unknown): value is JournalSession {
     isUuid(value.id) &&
     typeof value.kind === "string" &&
     sessionKinds.has(value.kind as SessionKind) &&
+    (value.createdBy === undefined || value.createdBy === null || isUuid(value.createdBy)) &&
     Array.isArray(value.responses) &&
     value.responses.length <= syncLimits.responsesPerSession &&
     value.responses.every(isPromptResponse)

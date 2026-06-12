@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     return fail(500, firstError.message, { user: user.id, workspace: payload.workspaceId });
   }
 
-  const entryOutcome = await syncEntries(payload.workspaceId, entries);
+  const entryOutcome = await syncEntries(payload.workspaceId, user.id, entries);
   if (entryOutcome.error) {
     return fail(500, entryOutcome.error.message, { user: user.id, workspace: payload.workspaceId });
   }
@@ -196,7 +196,7 @@ type EntrySyncOutcome = {
   stale: string[];
 };
 
-async function syncEntries(workspaceId: string, entries: JournalEntry[]): Promise<EntrySyncOutcome> {
+async function syncEntries(workspaceId: string, userId: string, entries: JournalEntry[]): Promise<EntrySyncOutcome> {
   const supabase = await createSupabaseServerClient();
   const applied: Record<string, string> = {};
   const stale: string[] = [];
@@ -230,18 +230,22 @@ async function syncEntries(workspaceId: string, entries: JournalEntry[]): Promis
         updated_at: entry.updatedAt,
         base_updated_at: entry.syncedAt ?? null,
         person_tag_ids: entry.personTagIds,
-        sessions: entry.sessions.map((session) => ({
-          id: session.id,
-          kind: session.kind,
-          responses: session.responses.map((response) => ({
-            id: response.id,
-            prompt_id: response.promptId,
-            prompt_title: response.promptTitle,
-            prompt_text: response.promptText,
-            prompt_order: response.promptOrder,
-            text: response.text
-          }))
-        })),
+        // Per-person sections: only the caller's own (or unowned legacy)
+        // sessions are written; other members' sections are untouched.
+        sessions: entry.sessions
+          .filter((session) => !session.createdBy || session.createdBy === userId)
+          .map((session) => ({
+            id: session.id,
+            kind: session.kind,
+            responses: session.responses.map((response) => ({
+              id: response.id,
+              prompt_id: response.promptId,
+              prompt_title: response.promptTitle,
+              prompt_text: response.promptText,
+              prompt_order: response.promptOrder,
+              text: response.text
+            }))
+          })),
         details: entry.details.map((detail) => ({
           id: detail.id,
           text: detail.text,

@@ -62,6 +62,8 @@ export type JournalSession = {
   id: string;
   kind: SessionKind;
   responses: PromptResponse[];
+  // Member who owns this section of the day; null/absent for legacy rows.
+  createdBy?: string | null;
 };
 
 export type PhotoAttachment = {
@@ -108,9 +110,16 @@ export type ReminderPreferences = {
   morningTime: string;
 };
 
+export type PendingWorkspaceInvite = {
+  workspaceId: string;
+  workspaceName: string;
+  role: WorkspaceRole;
+};
+
 export type JournalBootstrap = {
   mode: "demo" | "supabase";
   profile: Profile | null;
+  pendingInvites: PendingWorkspaceInvite[];
   workspaces: Workspace[];
   workspaceMembers: WorkspaceMember[];
   activeWorkspaceId: string;

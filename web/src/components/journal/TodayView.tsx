@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import { ArrowRight, CheckCircle2, ChevronDown, Heart, Plus, Sparkles, Trash2, Users } from "lucide-react";
-import type { JournalEntry, MemoryDetail, PersonTag, PromptTemplate, Workspace } from "@/types/journal";
+import type { JournalEntry, JournalSession, MemoryDetail, PersonTag, PromptTemplate, Workspace } from "@/types/journal";
 import { formatDisplayDate, toLocalDate } from "@/lib/dates";
 import { firstResponseExcerpt, isEntryComplete, memoryLaneMatches, streakSummary } from "@/lib/journal-logic";
 import { addSuggestionToReflectionText, gratitudeGuideForEntry } from "@/lib/prompts";
@@ -40,6 +40,8 @@ export function TodayView({
   onUpdateEntry,
   onAddPerson,
   isEntryStale = false,
+  currentUserId = null,
+  memberNames = {},
   onOpenEntry,
   onFocusFirstReflection,
   onDismissStarterGuide,
@@ -62,6 +64,8 @@ export function TodayView({
   onDismissStarterGuide: () => void;
   onDismissFirstMemoryCelebration: () => void;
   isEntryStale?: boolean;
+  currentUserId?: string | null;
+  memberNames?: Record<string, string>;
 }) {
   const [showMoreForToday, setShowMoreForToday] = useState(false);
   const summary = streakSummary(entries);
@@ -156,7 +160,7 @@ export function TodayView({
           }
         />
 
-        <PromptPanel entry={entry} canEdit={canEdit} onUpdateEntry={onUpdateEntry} />
+        <PromptPanel entry={entry} prompts={prompts} canEdit={canEdit} currentUserId={currentUserId} memberNames={memberNames} onUpdateEntry={onUpdateEntry} />
         <PeoplePanel entry={entry} people={people} canEdit={canEdit} onUpdateEntry={onUpdateEntry} onAddPerson={onAddPerson} />
         <LittleDetailsPanel entry={entry} people={people} workspace={workspace} canEdit={canEdit} onUpdateEntry={onUpdateEntry} />
         <MoodPanel entry={entry} canEdit={canEdit} onUpdateEntry={onUpdateEntry} />
@@ -345,18 +349,32 @@ function StarterGuideCard({
 
 function PromptPanel({
   entry,
+  prompts,
   canEdit,
+  currentUserId,
+  memberNames,
   onUpdateEntry
 }: {
   entry: JournalEntry;
+  prompts: PromptTemplate[];
   canEdit: boolean;
+  currentUserId: string | null;
+  memberNames: Record<string, string>;
   onUpdateEntry: (entryId: string, updater: (entry: JournalEntry) => JournalEntry) => void;
 }) {
-  const responses = entry.sessions.flatMap((session) => session.responses);
-  const primary = responses[0];
-  const secondary = responses.slice(1);
-
-  if (!primary) return null;
+  // Per-person sections: each member writes in their own session; unowned
+  // legacy sessions belong to whoever edits them first.
+  const ownsSession = (session: JournalSession) => !session.createdBy || session.createdBy === currentUserId;
+  const ownResponses = entry.sessions.filter(ownsSession).flatMap((session) => session.responses);
+  const primary = ownResponses[0] ?? null;
+  const secondary = ownResponses.slice(1);
+  const otherSections = entry.sessions
+    .filter((session) => !ownsSession(session))
+    .map((session) => ({
+      session,
+      texts: session.responses.flatMap((response) => response.text.split("\n")).map((line) => line.trim()).filter(Boolean)
+    }))
+    .filter((section) => section.texts.length > 0);
 
   function updateResponse(responseId: string, text: string) {
     onUpdateEntry(entry.id, (current) => ({
@@ -369,13 +387,38 @@ function PromptPanel({
     }));
   }
 
-  const lines = primary.text.split("\n");
+  // A member writing on a day someone else started gets their own section.
+  function updatePrimaryText(text: string) {
+    if (primary) {
+      updateResponse(primary.id, text);
+      return;
+    }
+    onUpdateEntry(entry.id, (current) => {
+      const enabled = prompts.filter((prompt) => prompt.isEnabled);
+      const newSession: JournalSession = {
+        id: crypto.randomUUID(),
+        kind: current.sessions[0]?.kind ?? "evening",
+        createdBy: currentUserId,
+        responses: (enabled.length > 0 ? enabled : prompts.slice(0, 1)).map((prompt, index) => ({
+          id: crypto.randomUUID(),
+          promptId: prompt.id,
+          promptTitle: prompt.title,
+          promptText: prompt.prompt,
+          promptOrder: prompt.sortOrder,
+          text: index === 0 ? text : ""
+        }))
+      };
+      return { ...current, sessions: [...current.sessions, newSession], updatedAt: new Date().toISOString() };
+    });
+  }
+
+  const lines = (primary?.text ?? "").split("\n");
 
   return (
     <section className="rounded-journal border border-journal-line bg-journal-surface p-5 shadow-sm">
       <div className="mb-4">
         <h2 className="text-xl font-bold">Three nice things</h2>
-        <p className="mt-1 text-sm text-warm-gray">{primary.promptText}</p>
+        <p className="mt-1 text-sm text-warm-gray">{primary?.promptText ?? prompts.find((prompt) => prompt.isEnabled)?.prompt ?? ""}</p>
       </div>
 
       <div className="grid gap-3">
@@ -391,7 +434,7 @@ function PromptPanel({
               onChange={(event) => {
                 const next = [...lines];
                 next[index] = event.target.value;
-                updateResponse(primary.id, trimTrailingBlankLines(next).join("\n"));
+                updatePrimaryText(trimTrailingBlankLines(next).join("\n"));
               }}
               rows={1}
               placeholder={["A small good thing", "Another nice moment", "One more, if it fits"][index]}
@@ -421,6 +464,23 @@ function PromptPanel({
             ))}
           </div>
         </details>
+      ) : null}
+
+      {otherSections.length > 0 ? (
+        <div className="mt-4 grid gap-3">
+          {otherSections.map(({ session, texts }) => (
+            <div key={session.id} className="rounded-2xl bg-journal-raised p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-warm-gray">
+                {(session.createdBy && memberNames[session.createdBy]) || "A household member"}&apos;s reflections
+              </p>
+              <ul className="mt-2 grid gap-1.5 text-sm leading-6 text-soft-ink">
+                {texts.map((text, index) => (
+                  <li key={index}>{text}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
       ) : null}
     </section>
   );
