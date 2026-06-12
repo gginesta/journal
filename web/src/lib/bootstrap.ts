@@ -260,15 +260,10 @@ async function createPhotoUrlMap(entries: EntryRow[]): Promise<Map<string, strin
   const urls = new Map<string, string>();
   if (!supabase || paths.length === 0) return urls;
 
-  const results = await Promise.all(
-    paths.map(async (path) => {
-      const { data } = await supabase.storage.from("journal-photos").createSignedUrl(path, 60 * 60 * 24 * 7);
-      return [path, data?.signedUrl ?? ""] as const;
-    })
-  );
+  const { data } = await supabase.storage.from("journal-photos").createSignedUrls(paths, 60 * 60 * 24 * 7);
 
-  for (const [path, signedUrl] of results) {
-    if (signedUrl) urls.set(path, signedUrl);
+  for (const result of data ?? []) {
+    if (result.path && result.signedUrl && !result.error) urls.set(result.path, result.signedUrl);
   }
   return urls;
 }

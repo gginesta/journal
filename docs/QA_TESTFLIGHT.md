@@ -5,7 +5,7 @@ Use this checklist for the consolidated Guided Gratitude Memory System beta. Run
 Record before testing:
 
 - Surface tested: Web demo / Web Supabase / TestFlight
-- App version/build number: web `0.2.10` or TestFlight marketing version/build:
+- App version/build number: web version from Settings > Beta or TestFlight marketing version/build:
 - Device model:
 - OS/browser version:
 - Tester:
@@ -20,7 +20,7 @@ Record before testing:
 - Confirm the homepage science section cites gratitude practice, savoring/noticing, photos and memory, and reminiscence/retrieval without clinical or medical claims.
 - Check the homepage on a phone viewport and confirm there is no horizontal overflow, clipped CTA text, or gray/broken hero imagery.
 - Confirm demo mode is not being used for real beta data.
-- Open Settings > Beta and confirm app version `0.2.10` is visible.
+- Open Settings > Beta and confirm the app version from `web/package.json` is visible.
 - Login with an email magic link.
 - Confirm the default personal workspace appears.
 - Create or open a household workspace.

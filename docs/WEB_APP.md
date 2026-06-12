@@ -2,7 +2,7 @@
 
 The web app lives in `web/` and is the active private-beta path for the consolidated Guided Gratitude Memory System. It is a real Next.js + Supabase app, not just a static prototype, and should be treated as the source of truth for shared household beta behavior.
 
-Current app version: `0.2.10`. The version comes from `web/package.json` and is shown in Settings > Beta for tester reports.
+The current app version comes from `web/package.json` and is shown in Settings > Beta for tester reports.
 
 For overall product and operational context, read `docs/PROJECT_CONTEXT.md` first. For the exact beta state, read `docs/CURRENT_STATUS.md`.
 
@@ -184,7 +184,7 @@ SUPABASE_THUMBNAILS_BUCKET=journal-thumbnails
 
 ## Beta QA
 
-- Confirm Settings > Beta shows app version `0.2.10`.
+- Confirm Settings > Beta shows the version from `web/package.json`.
 - Open `/` and confirm the science-backed homepage, research citations, privacy section, and demo/beta CTA render on desktop and mobile without horizontal overflow.
 - Login with email magic link.
 - Confirm default personal workspace appears.

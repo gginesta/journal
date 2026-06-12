@@ -70,6 +70,7 @@ import {
   type OnboardingSetup
 } from "@/lib/onboarding";
 import { addSuggestionToReflectionText, gratitudeGuideForEntry } from "@/lib/prompts";
+import { demoStorageFullMessage, writeDemoStateToStorage } from "@/lib/demo-storage";
 import { canMutateWorkspaceRole } from "@/lib/journal-sync-safety";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
@@ -171,10 +172,16 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
 
   useEffect(() => {
     if (initialData.mode !== "demo") return;
-    window.localStorage.setItem(
+    const result = writeDemoStateToStorage(
+      window.localStorage,
       storageKey,
       JSON.stringify({ entries, people, prompts, workspaces, workspaceMembers, reminders, activeWorkspaceId })
     );
+    if (!result.ok) {
+      setSaveError(result.message);
+      return;
+    }
+    setSaveError((current) => (current === demoStorageFullMessage ? null : current));
   }, [entries, people, prompts, workspaces, workspaceMembers, reminders, activeWorkspaceId, initialData.mode]);
 
   useEffect(() => {

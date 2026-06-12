@@ -14,7 +14,7 @@ The web beta also includes a public private-beta homepage at `/` that explains t
 
 ## Current Beta Version
 
-- Current web beta app version: `0.2.10`.
+- Current web beta app version: see `web/package.json` (shown in Settings > Beta).
 - The web package version is the app version source of truth and is visible in Settings > Beta for QA notes.
 - Manual QA should record this version when testing household sharing, Supabase sync safety, and photo handling.
 
