@@ -141,9 +141,10 @@ Documentation is a strength overall (15 current docs, ops runbooks, QA checklist
 ### Explicit non-goals (recommended NOT to do now)
 - **No pagination/virtualization framework** for lists — raise the 100-entry window pragmatically (P1) but don't build infinite-scroll infrastructure for a 2-user beta.
 - **No major version migrations** (Next 16, Tailwind 4, ESLint 10) — zero product payoff now, real regression risk.
-- **No iOS feature work or refactor** beyond the error-handling pass — it's not the beta path; revisit at TestFlight time.
+- **No iOS feature work or refactor** beyond the error-handling pass — it's not the beta path; revisit when TestFlight work starts (owner confirmed iOS is a 2026 goal, so the error pass is a hard pre-TestFlight gate).
 - **No external observability SaaS (Sentry etc.)** yet — structured console logging on Vercel is sufficient at this scale.
-- **No real async invitation flow** (emails, pending state) until the product decision in Open Questions is made.
+- **No field-level merge for conflicts** — the per-person-sections decision (M2-T6) plus a simple server-wins backstop makes CRDT-style merging unnecessary.
+- **No original-quality photo storage** — owner accepted compressed (canvas JPEG 0.82) as the archival format.
 - **No demo-mode localStorage encryption** — guard the quota crash (C3) and label demo as non-private; anything more fights the feature's purpose.
 
 ### Definition of done (measurable)
@@ -178,7 +179,7 @@ Statuses all `todo`. Effort: S < 2 h, M ≈ half-day, L ≈ 1–2 days, XL needs
 | M1-T1 | todo | Transactional per-entry sync via Postgres RPC | new migration (`sync_journal_entry` function), `web/src/app/api/journal/sync/route.ts:230-334` | Entry + nested rows applied in one transaction; induced mid-sync failure leaves prior server state intact (test from M0-T4 flips green); RPC is `SECURITY DEFINER`-hardened per existing house style or `security invoker` relying on RLS | L | Medium | M0-T4 |
 | M1-T2 | todo | Stale-write guard on entries | same RPC / route, `JournalApp.tsx` sync effect | Server rejects entry writes whose `updated_at` ≤ stored value with a 409; client refetches and surfaces "updated elsewhere" via SaveStatePill; two-tab manual QA passes | M | Medium | M1-T1 |
 | M1-T3 | todo | Runtime validation + size limits on sync payload | `sync/route.ts:29`, `journal-sync-safety.ts` (zod or hand-rolled guards to match house style) | Malformed payload → 400 (not 500); text fields length-capped; photo base64 capped (e.g. 8 MB); tests cover each rejection | M | Low | — |
-| M1-T4 | todo | Remove email enumeration from invite flow | `web/supabase/migrations/` (new), `202605230001:35-43`, members route | Unknown-email and known-email invites return indistinguishable responses to the caller; UI copy updated; gate noted in `docs/QA_TESTFLIGHT.md` equivalent for web | M | Low | — |
+| M1-T4 | todo | Remove email enumeration from invite flow (stopgap) | `web/supabase/migrations/` (new), `202605230001:35-43`, members route | Unknown-email and known-email invites return indistinguishable responses to the caller; UI copy updated. Superseded long-term by M2-T5 but ships first | S–M | Low | — |
 
 ### Milestone M2 — High-leverage
 
@@ -186,8 +187,10 @@ Statuses all `todo`. Effort: S < 2 h, M ≈ half-day, L ≈ 1–2 days, XL needs
 |---|---|---|---|---|---|---|---|
 | M2-T1 | todo | Split `JournalApp.tsx` into modules | `web/src/components/` (new: `views/TodayView.tsx`, `views/MemoriesView.tsx`, `views/CalendarView.tsx`, `views/InsightsView.tsx`, `views/SettingsView.tsx`, `onboarding/`, `household/`, hooks) | `JournalApp.tsx` ≤ 500 lines; no behavior change (e2e suite green); no file > 800 lines | XL → break into one PR per view | Medium | M0-T1 (e2e in CI first) |
 | M2-T2 | todo | Delta sync: send only dirty entries | `JournalApp.tsx` sync effect (:239-298), sync route | Payload contains only entries changed since last ack; payload size constant w.r.t. journal size in a 200-entry fixture; conflict guard (M1-T2) still holds | M | Medium | M1-T1, M1-T2 |
-| M2-T3 | todo | Lift the 100-entry bootstrap cap | `web/src/lib/bootstrap.ts:179`, calendar/memories data paths | Memory Lane reaches 1-year lookbacks with a 400-entry fixture; initial load fetches a windowed set + background fill or higher cap with measured load time < 2 s | M | Medium | M2-T2 preferred |
+| M2-T3 | todo | Lift the 100-entry bootstrap cap (12-month window) | `web/src/lib/bootstrap.ts:179`, calendar/memories data paths | Last 12 months load eagerly, older entries fetch on demand; Memory Lane reaches 1-year lookbacks with a 400-entry fixture; initial load < 2 s | M | Medium | M2-T2 preferred |
 | M2-T4 | todo | Server-side error logging for sync/API failures | API routes, `bootstrap.ts` | Every 4xx/5xx logs a structured line (route, workspace, error class — no journal content) visible in Vercel logs; documented in `docs/WEB_APP.md` | S | Low | — |
+| M2-T5 | todo | Pending-invite consent flow | new migration (use `invitation_state='invited'`), `202605230001`, members routes, `JournalApp.tsx` household panel | Invitee sees pending invite on next sign-in and must accept before membership activates; RLS already excludes non-accepted members (no policy change needed); unknown emails get the same caller response as known ones (closes S2 fully); e2e covers invite→accept→shared-workspace | L | Medium | M1-T4 |
+| M2-T6 | todo | Per-person day sections | new migration (`created_by` on `journal_sessions`), sync route/RPC, Today + entry detail views | Each member's responses live in their own session; both partners editing the same day never touch the same response rows; entry detail shows both sections attributed; conflict guard (M1-T2) remains the backstop for shared fields (mood, photos, tags) | L | Medium | M1-T1, M1-T2, M2-T1 |
 
 ### Milestone M3 — Quality & polish
 
@@ -195,7 +198,7 @@ Statuses all `todo`. Effort: S < 2 h, M ≈ half-day, L ≈ 1–2 days, XL needs
 |---|---|---|---|---|---|---|---|
 | M3-T1 | todo | Batch photo URL signing | `bootstrap.ts:262-268` | Single `createSignedUrls` call per bucket; page load makes ≤ 2 storage API calls | S | Low | — |
 | M3-T2 | todo | Single source of truth for app version | `README.md:59,72`, `docs/PROJECT_CONTEXT.md:65`, docs guidance | Docs reference Settings > Beta / package.json instead of restating the number; stale `0.2.10` mentions gone | S | Low | — |
-| M3-T3 | todo | iOS error-handling pass | `JournalStore.swift` (16 `try?` sites), `PhotoStore.swift`, views | Persistence failures surface a user-visible alert or logged error; zero bare `try? modelContext.save()` remaining | M | Low | — |
+| M3-T3 | todo | iOS error-handling pass (pre-TestFlight gate) | `JournalStore.swift` (16 `try?` sites), `PhotoStore.swift`, views | Persistence failures surface a user-visible alert or logged error; zero bare `try? modelContext.save()` remaining. Blocking for TestFlight per owner decision | M | Low | — |
 | M3-T4 | todo | Move photo compression off main thread | `JournalApp.tsx:3713-3738` (post-split: photo lib) | `createImageBitmap` + `OffscreenCanvas`/worker; UI stays interactive compressing a 12 MP image | M | Low | M2-T1 |
 | M3-T5 | todo | Dependency hygiene pass | `web/package.json` | `@supabase/ssr` → 0.12.x, minor bumps applied; audit clean; e2e green | S–M | Low | M0-T1 |
 | M3-T6 | todo | SwiftLint in iOS CI | `.github/workflows/ios-ci.yml` | Lint step runs and gates iOS PRs | S | Low | — |
@@ -213,13 +216,13 @@ Statuses all `todo`. Effort: S < 2 h, M ≈ half-day, L ≈ 1–2 days, XL needs
 
 ---
 
-## 6. Open Questions (need a human decision)
+## 6. Open Questions — RESOLVED (owner decisions, 2026-06-12)
 
-1. **Invitation consent:** should invitees get a pending-invite step (email + accept) before a workspace owner can see them as members, or is instant-add the intended product behavior? Determines M1-T4's shape and whether `invitation_state='invited'` lives or dies.
-2. **History scale target:** what's the expected journal size at 1 year (~365 entries, ~700 photos)? Confirms how aggressive M2-T3 needs to be and whether full-archive search stays client-side.
-3. **iOS timeline:** is TestFlight a 2026 goal? If not, consider disabling the macOS CI job (it burns paid minutes on every `main` push) until the scaffold reactivates.
-4. **Conflict policy:** when both partners edit the same day's entry, is "server wins + notify" acceptable, or do you want field-level merge (e.g., per-prompt-response)? M1-T2 sketch assumes the former.
-5. **Original photo retention:** originals upload at client-compressed quality (canvas JPEG 0.82). Is that the archival quality you want for a memory product, or should originals be stored unrecompressed?
+1. **Invitation consent → Add pending-invite flow.** Invitees must accept before joining a workspace; `invitation_state='invited'` becomes a real state. The immediate email-enumeration fix (M1-T4) stays as a security stopgap; the full consent flow is new task **M2-T5**.
+2. **History scale target → Daily personal use (~400 entries/yr).** M2-T3 scoped to a windowed load: last 12 months eager, older on demand; client-side search stays.
+3. **iOS timeline → Yes, TestFlight this year.** iOS CI stays as-is; the iOS error-handling pass (M3-T3) is a hard pre-TestFlight gate, not optional polish.
+4. **Conflict policy → Per-person sections.** Each household member writes their own session/responses for a day, structurally avoiding most same-row conflicts (new task **M2-T6**, building on the existing `journal_sessions` model). The stale-write guard (M1-T2) ships first as the backstop, using simple server-wins + notify for whatever rows remain shared (mood, photos, tags).
+5. **Photo retention → Compressed is fine.** Canvas JPEG at 0.82 quality is the accepted archival quality; no task added.
 
 ---
 
