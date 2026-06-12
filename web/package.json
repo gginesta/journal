@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "regenerate:thumbnails": "node scripts/regenerate-thumbnails.mjs",
-    "test": "vitest run tests/auth-callback.test.ts tests/auth-email-copy.test.ts tests/demo-storage.test.ts tests/early-memory-lane.test.ts tests/first-memory-celebration.test.ts tests/journal-logic.test.ts tests/journal-sync-safety.test.ts tests/onboarding.test.ts tests/shared-journal-copy.test.ts --environment node --globals",
+    "test": "vitest run tests/auth-callback.test.ts tests/auth-email-copy.test.ts tests/demo-storage.test.ts tests/early-memory-lane.test.ts tests/first-memory-celebration.test.ts tests/journal-logic.test.ts tests/journal-sync-route.test.ts tests/journal-sync-safety.test.ts tests/journal-sync-validation.test.ts tests/onboarding.test.ts tests/shared-journal-copy.test.ts --environment node --globals",
     "pretest:e2e": "npm run build",
     "test:e2e": "node scripts/run-e2e.mjs"
   },

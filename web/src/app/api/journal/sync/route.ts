@@ -1,16 +1,9 @@
 import { NextResponse } from "next/server";
 import type { JournalEntry, PersonTag, PromptTemplate, ReminderPreferences } from "@/types/journal";
 import { canMutateWorkspaceRole, computePersonTagDeletions, isSafeWorkspaceStoragePath, parseImageDataUrl } from "@/lib/journal-sync-safety";
+import { validateSyncPayload } from "@/lib/journal-sync-validation";
 import { makePhotoThumbnail } from "@/lib/photo-thumbnails";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-type SyncPayload = {
-  workspaceId: string;
-  people: PersonTag[];
-  prompts: PromptTemplate[];
-  reminders: ReminderPreferences;
-  entries: JournalEntry[];
-};
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServerClient();
@@ -26,10 +19,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   }
 
-  const payload = (await request.json()) as SyncPayload;
-  if (!payload.workspaceId) {
-    return NextResponse.json({ error: "workspaceId is required" }, { status: 400 });
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Sync payload must be valid JSON" }, { status: 400 });
   }
+
+  const validation = validateSyncPayload(body);
+  if (!validation.ok) {
+    return NextResponse.json({ error: validation.message }, { status: 400 });
+  }
+  const payload = validation.payload;
 
   const access = await getWorkspaceMutationAccess(payload.workspaceId, user.id);
   if (!access.ok) {

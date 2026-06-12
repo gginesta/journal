@@ -1674,6 +1674,7 @@ function PhotoHero({
                     {index === 0 ? "Cover caption" : "Second photo caption"}
                     <input
                       value={photo.caption}
+                      maxLength={300}
                       onChange={(event) => updateCaption(photo.id, event.target.value)}
                       placeholder={index === 0 ? "What should this photo remember?" : "Add a small note"}
                       disabled={!canEdit}
