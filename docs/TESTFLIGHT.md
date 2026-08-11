@@ -54,7 +54,7 @@ Use this checklist to prepare the first private iPhone beta for the owner and sp
 - There is no custom account backend and no shared public journal data.
 - Photos are imported into app-local storage; testers should still avoid using irreplaceable-only photos during the first beta.
 - People tags are private labels, not contacts or social profiles.
-- Premium and StoreKit surfaces are scaffolded; do not treat purchase behavior as production-ready in this beta.
+- Premium/paywall UI is hidden for the beta behind `EntitlementService.showPremiumUI` (nothing is gated and the paywall shows no StoreKit price — an App Review rejection risk). Re-enable it together with the `.storekit` configuration when gating actually lands.
 - App Store privacy labels and legal links are not final for App Store submission.
 
 ## Spouse Testing Flow

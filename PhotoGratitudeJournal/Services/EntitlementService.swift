@@ -4,6 +4,13 @@ import StoreKit
 @MainActor
 @Observable
 final class EntitlementService {
+    // TestFlight beta gate (improvement plan section 6.4, P3): nothing is
+    // actually gated by Premium and the paywall shows no StoreKit price, so
+    // every Premium/paywall surface is hidden for the beta. Flip this back on
+    // together with the .storekit configuration when gating lands (milestone
+    // 0.7.0) — never before, or App Review will see a priceless paywall.
+    static let showPremiumUI = false
+
     static let yearlyProductID = "photo.gratitude.journal.premium.yearly"
 
     var state: EntitlementState = .loading

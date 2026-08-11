@@ -68,6 +68,50 @@ final class SpecConformanceTests: XCTestCase {
         }
     }
 
+    // MARK: - SPEC-7 experience-mode capability matrix
+
+    func testExperienceModeFeatureUniverseMatchesFixture() throws {
+        let fixture: ExperienceModeFixture = try loadFixture(named: "experience-mode")
+
+        XCTAssertEqual(
+            ExperienceFeature.allCases.map(\.rawValue).sorted(),
+            fixture.featureKeys.sorted()
+        )
+    }
+
+    func testExperienceModeSimpleFeatureSetMatchesFixture() throws {
+        let fixture: ExperienceModeFixture = try loadFixture(named: "experience-mode")
+
+        XCTAssertEqual(
+            ExperienceModeMap.simpleFeatures.map(\.rawValue).sorted(),
+            fixture.simpleFeatures.sorted()
+        )
+    }
+
+    func testExperienceModeFullShowsEveryFeature() {
+        for feature in ExperienceFeature.allCases {
+            XCTAssertTrue(ExperienceModeMap.isVisible(feature, in: .full), feature.rawValue)
+        }
+    }
+
+    func testExperienceModeSimpleShowsExactlyTheFixtureFeatures() throws {
+        let fixture: ExperienceModeFixture = try loadFixture(named: "experience-mode")
+
+        let visibleInSimple = ExperienceFeature.allCases
+            .filter { ExperienceModeMap.isVisible($0, in: .simple) }
+            .map(\.rawValue)
+            .sorted()
+
+        XCTAssertEqual(visibleInSimple, fixture.simpleFeatures.sorted())
+    }
+
+    func testExperienceModeVisibleTabsMatchFixture() throws {
+        let fixture: ExperienceModeFixture = try loadFixture(named: "experience-mode")
+
+        XCTAssertEqual(ExperienceModeMap.visibleTabs(in: .simple).map(\.rawValue), fixture.tabs.simple)
+        XCTAssertEqual(ExperienceModeMap.visibleTabs(in: .full).map(\.rawValue), fixture.tabs.full)
+    }
+
     // MARK: - Helpers
 
     private func loadFixture<T: Decodable>(named name: String) throws -> T {
@@ -122,6 +166,17 @@ private struct StreakFixture: Decodable {
     }
 
     let cases: [Case]
+}
+
+private struct ExperienceModeFixture: Decodable {
+    struct Tabs: Decodable {
+        let simple: [String]
+        let full: [String]
+    }
+
+    let featureKeys: [String]
+    let simpleFeatures: [String]
+    let tabs: Tabs
 }
 
 private struct MemoryLaneFixture: Decodable {

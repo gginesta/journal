@@ -8,6 +8,13 @@ struct MemoriesView: View {
     @State private var selectedPersonID: UUID?
     @State private var selectedContentFilter: MemoryContentFilter = .all
     @State private var searchText = ""
+    @AppStorage(ExperienceMode.storageKey) private var experienceModeRawValue = ExperienceMode.defaultMode.rawValue
+
+    // SPEC-7: person/content filters are a Full surface; search stays in both
+    // modes and still matches details and people text.
+    private var showsFilters: Bool {
+        ExperienceModeMap.isVisible(.memoriesFilters, in: ExperienceMode.fromStoredValue(experienceModeRawValue))
+    }
 
     private var photoEntries: [JournalEntry] {
         filteredEntries.filter { !$0.sortedPhotos.isEmpty }
@@ -19,8 +26,9 @@ struct MemoriesView: View {
 
     private var filteredEntries: [JournalEntry] {
         entries.filter { entry in
-            entryMatches(entry, personID: selectedPersonID) &&
-            selectedContentFilter.matches(entry) &&
+            // A lingering filter selection must not keep filtering invisibly
+            // once the filter bar is hidden in Simple.
+            (!showsFilters || (entryMatches(entry, personID: selectedPersonID) && selectedContentFilter.matches(entry))) &&
             entryMatchesSearch(entry)
         }
     }
@@ -45,14 +53,16 @@ struct MemoriesView: View {
                     )
                     .padding()
                 } else {
-                    PersonFilterBar(
-                        people: people,
-                        selectedPersonID: $selectedPersonID,
-                        selectedContentFilter: $selectedContentFilter,
-                        hasSearchText: !normalizedSearchText.isEmpty,
-                        resultCount: filteredEntries.count
-                    )
-                    .padding(.horizontal)
+                    if showsFilters {
+                        PersonFilterBar(
+                            people: people,
+                            selectedPersonID: $selectedPersonID,
+                            selectedContentFilter: $selectedContentFilter,
+                            hasSearchText: !normalizedSearchText.isEmpty,
+                            resultCount: filteredEntries.count
+                        )
+                        .padding(.horizontal)
+                    }
 
                     if filteredEntries.isEmpty {
                         EmptyStateView(

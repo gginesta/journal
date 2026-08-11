@@ -94,4 +94,6 @@ The Simple/Full toggle changes only which UI surfaces render. It never changes d
 
 **Worked example.** In Simple, the Calendar and Insights tabs do not render and Today hides the mood picker, people tags, and Little Details panel — but a Little Detail saved earlier in Full still appears in the entry detail modal and still matches Memories search. Switching Simple → Full restores every hidden surface with the stored data intact.
 
-Fixtures: `spec/fixtures/experience-mode.json` · Web: `isFeatureVisible`/`visibleTabs` in `web/src/lib/experience-mode.ts` · iOS: `Services/ExperienceMode.swift` (lands with the iOS parity wave).
+**iOS note.** iOS stores the mode in `@AppStorage("experienceMode")` and, like new web accounts, defaults to Simple — there are no shipped iOS installs to grandfather. Entry detail (`EntryDetailView`), including its edit mode, always shows everything stored in both modes.
+
+Fixtures: `spec/fixtures/experience-mode.json` · Web: `isFeatureVisible`/`visibleTabs` in `web/src/lib/experience-mode.ts` · iOS: `ExperienceModeMap` in `Services/ExperienceMode.swift`.

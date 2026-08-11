@@ -6,7 +6,7 @@ Last updated: 2026-08-11.
 
 Photo Gratitude Journal is in private web beta preparation. The current beta is functional and ready for Stephanie to test, but **deploying current `main` to production requires applying the pending Supabase migrations first** (see Pending Operator Actions below) — the sync route now depends on the `sync_journal_entry` RPC created by those migrations.
 
-The June 2026 audit cycle (`AUDIT.md`, `AUDIT_UX.md`) landed transactional sync, stale-write conflict guards, a pending-invite consent flow, per-person day sections, delta sync, archive paging, and a full accessibility/UX overhaul. The 2026-08 audit produced `docs/IMPROVEMENT_PLAN.md`, the current execution plan.
+The June 2026 audit cycle (`AUDIT.md`, `AUDIT_UX.md`) landed transactional sync, stale-write conflict guards, a pending-invite consent flow, per-person day sections, delta sync, archive paging, and a full accessibility/UX overhaul. The 2026-08 audit produced `docs/IMPROVEMENT_PLAN.md`, whose execution waves 0-5 have all landed on branch `claude/project-audit-plan-gl1g72`: web hygiene/perf/trust/reminders, the Simple/Full experience toggle on web, and the iOS P0 foundations + P1 logic parity + P2 experience parity + P3 premium-hidden TestFlight prep. The iOS app is code-complete for the first TestFlight build; only owner-side steps remain (signing team, manual QA, archive/upload — see Pending Operator Actions).
 
 The active app version is:
 
@@ -53,6 +53,8 @@ https://journal-gginestas-projects.vercel.app
 - Client delta sync and on-demand archive paging (12-month eager window + anniversary slices).
 - Sync payload runtime validation with size caps; batched signed photo URLs; structured server logging.
 - Accessibility pass: zero axe violations across 8 surfaces, WCAG AA chip colors, 44 px touch targets, ritual-first mobile Today.
+- Simple/Full experience toggle (SPEC-7) on web and iOS, driven by the shared `spec/fixtures/experience-mode.json` fixture with conformance tests on both platforms.
+- iOS experience parity (Wave 5): Gratitude Guide (deterministic mood-aware starters, wire-format parity with web), early Memory Lane milestone guidance, first-memory celebration, entry editing from `EntryDetailView` (photos, responses, people, details, mood), and Premium/paywall UI hidden for the beta behind `EntitlementService.showPremiumUI`.
 
 ## What Is Deployed
 
@@ -143,6 +145,13 @@ These require the Supabase dashboard (owner access) and block deploying current 
 2. Apply the magic-link email template per `docs/SUPABASE_AUTH_EMAILS.md` if not already done.
 3. For Web Push reminders: generate VAPID keys (`node web/scripts/generate-vapid-keys.mjs`) and set `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET`, and `SUPABASE_SERVICE_ROLE_KEY` in Vercel (see docs/WEB_APP.md "Reminders / Web Push").
 4. Record completion here (move each item to "Applied and verified" below).
+
+For the iOS TestFlight build (needs the owner's Mac + Apple account; the code side of waves 4-5 is done):
+
+1. Set the Apple team id in the four empty `DEVELOPMENT_TEAM = "";` entries in `PhotoGratitudeJournal.xcodeproj/project.pbxproj` (see `docs/TESTFLIGHT.md`).
+2. Confirm iOS CI is green on this branch (`xcodebuild test` on macos-15 runs the SPEC conformance tests, including the new SPEC-7 experience-mode tests — this container cannot run Xcode).
+3. Run the manual QA pass per `docs/QA_TESTFLIGHT.md` (Premium surfaces should be unreachable; the beta ships with them hidden).
+4. Bump `CURRENT_PROJECT_VERSION`, archive, upload, and smoke-test per `docs/TESTFLIGHT.md`, then invite Stephanie.
 
 ## Supabase Status
 

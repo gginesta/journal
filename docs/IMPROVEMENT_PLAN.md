@@ -252,6 +252,8 @@ This mechanism would have caught all five known drifts.
 | **W5 — iOS P2+P3 (≈1–2 wks)** | §6.4 incl. Simple/Full port | TestFlight household beta (solo journals) |
 | Continuous | §3 Tiers 2–3 as filler between waves | |
 
+**Execution status (2026-08-11):** waves 0–5 have all landed on `claude/project-audit-plan-gl1g72` (commits `1b6be4e` W0, `9f5f52a` W1, `4f24105`/`481243c`/`3985c3e` W2, `3fe7428` W3, `f746ee1` W4, and the Wave 5 commit for iOS P2 experience parity — Gratitude Guide, early Memory Lane copy, first-memory celebration, entry editing, Simple/Full port with the SPEC-7 iOS conformance test — plus P3's premium-UI hide). Remaining work is operator-side only: the pending Supabase migrations/env vars above, and the iOS signing + manual QA + archive/upload steps in `docs/CURRENT_STATUS.md` and `docs/TESTFLIGHT.md`.
+
 ### 7.2 Verification
 
 - **Per-wave gates:** existing CI (lint/typecheck/78 unit/20 E2E web; SwiftLint + `xcodebuild test` iOS) stays green; new features add tests in the same PR (toggle: unit tests on `experience-mode.ts` + one Playwright pass per mode; push: a route test + manual device check).
