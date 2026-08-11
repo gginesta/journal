@@ -1,15 +1,17 @@
 # Current Status
 
-Last updated: 2026-06-07.
+Last updated: 2026-08-11.
 
 ## Summary
 
-Photo Gratitude Journal is in private web beta preparation. The current beta is functional, deployed, and ready for Stephanie to test after the final production magic-link email template is applied or accepted as a non-blocking follow-up.
+Photo Gratitude Journal is in private web beta preparation. The current beta is functional and ready for Stephanie to test, but **deploying current `main` to production requires applying the pending Supabase migrations first** (see Pending Operator Actions below) — the sync route now depends on the `sync_journal_entry` RPC created by those migrations.
+
+The June 2026 audit cycle (`AUDIT.md`, `AUDIT_UX.md`) landed transactional sync, stale-write conflict guards, a pending-invite consent flow, per-person day sections, delta sync, archive paging, and a full accessibility/UX overhaul. The 2026-08 audit produced `docs/IMPROVEMENT_PLAN.md`, the current execution plan.
 
 The active app version is:
 
 ```text
-0.2.11
+0.2.12
 ```
 
 The live URL is:
@@ -45,6 +47,12 @@ https://journal-gginestas-projects.vercel.app
 - App version visibility in Settings > Beta.
 - Mobile overflow regression checks.
 - Desktop/mobile Playwright E2E.
+- Transactional per-entry sync (`sync_journal_entry` RPC) with a stale-write conflict guard.
+- Per-person day sections for shared households (each member's reflections are their own).
+- Pending-invite consent flow (accept/decline banner, invites for emails without accounts).
+- Client delta sync and on-demand archive paging (12-month eager window + anniversary slices).
+- Sync payload runtime validation with size caps; batched signed photo URLs; structured server logging.
+- Accessibility pass: zero axe violations across 8 surfaces, WCAG AA chip colors, 44 px touch targets, ritual-first mobile Today.
 
 ## What Is Deployed
 
@@ -64,6 +72,15 @@ Routes:
 - `/auth/callback`: Supabase Auth callback
 
 ## What Was Recently Added
+
+Version `0.2.12` added (the June audit-execution work, recorded late):
+
+- transactional entry sync with stale-write conflict handling
+- pending-invite consent flow and a fix for the invite function that failed for every registered user
+- per-person day sections in shared households
+- delta sync, 12-month eager window, and archive paging
+- the full accessibility/UX overhaul (see `AUDIT_UX.md`)
+- SwiftLint in iOS CI; Playwright E2E in web CI
 
 Version `0.2.11` added:
 
@@ -111,12 +128,33 @@ Latest expected test state:
 - E2E tests: desktop and mobile pass.
 - Vercel: green on `main`.
 
+## Pending Operator Actions
+
+These require the Supabase dashboard (owner access) and block deploying current `main`:
+
+1. Apply the pending migrations from `web/supabase/migrations/`, in order, in the SQL editor:
+   - `202606070001_personalized_onboarding.sql` (confirm — likely applied with the 0.2.11 deploy, but unrecorded)
+   - `202606120001_transactional_entry_sync.sql` (**required** — the sync route calls its `sync_journal_entry` RPC)
+   - `202606120002_invite_without_account_probe.sql` (**required** — fixes invites of registered users)
+   - `202606130001_pending_invites.sql`
+   - `202606130002_per_person_sessions.sql`
+2. Apply the magic-link email template per `docs/SUPABASE_AUTH_EMAILS.md` if not already done.
+3. Record completion here (move each item to "Applied and verified" below).
+
 ## Supabase Status
 
 Applied and verified:
 
 - `202605210001_initial_schema.sql`
 - `202605230001_workspace_member_invites.sql`
+
+Written in the repo but **not yet recorded as applied** (see Pending Operator Actions):
+
+- `202606070001_personalized_onboarding.sql`
+- `202606120001_transactional_entry_sync.sql`
+- `202606120002_invite_without_account_probe.sql`
+- `202606130001_pending_invites.sql`
+- `202606130002_per_person_sessions.sql`
 
 Verified invite function state:
 
@@ -151,7 +189,8 @@ Storage:
 
 - Apply the polished Supabase Auth email template if not already done.
 - Add more formal tester feedback capture.
-- Improve conflict handling for simultaneous household edits.
+
+Resolved since last update: conflict handling for simultaneous household edits shipped twice over (stale-write guard + per-person day sections).
 
 ## Stephanie Test Script
 
@@ -166,7 +205,7 @@ Ask Stephanie to test on iPhone first.
 1. Open the URL.
 2. Confirm the homepage feels clear and trustworthy.
 3. Sign in with magic link.
-4. Confirm Settings > Beta shows `0.2.11`.
+4. Confirm Settings > Beta shows the current version from `web/package.json`.
 5. Complete onboarding as family/kids, partner, or whichever feels natural.
 6. Add one photo or one line in Today.
 7. Confirm the first-memory celebration appears.

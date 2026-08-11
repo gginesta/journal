@@ -26,7 +26,7 @@ For web beta releases:
 - Confirm Settings > Beta shows the package version in the running app.
 - Update the milestone docs and QA notes with the tested version.
 
-Current web beta version: `0.2.11`.
+The current web beta version is the `version` field in `web/package.json` — do not restate it in docs.
 
 ## TestFlight Builds
 
@@ -40,7 +40,8 @@ Current web beta version: `0.2.11`.
 ## Branches
 
 - `main`: stable trunk.
-- `codex/<topic>`: implementation branches owned by Codex.
+- `claude/<topic>`: implementation branches owned by Claude sessions (the current convention; CI runs on these).
+- `codex/<topic>`: implementation branches owned by Codex (CI also runs on these).
 - `release/<version>`: optional stabilization branch for App Store release candidates.
 
 ## Workflow

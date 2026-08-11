@@ -15,7 +15,7 @@ The app is not a social network, camera roll clone, clinical mental-health tool,
 ## Current Source Of Truth
 
 - Current active beta: `web/`, a Next.js + Supabase + Vercel app.
-- Current web beta version: `0.2.10`.
+- Current web beta version: the `version` field in `web/package.json` (shown in Settings > Beta). Do not hand-copy it into docs.
 - Production URL: `https://journal-gginestas-projects.vercel.app`.
 - Production deploys from `main` with Vercel project root set to `web`.
 - Supabase is the current backend for the web beta.
@@ -30,6 +30,8 @@ The app is not a social network, camera roll clone, clinical mental-health tool,
 5. `docs/QA_TESTFLIGHT.md` for manual QA.
 6. `docs/ROADMAP.md` for milestones and next product work.
 7. `docs/SUPABASE_AUTH_EMAILS.md` before touching auth email copy.
+8. `docs/IMPROVEMENT_PLAN.md` for the current audit-driven execution plan (waves W0-W5).
+9. `AUDIT.md` and `AUDIT_UX.md` for the 2026-06 repository and UX audits, their findings, and execution logs. `AUDIT.md` also records owner decisions and operator actions.
 
 ## Product Principles To Preserve
 
@@ -59,14 +61,14 @@ The app is not a social network, camera roll clone, clinical mental-health tool,
 
 ## Web Commands
 
-From `web/`:
+From `web/` (use `npm.cmd` instead of `npm` on Windows PowerShell):
 
-```powershell
-npm.cmd run lint
-npm.cmd run typecheck
-npm.cmd test
-npm.cmd run build
-npm.cmd run test:e2e
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+npm run test:e2e
 ```
 
 The E2E suite runs Chromium desktop and mobile projects. It covers the public homepage, onboarding, first-memory celebration, Little Details, photo add/remove, Memories, and mobile overflow guards.
@@ -95,4 +97,4 @@ Stephanie can test the web beta once she receives the live URL and magic-link em
 5. Stephanie refreshes/logs back in and confirms she can access the shared workspace.
 6. Both create and view shared memories.
 
-Track feedback against app version `0.2.10`.
+Track feedback against the app version shown in Settings > Beta (sourced from `web/package.json`).

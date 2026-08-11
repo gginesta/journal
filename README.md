@@ -21,7 +21,7 @@ This repository contains the first iOS app scaffold and a production web beta:
 - Unit tests for completion rules, streaks, Memory Lane matching, and prompt defaults.
 - GitHub Actions workflow for macOS simulator tests.
 
-The web beta is deployed and ready for private household testing. The iOS code is ready for first validation on a Mac with Xcode, but this Windows workspace cannot run `xcodebuild`, `xcrun`, or iOS Simulator.
+The web beta is deployed and ready for private household testing. The iOS code is ready for first validation on a Mac with Xcode; development sessions typically run on Windows or Linux, where `xcodebuild`, `xcrun`, and the iOS Simulator are unavailable — iOS validation currently happens through the macOS GitHub Actions workflow.
 
 For the fastest orientation, read [Project Context](docs/PROJECT_CONTEXT.md) and [Current Status](docs/CURRENT_STATUS.md). Future Codex sessions should start with [AGENTS.md](AGENTS.md).
 
@@ -60,11 +60,11 @@ The browser app lives in `web/` and is the fastest way to test the product from 
 
 The web root `/` is the public private-beta homepage. It explains the product loop, cites the evidence-informed gratitude/savoring/photo-memory/reminiscence basis, and links into `/app`. The actual journal experience remains at `/app`; authenticated beta sign-in remains at `/login`.
 
-```powershell
+```bash
 cd web
-copy .env.example .env.local
-npm.cmd install
-npm.cmd run dev
+cp .env.example .env.local   # PowerShell: copy .env.example .env.local
+npm install                  # PowerShell: npm.cmd install
+npm run dev                  # PowerShell: npm.cmd run dev
 ```
 
 Keep `NEXT_PUBLIC_DEMO_MODE=true` for local UX review without Supabase. For the private shared-family beta, deploy `web/` on Vercel, apply the Supabase migration in `web/supabase/migrations`, and use [Web App Operations](docs/WEB_APP.md) as the setup checklist.
@@ -108,6 +108,9 @@ The current app schedules local notifications only; remote push notifications ar
 
 - [Codex Handoff Guide](AGENTS.md)
 - [Documentation Index](docs/INDEX.md)
+- [Improvement Plan 2026-08](docs/IMPROVEMENT_PLAN.md)
+- [Repository Audit 2026-06](AUDIT.md)
+- [UX Audit 2026-06](AUDIT_UX.md)
 - [Project Context](docs/PROJECT_CONTEXT.md)
 - [Current Status](docs/CURRENT_STATUS.md)
 - [Product Requirements](docs/PRD.md)

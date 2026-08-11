@@ -2,7 +2,41 @@
 
 All notable changes to Photo Gratitude Journal will be documented here.
 
-## [Unreleased]
+## [0.2.12] - 2026-08-11
+
+Catch-up release recording the 2026-06-11 to 2026-06-13 audit-execution work (see `AUDIT.md` and `AUDIT_UX.md` for the full findings and execution logs).
+
+### Changed
+
+- Restructured mobile Today after the UX audit: ritual-first layout at 4.2 viewports deep (down from 6.5), with Pick-me-up, Gratitude Guide, and discovery content behind a "More for today" disclosure shown after completion. The duplicate "Today's prompts" snapshot is now desktop-only.
+- Darkened the brand rose from `#c7455c` to `#ad3145` and reworked person-tag chip colors so all text meets WCAG AA contrast (`web/src/lib/tag-colors.ts`).
+- Replaced the whole-journal sync payload with per-entry delta sync: only entries whose content changed since the last server acknowledgement are posted.
+- Journal bootstrap now eagerly loads the last 12 months plus anniversary windows (instead of a silent 100-entry cap), with older memories loaded on demand through `GET /api/journal/entries` paging.
+- Split the 3,700-line `JournalApp` component into per-view modules under `web/src/components/journal/`.
+- Text-only memories render a text-first card instead of an oversized photo placeholder; Memories stat pills sit in a single row on mobile; photo guidance retires after the first kept photo.
+
+### Fixed
+
+- Entry sync is now transactional: a single `sync_journal_entry` RPC replaces the delete-then-reinsert sequence, so a partial failure can no longer destroy entry data.
+- Concurrent household edits are guarded: syncs carry a `base_updated_at` baseline and stale writes return a conflict surfaced inline on Today instead of silently clobbering the other member's changes.
+- Fixed the workspace invite function, which failed for every registered user due to an ambiguous column reference — the household invite flow could never have completed before this fix.
+- Removed the account-existence oracle from invites: inviting a registered and an unregistered email now return identical responses.
+- Guarded demo-mode localStorage writes against quota errors so a full disk no longer crashes the app.
+- Labeled all journaling textareas, Settings inputs, and selects for assistive tech; onboarding sits in a labeled dialog landmark; all touch targets meet 44 px. Axe scans across 8 surfaces report zero violations.
+- Surfaced iOS persistence failures to the user instead of silently swallowing them (`try?` cleanup), and moved iOS photo compression off the main thread.
+
+### Added
+
+- Pending-invite consent flow: invited members now see an accept/decline banner instead of being silently added, backed by a `workspace_invites` table for emails without accounts.
+- Per-person day sections: each household member writes their own reflections for a shared day; sync only rewrites the caller's own sessions, and other members' sections render read-only.
+- Runtime validation and size caps for sync payloads.
+- Batched signed-URL creation for photo previews (one Storage call per page load).
+- Structured server-side logging for API failures.
+- Regression tests for the sync route (12 tests), sync validation (8 tests), and a local Postgres harness that applies all migrations and exercises the sync RPC end to end.
+- SwiftLint in iOS CI; Playwright E2E now runs in web CI on `main`, `claude/**`, and `codex/**` branches.
+- `docs/IMPROVEMENT_PLAN.md`: the 2026-08 full-project audit and improvement plan (UX, performance, Simple/Full mode, iPhone path).
+
+## [0.2.11] - 2026-06-07
 
 ### Changed
 

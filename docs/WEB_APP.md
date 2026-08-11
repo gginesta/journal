@@ -54,21 +54,24 @@ Demo mode stores changes in browser local storage. This is only for UX review an
 
 ## Supabase Sync Behavior
 
-- Authenticated users load journal data through server-side Supabase queries.
-- Edits to the active workspace are debounced and posted to `/api/journal/sync`.
-- The sync route upserts people tags, prompt templates, reminder preferences, entries, sessions, prompt responses, entry people links, Little Details, and per-detail people links.
+- Authenticated users load journal data through server-side Supabase queries. Bootstrap eagerly loads the last 12 months plus anniversary windows; older entries load on demand through `GET /api/journal/entries` paging.
+- Edits to the active workspace are debounced and posted to `/api/journal/sync`. The client sends only dirty entries (delta sync): an entry is included only when its content differs from what the server last acknowledged.
+- Each entry is written through the transactional `public.sync_journal_entry` RPC (`202606120001` migration), which replaces the old delete-then-reinsert sequence — a partial failure can no longer destroy entry data. The RPC is `SECURITY INVOKER`, so RLS still applies.
+- Concurrent-edit safety: each entry carries a `base_updated_at` baseline. If another member changed the entry since, the server returns it as stale instead of clobbering, and Today shows an inline "changed on another device" notice.
+- Per-person day sections (`202606130002`): each member's `journal_sessions` rows are owned via `created_by`; sync only deletes/rewrites the caller's own (or legacy unowned) sessions, and other members' sections render read-only.
+- Sync payloads are validated at runtime with size caps before any write.
 - Browser-selected photos are uploaded from compressed local previews into private Supabase Storage paths under `<workspace-id>/<local-date>/...`.
-- Photo metadata is written only after Storage upload succeeds, and future page loads use signed URLs for private photo previews.
+- Photo metadata is written only after Storage upload succeeds, and page loads use batched signed URLs for private photo previews.
 - Workspace creation uses the secured `public.create_workspace` database function through `/api/workspaces`.
 - Delete workspace entries uses `/api/journal/delete-workspace-entries` and relies on RLS plus cascade deletes for child rows.
-- Household invitation/member-management lives in Settings. Owners can invite existing signed-in users by email, assign roles, change roles, and remove non-self members.
+- Household invitation/member-management lives in Settings. Owners can invite by email (registered or not — both return identical responses, closing the account-existence probe), assign roles, change roles, and remove non-self members. Invitees see an accept/decline banner (`202606130001` pending-invite consent flow) rather than being silently added.
 
 ## Sync Safety Rules
 
 - In Supabase mode, server data is authoritative. Demo localStorage must not restore over authenticated workspace data.
 - Test demo mode and Supabase mode in separate clean browser profiles when possible.
 - Before testing a production-like account, clear stale demo data or use a browser profile that has never run demo mode.
-- Two accepted members editing the same workspace should be treated as a beta risk area until conflict handling is more granular; record which account, role, entry date, and browser performed each edit.
+- Concurrent household edits are now guarded (stale-write baseline + per-person sessions), but when QA-testing simultaneous edits still record which account, role, entry date, and browser performed each edit so any conflict report is reproducible.
 - Photo metadata should appear only after the private Storage upload succeeds.
 - Signed photo URLs should be treated as temporary previews; do not copy them into product data or docs as stable assets.
 
@@ -103,15 +106,15 @@ Demo mode stores changes in browser local storage. This is only for UX review an
   - Workspace switching, prompt editing, people tags, reminders, export, delete controls, and sign out remain understandable in both demo and Supabase modes.
   - Workspace copy reflects solo, partner, family, or custom journal contexts without making family use mandatory.
 
-## Windows Local Setup
+## Local Setup
 
-From PowerShell:
+From a shell (on Windows PowerShell, use `npm.cmd` and `copy` instead of `npm` and `cp`):
 
-```powershell
+```bash
 cd web
-copy .env.example .env.local
-npm.cmd install
-npm.cmd run dev
+cp .env.example .env.local
+npm install
+npm run dev
 ```
 
 For local UX review without a Supabase project, keep `NEXT_PUBLIC_DEMO_MODE=true` in `web/.env.local`.
@@ -132,9 +135,17 @@ Do not put `SUPABASE_SERVICE_ROLE_KEY` in browser-readable code. It can exist in
 ## Supabase Private Beta Setup
 
 1. Create a Supabase project for the private beta.
-2. Run `web/supabase/migrations/202605210001_initial_schema.sql` in the Supabase SQL editor or through the Supabase CLI.
-3. Run `web/supabase/migrations/202605230001_workspace_member_invites.sql` so owner-managed household invites can look up existing signed-in users safely.
-4. Confirm the migrations created private Storage buckets:
+2. Run **all** migrations from `web/supabase/migrations/` in filename order in the Supabase SQL editor or through the Supabase CLI. As of this writing that is:
+   1. `202605210001_initial_schema.sql`
+   2. `202605230001_workspace_member_invites.sql`
+   3. `202606070001_personalized_onboarding.sql`
+   4. `202606120001_transactional_entry_sync.sql` (required — the sync route calls its `sync_journal_entry` RPC)
+   5. `202606120002_invite_without_account_probe.sql`
+   6. `202606130001_pending_invites.sql`
+   7. `202606130002_per_person_sessions.sql`
+
+   The app will not sync entries against a database missing the later migrations. Check the directory for migrations newer than this list.
+3. Confirm the migrations created private Storage buckets:
    - `journal-photos`
    - `journal-thumbnails`
 4. In Authentication, enable email magic links.
@@ -225,15 +236,14 @@ SUPABASE_THUMBNAILS_BUCKET=journal-thumbnails
 
 ## Verification Commands
 
-From PowerShell:
+From `web/` (use `npm.cmd` on Windows PowerShell):
 
-```powershell
-cd web
-npm.cmd run lint
-npm.cmd run typecheck
-npm.cmd test
-npm.cmd run build
-npm.cmd run test:e2e
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+npm run test:e2e
 ```
 
-For Supabase, apply the migration to a fresh beta project first. Then test the owner/editor/viewer matrix with real authenticated users before reusing the migration in production.
+For Supabase, apply all migrations to a fresh beta project first. Then test the owner/editor/viewer matrix with real authenticated users before reusing the migrations in production. A local Postgres harness at `web/supabase/tests/run-local-validation.sh` applies every migration in order and exercises the sync RPC end to end.
