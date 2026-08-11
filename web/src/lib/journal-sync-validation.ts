@@ -107,7 +107,8 @@ function isReminderPreferences(value: unknown): value is ReminderPreferences {
     cadences.has(value.cadence as RitualCadence) &&
     typeof value.remindersEnabled === "boolean" &&
     isText(value.eveningTime, 8) &&
-    isText(value.morningTime, 8)
+    isText(value.morningTime, 8) &&
+    (value.timezone === undefined || value.timezone === null || isText(value.timezone, 64))
   );
 }
 

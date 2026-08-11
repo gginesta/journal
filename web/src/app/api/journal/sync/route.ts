@@ -177,7 +177,8 @@ async function upsertReminders(supabase: SupabaseServerClient, workspaceId: stri
       cadence: reminders.cadence,
       reminders_enabled: reminders.remindersEnabled,
       evening_time: reminders.eveningTime,
-      morning_time: reminders.morningTime
+      morning_time: reminders.morningTime,
+      timezone: reminders.timezone ?? null
     },
     { onConflict: "workspace_id" }
   );

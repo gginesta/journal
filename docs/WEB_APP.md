@@ -143,6 +143,7 @@ Do not put `SUPABASE_SERVICE_ROLE_KEY` in browser-readable code. It can exist in
    5. `202606120002_invite_without_account_probe.sql`
    6. `202606130001_pending_invites.sql`
    7. `202606130002_per_person_sessions.sql`
+   8. `202608110001_push_subscriptions.sql` (required for working reminders — push subscriptions plus the `reminder_preferences.timezone` column)
 
    The app will not sync entries against a database missing the later migrations. Check the directory for migrations newer than this list.
 3. Confirm the migrations created private Storage buckets:
@@ -184,6 +185,24 @@ SUPABASE_THUMBNAILS_BUCKET=journal-thumbnails
 6. Deploy from `main` after the web PR merges.
 7. After deployment, open the production root URL and confirm the homepage CTA reaches `/app`.
 8. Send one magic link through the production URL and confirm the callback returns to the app.
+
+## Reminders / Web Push
+
+Reminders are sent as Web Push notifications from `/api/push/dispatch`, which Vercel Cron calls every 15 minutes (`web/vercel.json`). The dispatcher reads `reminder_preferences` (with the stored IANA `timezone`; null is treated as UTC) and pushes to every subscription in workspaces whose evening/morning time falls in the current 15-minute window. Payloads are encrypted per RFC 8291 in `web/src/lib/web-push.ts` with no extra dependencies. Users who skip push can download a daily-repeating calendar file from Settings instead.
+
+Operator setup:
+
+1. Generate a VAPID key pair: `node scripts/generate-vapid-keys.mjs` (run in `web/`).
+2. Set `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (a `mailto:` contact), and `CRON_SECRET` (any long random string) in the Vercel project env vars. `SUPABASE_SERVICE_ROLE_KEY` must also be set — the dispatcher needs it to read subscriptions across workspaces.
+3. Apply `202608110001_push_subscriptions.sql` in the Supabase SQL editor.
+4. Deploy; Vercel picks up the cron entry from `web/vercel.json` and sends `Authorization: Bearer <CRON_SECRET>` on each invocation automatically.
+5. Smoke-test: enable reminders in Settings on a real account, accept the notification permission prompt, set the evening time a few minutes ahead, and either wait for the cron or call the route once yourself: `curl -H "Authorization: Bearer $CRON_SECRET" https://<production-url>/api/push/dispatch`.
+
+Notes:
+
+- On iOS Safari, push requires the app to be added to the Home Screen (iOS 16.4+); Settings says so next to the toggle.
+- Expired subscriptions (push service returns 404/410) are deleted automatically by the dispatcher.
+- In demo mode nothing subscribes and no push is sent; the calendar-file fallback still works.
 
 ## Migration Notes
 

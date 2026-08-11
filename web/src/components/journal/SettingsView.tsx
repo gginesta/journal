@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { Download, LogOut, Plus, Sparkles, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import clsx from "clsx";
+import { CalendarPlus, Download, LogOut, Plus, Sparkles, Trash2 } from "lucide-react";
 import type {
   JournalEntry,
   PersonTag,
@@ -13,6 +14,8 @@ import type {
 import { SharedJournalCopy } from "@/components/wow/SharedJournalCopy";
 import { responseErrorMessage } from "@/components/journal/helpers";
 import { PageHeader } from "@/components/journal/shared";
+import { buildReminderIcs } from "@/lib/reminder-ics";
+import { getPushDeviceStatus, subscribeThisDevice, unsubscribeThisDevice, type PushDeviceStatus } from "@/lib/push";
 
 export function SettingsView({
   profile,
@@ -109,45 +112,13 @@ export function SettingsView({
                 setWorkspaceMembers={setWorkspaceMembers}
               />
 
-      <SettingsSection title="Reminders">
-        {!canEdit ? <ReadOnlySettingsCopy /> : null}
-        <div className="grid gap-3 sm:grid-cols-3">
-          <label className="grid gap-1 text-sm font-bold text-soft-ink">
-            Cadence
-            <select
-              value={reminders.cadence}
-              disabled={!canEdit}
-              onChange={(event) => setReminders({ ...reminders, cadence: event.target.value as RitualCadence })}
-              className="min-h-11 rounded-2xl border border-journal-line bg-white px-3 font-normal outline-none"
-            >
-              <option value="evening">Evening</option>
-              <option value="once_daily">Once daily</option>
-              <option value="morning_evening">Morning + evening</option>
-              <option value="anytime">Anytime</option>
-            </select>
-          </label>
-          <label className="grid gap-1 text-sm font-bold text-soft-ink">
-            Evening
-            <input
-              type="time"
-              value={reminders.eveningTime}
-              disabled={!canEdit}
-              onChange={(event) => setReminders({ ...reminders, eveningTime: event.target.value })}
-              className="min-h-11 rounded-2xl border border-journal-line bg-white px-3 font-normal outline-none"
-            />
-          </label>
-          <label className="grid gap-1 text-sm font-bold text-soft-ink">
-            Morning
-            <input
-              type="time"
-              value={reminders.morningTime}
-              disabled={!canEdit}
-              onChange={(event) => setReminders({ ...reminders, morningTime: event.target.value })}
-              className="min-h-11 rounded-2xl border border-journal-line bg-white px-3 font-normal outline-none"
-            />
-          </label>
-        </div>
-      </SettingsSection>
+      <RemindersSection
+        mode={mode}
+        workspaceId={activeWorkspaceId}
+        reminders={reminders}
+        canEdit={canEdit}
+        setReminders={setReminders}
+      />
 
       <SettingsSection title="Prompts">
         {!canEdit ? <ReadOnlySettingsCopy /> : null}
@@ -239,6 +210,162 @@ function workspaceRoleCopy(role: WorkspaceRole) {
 
 function ReadOnlySettingsCopy() {
   return <p className="mb-3 text-sm leading-6 text-warm-gray">Viewer access is read-only for this workspace.</p>;
+}
+
+function currentTimezone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function pushStatusCopy(status: PushDeviceStatus | null): string | null {
+  if (status === "subscribed") return "Reminders are on for this device.";
+  if (status === "blocked") return "Notifications are blocked in this browser. Allow them in your browser settings, then turn reminders on again.";
+  if (status === "unsupported") return "This browser can't show notifications. The calendar option below works everywhere.";
+  return null;
+}
+
+function RemindersSection({
+  mode,
+  workspaceId,
+  reminders,
+  canEdit,
+  setReminders
+}: {
+  mode: "demo" | "supabase";
+  workspaceId: string;
+  reminders: ReminderPreferences;
+  canEdit: boolean;
+  setReminders: (preferences: ReminderPreferences) => void;
+}) {
+  const [pushStatus, setPushStatus] = useState<PushDeviceStatus | null>(null);
+  const [pushError, setPushError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (mode !== "supabase" || !reminders.remindersEnabled) return;
+    let cancelled = false;
+    void getPushDeviceStatus().then((status) => {
+      if (!cancelled) setPushStatus(status);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, reminders.remindersEnabled]);
+
+  // Every reminder edit also records the device's timezone, so the dispatcher
+  // knows which wall clock "21:00" belongs to.
+  function saveReminders(next: ReminderPreferences) {
+    setReminders({ ...next, timezone: currentTimezone() ?? next.timezone ?? null });
+  }
+
+  async function toggleReminders() {
+    const enabled = !reminders.remindersEnabled;
+    saveReminders({ ...reminders, remindersEnabled: enabled });
+    if (mode !== "supabase") return;
+    if (enabled) {
+      setPushError(null);
+      const outcome = await subscribeThisDevice(workspaceId);
+      setPushStatus(outcome.status);
+      setPushError(outcome.error ?? null);
+    } else {
+      await unsubscribeThisDevice();
+      setPushStatus("not-subscribed");
+      setPushError(null);
+    }
+  }
+
+  const statusCopy = pushStatusCopy(pushStatus);
+
+  return (
+    <SettingsSection title="Reminders">
+      {!canEdit ? <ReadOnlySettingsCopy /> : null}
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <div>
+          <p className="font-bold text-soft-ink">Remind me to keep a moment</p>
+          <p className="text-sm leading-6 text-warm-gray">A soft, optional nudge. No streaks lost, no guilt.</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={reminders.remindersEnabled}
+          aria-label="Enable reminders"
+          disabled={!canEdit}
+          onClick={toggleReminders}
+          className={clsx(
+            "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition disabled:cursor-not-allowed",
+            reminders.remindersEnabled ? "bg-rose" : "bg-journal-line"
+          )}
+        >
+          <span
+            className={clsx(
+              "inline-block h-5 w-5 transform rounded-full bg-white shadow transition",
+              reminders.remindersEnabled ? "translate-x-6" : "translate-x-1"
+            )}
+          />
+        </button>
+      </div>
+      {mode === "supabase" && reminders.remindersEnabled ? (
+        <div className="mb-4 grid gap-1 text-sm leading-6 text-warm-gray">
+          {statusCopy ? <p className={clsx(pushStatus === "subscribed" && "font-semibold text-leaf")}>{statusCopy}</p> : null}
+          {pushError ? <p className="font-semibold text-rose">{pushError}</p> : null}
+          <p className="text-xs">On iPhone and iPad, reminders arrive after you add this app to your Home Screen (iOS 16.4 or later).</p>
+        </div>
+      ) : null}
+      {mode === "demo" && reminders.remindersEnabled ? (
+        <p className="mb-4 text-sm leading-6 text-warm-gray">
+          Notifications need the beta account — the demo keeps your choice but can&apos;t send them. The calendar option below works here too.
+        </p>
+      ) : null}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label className="grid gap-1 text-sm font-bold text-soft-ink">
+          Cadence
+          <select
+            value={reminders.cadence}
+            disabled={!canEdit}
+            onChange={(event) => saveReminders({ ...reminders, cadence: event.target.value as RitualCadence })}
+            className="min-h-11 rounded-2xl border border-journal-line bg-white px-3 font-normal outline-none"
+          >
+            <option value="evening">Evening</option>
+            <option value="once_daily">Once daily</option>
+            <option value="morning_evening">Morning + evening</option>
+            <option value="anytime">Anytime</option>
+          </select>
+        </label>
+        <label className="grid gap-1 text-sm font-bold text-soft-ink">
+          Evening
+          <input
+            type="time"
+            value={reminders.eveningTime}
+            disabled={!canEdit}
+            onChange={(event) => saveReminders({ ...reminders, eveningTime: event.target.value })}
+            className="min-h-11 rounded-2xl border border-journal-line bg-white px-3 font-normal outline-none"
+          />
+        </label>
+        <label className="grid gap-1 text-sm font-bold text-soft-ink">
+          Morning
+          <input
+            type="time"
+            value={reminders.morningTime}
+            disabled={!canEdit}
+            onChange={(event) => saveReminders({ ...reminders, morningTime: event.target.value })}
+            className="min-h-11 rounded-2xl border border-journal-line bg-white px-3 font-normal outline-none"
+          />
+        </label>
+      </div>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <button
+          onClick={() => downloadFile("photo-gratitude-reminders.ics", new Blob([buildReminderIcs(reminders)], { type: "text/calendar;charset=utf-8" }))}
+          className="inline-flex min-h-10 items-center gap-2 rounded-full bg-journal-raised px-4 text-sm font-bold text-soft-ink"
+        >
+          <CalendarPlus aria-hidden="true" size={16} />
+          Add to calendar
+        </button>
+        <p className="text-xs text-warm-gray">Prefer your calendar? Download a daily reminder event instead.</p>
+      </div>
+    </SettingsSection>
+  );
 }
 
 function HouseholdSharingPanel({
@@ -554,7 +681,10 @@ function SettingsSection({ title, children }: { title: string; children: React.R
 }
 
 function downloadJson(filename: string, value: unknown) {
-  const blob = new Blob([JSON.stringify(value, null, 2)], { type: "application/json" });
+  downloadFile(filename, new Blob([JSON.stringify(value, null, 2)], { type: "application/json" }));
+}
+
+function downloadFile(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;

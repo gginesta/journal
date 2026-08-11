@@ -138,8 +138,10 @@ These require the Supabase dashboard (owner access) and block deploying current 
    - `202606120002_invite_without_account_probe.sql` (**required** — fixes invites of registered users)
    - `202606130001_pending_invites.sql`
    - `202606130002_per_person_sessions.sql`
+   - `202608110001_push_subscriptions.sql` (**required for working reminders** — push subscriptions table plus `reminder_preferences.timezone`)
 2. Apply the magic-link email template per `docs/SUPABASE_AUTH_EMAILS.md` if not already done.
-3. Record completion here (move each item to "Applied and verified" below).
+3. For Web Push reminders: generate VAPID keys (`node web/scripts/generate-vapid-keys.mjs`) and set `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET`, and `SUPABASE_SERVICE_ROLE_KEY` in Vercel (see docs/WEB_APP.md "Reminders / Web Push").
+4. Record completion here (move each item to "Applied and verified" below).
 
 ## Supabase Status
 
@@ -155,6 +157,7 @@ Written in the repo but **not yet recorded as applied** (see Pending Operator Ac
 - `202606120002_invite_without_account_probe.sql`
 - `202606130001_pending_invites.sql`
 - `202606130002_per_person_sessions.sql`
+- `202608110001_push_subscriptions.sql`
 
 Verified invite function state:
 

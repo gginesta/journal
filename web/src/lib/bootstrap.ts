@@ -114,6 +114,7 @@ type ReminderRow = {
   reminders_enabled?: boolean;
   evening_time?: string;
   morning_time?: string;
+  timezone?: string | null;
 };
 
 export async function loadJournalBootstrap(): Promise<JournalBootstrap> {
@@ -385,6 +386,7 @@ function mapReminders(row: ReminderRow | null): ReminderPreferences {
     cadence: row?.cadence ?? "evening",
     remindersEnabled: row?.reminders_enabled ?? false,
     eveningTime: row?.evening_time ?? "21:00",
-    morningTime: row?.morning_time ?? "08:30"
+    morningTime: row?.morning_time ?? "08:30",
+    timezone: row?.timezone ?? null
   };
 }

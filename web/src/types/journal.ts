@@ -112,6 +112,9 @@ export type ReminderPreferences = {
   remindersEnabled: boolean;
   eveningTime: string;
   morningTime: string;
+  // IANA zone the times were chosen in (saved when reminder settings are
+  // edited). Null/absent means the dispatcher treats the times as UTC.
+  timezone?: string | null;
 };
 
 export type PendingWorkspaceInvite = {
