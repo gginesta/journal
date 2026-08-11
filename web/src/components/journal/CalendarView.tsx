@@ -3,18 +3,22 @@ import clsx from "clsx";
 import { Camera, CheckCircle2, ChevronLeft, ChevronRight } from "lucide-react";
 import type { JournalEntry, PersonTag } from "@/types/journal";
 import { daysInCalendarMonth, formatDisplayDate, toLocalDate } from "@/lib/dates";
-import { isEntryComplete } from "@/lib/journal-logic";
+import { calendarDayAction, isEntryComplete } from "@/lib/journal-logic";
 import { MemoryCard } from "@/components/journal/MemoriesView";
 import { PageHeader } from "@/components/journal/shared";
 
 export function CalendarView({
   entries,
   people,
-  onOpenEntry
+  onOpenEntry,
+  onStartDay
 }: {
   entries: JournalEntry[];
   people: PersonTag[];
   onOpenEntry: (entryId: string) => void;
+  // When provided (editors/owners), tapping an empty past day starts a
+  // backfill entry for that date; without it, empty days stay inert.
+  onStartDay?: (date: string) => void;
 }) {
   const [visibleDate, setVisibleDate] = useState(toLocalDate());
   const monthDays = daysInCalendarMonth(visibleDate);
@@ -48,7 +52,7 @@ export function CalendarView({
         <div className="mt-2 grid grid-cols-7 gap-2">
           {monthDays.map((day) => {
             const entry = entriesByDate.get(day.date);
-            return <CalendarCell key={day.date} date={day.date} inMonth={day.inMonth} entry={entry} onOpenEntry={onOpenEntry} />;
+            return <CalendarCell key={day.date} date={day.date} inMonth={day.inMonth} entry={entry} onOpenEntry={onOpenEntry} onStartDay={onStartDay} />;
           })}
         </div>
       </section>
@@ -65,28 +69,32 @@ function CalendarCell({
   date,
   inMonth,
   entry,
-  onOpenEntry
+  onOpenEntry,
+  onStartDay
 }: {
   date: string;
   inMonth: boolean;
   entry?: JournalEntry;
   onOpenEntry: (entryId: string) => void;
+  onStartDay?: (date: string) => void;
 }) {
   const day = Number(date.slice(-2));
   const today = date === toLocalDate();
+  const action = calendarDayAction({ date, hasEntry: Boolean(entry), canStart: Boolean(onStartDay) });
+  const ariaSuffix = entry ? ", has journal entry" : action === "start" ? ", no entry yet, start this day" : ", no entry";
   return (
     <button
       type="button"
-      disabled={!entry}
-      onClick={() => entry && onOpenEntry(entry.id)}
+      disabled={action === "none"}
+      onClick={() => (entry ? onOpenEntry(entry.id) : action === "start" ? onStartDay?.(date) : undefined)}
       className={clsx(
         "min-h-16 rounded-2xl border p-2 text-left transition",
         today ? "border-rose" : "border-journal-line",
         entry ? "bg-journal-raised" : "bg-white/42",
-        entry && "hover:-translate-y-0.5 hover:bg-white hover:shadow-sm",
+        action !== "none" && "hover:-translate-y-0.5 hover:bg-white hover:shadow-sm",
         !inMonth && "opacity-40"
       )}
-      aria-label={`${formatDisplayDate(date)}${entry ? ", has journal entry" : ", no entry"}`}
+      aria-label={`${formatDisplayDate(date)}${ariaSuffix}`}
     >
       <p className={clsx("text-sm font-bold", today && "text-rose")}>{day}</p>
       <div className="mt-2 flex gap-1">

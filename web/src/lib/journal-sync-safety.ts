@@ -14,6 +14,12 @@ const imageExtensions: Record<ImageDataUrlParts["contentType"], ImageDataUrlPart
   "image/webp": "webp"
 };
 
+// Storage extension for an uploaded image content type; null for anything that
+// is not a supported journal photo format.
+export function imageExtensionForContentType(contentType: string): ImageDataUrlParts["extension"] | null {
+  return imageExtensions[contentType as ImageDataUrlParts["contentType"]] ?? null;
+}
+
 export function canMutateWorkspaceRole(role: WorkspaceRole | null | undefined) {
   return Boolean(role && syncMutationRoles.has(role));
 }

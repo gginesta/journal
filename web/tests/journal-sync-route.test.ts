@@ -9,6 +9,7 @@ vi.mock("@/lib/photo-thumbnails", () => ({
 }));
 
 import { POST } from "../src/app/api/journal/sync/route";
+import { makePhotoThumbnail } from "../src/lib/photo-thumbnails";
 import { createSupabaseServerClient } from "../src/lib/supabase/server";
 
 const workspaceId = "11111111-1111-4111-8111-111111111111";
@@ -260,6 +261,33 @@ describe("POST /api/journal/sync", () => {
     const response = await POST(syncRequest(makePayload({ entries: [makeEntry({ workspaceId: otherWorkspaceId })] })));
     expect(response.status).toBe(200);
     expect(fake.calls.some((call) => call.table === "rpc:sync_journal_entry")).toBe(false);
+  });
+
+  // New clients upload photo bytes out-of-band through /api/journal/photos,
+  // but a tab loaded before that shipped may still send base64 in the payload.
+  it("still stores legacy base64 photos that arrive in the sync payload", async () => {
+    vi.mocked(makePhotoThumbnail).mockResolvedValue({
+      buffer: Buffer.from("thumb-bytes"),
+      contentType: "image/jpeg",
+      extension: "jpg"
+    });
+    const fake = useFake(createFakeSupabase({ role: "editor" }));
+    const photo = {
+      id: "55555555-5555-4555-8555-555555555555",
+      entryId: "44444444-4444-4444-8444-444444444444",
+      storagePath: "",
+      thumbnailPath: "",
+      previewUrl: "data:image/jpeg;base64,abcd",
+      caption: "Legacy upload",
+      sortOrder: 0,
+      createdAt: "2026-06-12T20:00:00.000Z"
+    };
+    const response = await POST(syncRequest(makePayload({ entries: [makeEntry({ photos: [photo] })] })));
+    expect(response.status).toBe(200);
+    const rpcCall = fake.calls.find((call) => call.table === "rpc:sync_journal_entry");
+    const args = rpcCall?.args[0] as { entry: { photos: Array<{ storage_path: string; thumbnail_path: string }> } };
+    expect(args.entry.photos[0].storage_path).toBe(`${workspaceId}/2026-06-12/${photo.id}.jpg`);
+    expect(args.entry.photos[0].thumbnail_path).toBe(`${workspaceId}/2026-06-12/${photo.id}-thumb.jpg`);
   });
 
   it("rejects photo storage paths that do not belong to the workspace", async () => {

@@ -7,6 +7,7 @@ import type {
   JournalEntry,
   MemoryDetail,
   PersonTag,
+  PhotoAttachment,
   PromptResponse,
   PromptTemplate,
   ReminderPreferences,
@@ -21,7 +22,7 @@ import {
   type OnboardingSetup
 } from "@/lib/onboarding";
 import { demoStorageFullMessage, writeDemoStateToStorage } from "@/lib/demo-storage";
-import { selectDirtyEntries, serializeEntryForSync } from "@/lib/journal-sync-delta";
+import { isPendingUploadPhoto, selectDirtyEntries, serializeEntryForSync, stripPendingUploadPhotos } from "@/lib/journal-sync-delta";
 import { canMutateWorkspaceRole } from "@/lib/journal-sync-safety";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
@@ -112,6 +113,11 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
     prompts: JSON.stringify(initialData.prompts.filter((prompt) => prompt.workspaceId === initialData.activeWorkspaceId)),
     reminders: JSON.stringify(initialData.reminders)
   });
+  // Out-of-band photo upload bookkeeping: ids currently uploading (dedupes
+  // across overlapping sync ticks) and failed-attempt counts (bounds the
+  // automatic retry nudges; later sync ticks keep retrying naturally).
+  const inflightPhotoUploads = useRef<Set<string>>(new Set());
+  const photoUploadAttempts = useRef<Map<string, number>>(new Map());
 
   const onboardingKey = useMemo(() => `${onboardingStorageKey}:${initialData.profile?.id ?? "demo"}`, [initialData.profile?.id]);
   const firstMemoryKey = useMemo(() => firstMemoryCelebrationStorageKey(activeWorkspaceId), [activeWorkspaceId]);
@@ -299,10 +305,80 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
     const controller = new AbortController();
     setSaveState("saving");
     setSaveError(null);
+    // Out-of-band photo upload, chained on the entry ack so the entry row
+    // exists before its photo row is written. Deterministic storage paths and
+    // the row upsert make retries idempotent; the fetch is deliberately not
+    // tied to the sync abort controller because a finished upload is useful
+    // even when a newer sync tick supersedes this one.
+    async function uploadPendingPhoto(entry: JournalEntry, photo: PhotoAttachment) {
+      if (inflightPhotoUploads.current.has(photo.id)) return;
+      inflightPhotoUploads.current.add(photo.id);
+      try {
+        const bytes = await (await fetch(photo.previewUrl)).blob();
+        const form = new FormData();
+        form.set("workspaceId", entry.workspaceId);
+        form.set("entryId", entry.id);
+        form.set("photoId", photo.id);
+        form.set("localDate", entry.localDate);
+        form.set("caption", photo.caption);
+        form.set("sortOrder", String(photo.sortOrder));
+        form.set("file", bytes, "photo");
+        const response = await fetch("/api/journal/photos", { method: "POST", body: form });
+        if (!response.ok) throw new Error(await responseErrorMessage(response, "The photo could not be uploaded yet"));
+        const stored = (await response.json()) as { storagePath: string; thumbnailPath: string; previewUrl: string; thumbnailUrl: string };
+        photoUploadAttempts.current.delete(photo.id);
+        // Force one reconciling delta sync: it writes the stored photo row
+        // through the transactional RPC (or deletes the row again if the photo
+        // was removed while uploading) and re-acks the entry.
+        ackedEntrySerializations.current.delete(entry.id);
+        setEntries((current) =>
+          current.map((candidate) =>
+            candidate.id === entry.id
+              ? {
+                  ...candidate,
+                  photos: candidate.photos.map((existing) =>
+                    existing.id === photo.id && isPendingUploadPhoto(existing)
+                      ? {
+                          ...existing,
+                          storagePath: stored.storagePath,
+                          thumbnailPath: stored.thumbnailPath,
+                          previewUrl: stored.previewUrl,
+                          thumbnailUrl: stored.thumbnailUrl
+                        }
+                      : existing
+                  )
+                }
+              : candidate
+          )
+        );
+      } catch (error) {
+        const attempts = (photoUploadAttempts.current.get(photo.id) ?? 0) + 1;
+        photoUploadAttempts.current.set(photo.id, attempts);
+        setSaveState(navigator.onLine ? "error" : "offline");
+        setSaveError(
+          error instanceof Error && error.message
+            ? `${error.message}. The photo stays on this device and retries with the next sync.`
+            : "The photo could not be uploaded yet. It stays on this device and retries with the next sync."
+        );
+        // The photo stays pending (its entry stays dirty), so any later sync
+        // tick retries; nudge the first retries automatically, mirroring the
+        // offline listener's retry token.
+        if (attempts <= 2 && navigator.onLine) {
+          window.setTimeout(() => setSyncRetryToken((current) => current + 1), 10_000);
+        }
+      } finally {
+        inflightPhotoUploads.current.delete(photo.id);
+      }
+    }
+
     const timeout = window.setTimeout(async () => {
       try {
         const dirtyEntries = selectDirtyEntries(workspaceEntries, ackedEntrySerializations.current);
-        const sentSerializations = new Map(dirtyEntries.map((entry) => [entry.id, serializeEntryForSync(entry)]));
+        // Photos waiting on their out-of-band upload never travel in the sync
+        // JSON. Recording the ack against the stripped serialization keeps
+        // their entries dirty until the upload (and its follow-up sync) lands.
+        const syncedEntries = dirtyEntries.map(stripPendingUploadPhotos);
+        const sentSerializations = new Map(syncedEntries.map((entry) => [entry.id, serializeEntryForSync(entry)]));
         const ackedSections = ackedSectionSerializations.current;
         const peopleJson = JSON.stringify(workspacePeople);
         const promptsJson = JSON.stringify(workspacePrompts);
@@ -316,7 +392,7 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
             ...(peopleJson === ackedSections.people ? {} : { people: workspacePeople }),
             ...(promptsJson === ackedSections.prompts ? {} : { prompts: workspacePrompts }),
             ...(remindersJson === ackedSections.reminders ? {} : { reminders }),
-            entries: dirtyEntries.map((entry) => ({
+            entries: syncedEntries.map((entry) => ({
               ...entry,
               // Derived presentation data; JSON.stringify drops the undefined.
               photos: entry.photos.map((photo) => ({ ...photo, thumbnailUrl: undefined })),
@@ -330,10 +406,19 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
         ackedSections.people = peopleJson;
         ackedSections.prompts = promptsJson;
         ackedSections.reminders = remindersJson;
-        for (const [entryId, serverUpdatedAt] of Object.entries(result.applied ?? {})) {
+        const applied = result.applied ?? {};
+        for (const [entryId, serverUpdatedAt] of Object.entries(applied)) {
           serverEntryBaselines.current.set(entryId, serverUpdatedAt);
           const sent = sentSerializations.get(entryId);
           if (sent) ackedEntrySerializations.current.set(entryId, sent);
+        }
+        // An applied ack guarantees the entry row exists server-side, so any
+        // photos still holding local base64 previews can upload out-of-band.
+        for (const entry of dirtyEntries) {
+          if (!applied[entry.id]) continue;
+          for (const photo of entry.photos) {
+            if (isPendingUploadPhoto(photo)) void uploadPendingPhoto(entry, photo);
+          }
         }
         if (latestSyncId.current === syncId) {
           setStaleEntryIds(result.stale ?? []);
@@ -467,6 +552,22 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
       next.delete(workspaceId);
       return next;
     });
+  }
+
+  // Calendar backfill: tapping an empty past day opens a local entry shell for
+  // that date. Pre-acking its serialization keeps delta sync from creating an
+  // empty server row — the day only syncs once the user actually writes.
+  function startDayEntry(localDate: string) {
+    const existing = workspaceEntries.find((entry) => entry.localDate === localDate);
+    if (existing) {
+      setSelectedEntryId(existing.id);
+      return;
+    }
+    if (blockReadOnlyMutation()) return;
+    const entry = makeEntry(activeWorkspaceId, localDate, workspacePrompts, reminders.cadence, initialData.profile?.id ?? null);
+    ackedEntrySerializations.current.set(entry.id, serializeEntryForSync(entry));
+    setEntries((current) => [entry, ...current]);
+    setSelectedEntryId(entry.id);
   }
 
   function addRepositoryDetail({
@@ -764,7 +865,14 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
             />
           ) : null}
 
-          {tab === "calendar" ? <CalendarView entries={workspaceEntries} people={workspacePeople} onOpenEntry={setSelectedEntryId} /> : null}
+          {tab === "calendar" ? (
+            <CalendarView
+              entries={workspaceEntries}
+              people={workspacePeople}
+              onOpenEntry={setSelectedEntryId}
+              onStartDay={canEditActiveWorkspace ? startDayEntry : undefined}
+            />
+          ) : null}
 
           {tab === "insights" ? <InsightsView entries={workspaceEntries} /> : null}
 
@@ -796,7 +904,18 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
       </div>
 
       <MobileTabs activeTab={tab} setTab={setTab} />
-      {selectedEntry ? <EntryDetailModal entry={selectedEntry} people={workspacePeople} onClose={() => setSelectedEntryId(null)} /> : null}
+      {selectedEntry ? (
+        <EntryDetailModal
+          entry={selectedEntry}
+          people={workspacePeople}
+          prompts={workspacePrompts}
+          memberNames={memberNames}
+          currentUserId={initialData.profile?.id ?? null}
+          canEdit={canEditActiveWorkspace}
+          onUpdateEntry={updateEntry}
+          onClose={() => setSelectedEntryId(null)}
+        />
+      ) : null}
       {showOnboarding ? (
         <OnboardingOverlay
           profile={initialData.profile}

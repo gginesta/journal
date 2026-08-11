@@ -40,8 +40,17 @@ export const syncLimits = {
   longText: 5_000,
   caption: 300,
   storagePath: 300,
-  // ~8 MB of decoded image data once base64 overhead is removed.
-  photoDataUrlChars: 11_500_000
+  // Signed https preview URLs for already-stored photos. New clients only ever
+  // send this short form: photo bytes upload out-of-band through
+  // POST /api/journal/photos, so a typical sync payload is text-level KBs.
+  photoPreviewUrlChars: 2_048,
+  // Legacy in-payload base64 upload (~8 MB of decoded image data once base64
+  // overhead is removed). Kept only for backward compatibility with tabs that
+  // loaded before out-of-band photo upload shipped; the sync route still
+  // stores these the old way.
+  photoDataUrlChars: 11_500_000,
+  // Body cap for the out-of-band photo upload route (compressed image bytes).
+  photoUploadBytes: 8_000_000
 } as const;
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -137,6 +146,14 @@ function isJournalSession(value: unknown): value is JournalSession {
   );
 }
 
+// Stored photos carry a short signed https URL (or nothing); only the legacy
+// in-payload base64 upload path may be megabytes.
+function isPhotoPreviewUrl(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const cap = value.startsWith("data:") ? syncLimits.photoDataUrlChars : syncLimits.photoPreviewUrlChars;
+  return value.length <= cap;
+}
+
 function isPhotoAttachment(value: unknown): value is PhotoAttachment {
   return (
     isRecord(value) &&
@@ -144,7 +161,7 @@ function isPhotoAttachment(value: unknown): value is PhotoAttachment {
     isUuid(value.entryId) &&
     isText(value.storagePath, syncLimits.storagePath) &&
     isText(value.thumbnailPath, syncLimits.storagePath) &&
-    isText(value.previewUrl, syncLimits.photoDataUrlChars) &&
+    isPhotoPreviewUrl(value.previewUrl) &&
     isText(value.caption, syncLimits.caption) &&
     isFiniteNumber(value.sortOrder) &&
     isText(value.createdAt, 64)

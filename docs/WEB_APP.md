@@ -60,7 +60,8 @@ Demo mode is enabled only when `NEXT_PUBLIC_DEMO_MODE` is exactly `true`, or whe
 - Concurrent-edit safety: each entry carries a `base_updated_at` baseline. If another member changed the entry since, the server returns it as stale instead of clobbering, and Today shows an inline "changed on another device" notice.
 - Per-person day sections (`202606130002`): each member's `journal_sessions` rows are owned via `created_by`; sync only deletes/rewrites the caller's own (or legacy unowned) sessions, and other members' sections render read-only.
 - Sync payloads are validated at runtime with size caps before any write.
-- Browser-selected photos are uploaded from compressed local previews into private Supabase Storage paths under `<workspace-id>/<local-date>/...`.
+- Photos upload out-of-band from text sync: after the entry row is acked, the client posts the compressed image bytes as multipart form data to `POST /api/journal/photos`, which stores the original and its thumbnail under private Storage paths (`<workspace-id>/<local-date>/...`), upserts the `photo_attachments` row, and returns fresh signed URLs. Sync payloads never carry new photo bytes (photos still awaiting upload are stripped from the JSON), so a sync POST stays text-level small; the legacy base64-in-payload path is still accepted from older tabs.
+- A failed photo upload keeps the photo pending on-device and retries on later sync ticks; because both storage writes happen before the metadata upsert at deterministic paths, a failed attempt leaves at most an unreferenced object that the retry overwrites.
 - Photo metadata is written only after Storage upload succeeds, and page loads use batched signed URLs for private photo previews.
 - Workspace creation uses the secured `public.create_workspace` database function through `/api/workspaces`.
 - Delete workspace entries uses `/api/journal/delete-workspace-entries` and relies on RLS plus cascade deletes for child rows.

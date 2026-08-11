@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { selectDirtyEntries, serializeEntryForSync } from "../src/lib/journal-sync-delta";
+import { isPendingUploadPhoto, selectDirtyEntries, serializeEntryForSync, stripPendingUploadPhotos } from "../src/lib/journal-sync-delta";
 import type { JournalEntry, PhotoAttachment } from "../src/types/journal";
 
 function makePhoto(overrides: Partial<PhotoAttachment> = {}): PhotoAttachment {
@@ -110,5 +110,60 @@ describe("delta sync selection", () => {
   it("excludes photo bytes from the serialization", () => {
     const entry = makeEntry({ photos: [makePhoto({ previewUrl: `data:image/jpeg;base64,${"a".repeat(100_000)}` })] });
     expect(serializeEntryForSync(entry).length).toBeLessThan(2_000);
+  });
+});
+
+describe("pending out-of-band photo uploads", () => {
+  const pendingPhoto = makePhoto({
+    id: "photo-2",
+    storagePath: "",
+    thumbnailPath: "",
+    previewUrl: "data:image/jpeg;base64,abcd",
+    thumbnailUrl: undefined,
+    sortOrder: 1
+  });
+
+  it("classifies base64 previews as pending and stored signed URLs as not", () => {
+    expect(isPendingUploadPhoto(pendingPhoto)).toBe(true);
+    expect(isPendingUploadPhoto(makePhoto())).toBe(false);
+  });
+
+  it("strips pending photos from the sync payload while keeping stored ones", () => {
+    const entry = makeEntry({ photos: [makePhoto(), pendingPhoto] });
+    const stripped = stripPendingUploadPhotos(entry);
+    expect(stripped.photos.map((photo) => photo.id)).toEqual(["photo-1"]);
+    // Everything except the pending photo is untouched.
+    expect(stripped.id).toBe(entry.id);
+    expect(stripped.details).toBe(entry.details);
+  });
+
+  it("returns the same entry object when nothing is pending", () => {
+    const entry = makeEntry({ photos: [makePhoto()] });
+    expect(stripPendingUploadPhotos(entry)).toBe(entry);
+  });
+
+  it("keeps an entry dirty against its stripped ack until the upload lands", () => {
+    const entry = makeEntry({ photos: [makePhoto(), pendingPhoto] });
+    // The sync ack records the serialization of the stripped payload.
+    const acked = new Map([[entry.id, serializeEntryForSync(stripPendingUploadPhotos(entry))]]);
+    expect(selectDirtyEntries([entry], acked)).toEqual([entry]);
+
+    // After the out-of-band upload merges the stored paths, the follow-up
+    // sync acks the full serialization and the entry goes clean.
+    const uploaded = {
+      ...entry,
+      photos: [
+        entry.photos[0],
+        {
+          ...pendingPhoto,
+          storagePath: "ws-1/2026-06-12/photo-2.jpg",
+          thumbnailPath: "ws-1/2026-06-12/photo-2-thumb.jpg",
+          previewUrl: "https://storage.example/signed/photo-2?token=a",
+          thumbnailUrl: "https://storage.example/signed/photo-2-thumb?token=a"
+        }
+      ]
+    };
+    acked.set(entry.id, serializeEntryForSync(uploaded));
+    expect(selectDirtyEntries([uploaded], acked)).toEqual([]);
   });
 });

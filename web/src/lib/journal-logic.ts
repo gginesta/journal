@@ -8,6 +8,27 @@ export function isEntryComplete(entry: JournalEntry): boolean {
   return hasText || entry.photos.length > 0;
 }
 
+// What tapping a calendar day does: days with an entry open it, empty days up
+// to today can start a backfill (when the caller may edit), and empty future
+// days stay inert. Local dates compare lexicographically.
+export type CalendarDayAction = "open" | "start" | "none";
+
+export function calendarDayAction({
+  date,
+  hasEntry,
+  canStart,
+  today = toLocalDate()
+}: {
+  date: string;
+  hasEntry: boolean;
+  canStart: boolean;
+  today?: string;
+}): CalendarDayAction {
+  if (hasEntry) return "open";
+  if (canStart && date <= today) return "start";
+  return "none";
+}
+
 export function entryPeople(entry: JournalEntry, people: PersonTag[]): PersonTag[] {
   const ids = new Set<string>(entry.personTagIds);
   for (const detail of entry.details) {

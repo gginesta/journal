@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { JournalEntry, PersonTag } from "../src/types/journal";
-import { eagerEntryWindows, isEntryComplete, memoryLaneMatches, searchEntries, streakSummary } from "../src/lib/journal-logic";
+import { calendarDayAction, eagerEntryWindows, isEntryComplete, memoryLaneMatches, searchEntries, streakSummary } from "../src/lib/journal-logic";
 import { listMemoryDetails } from "../src/lib/memory-details";
 import { addSuggestionToReflectionText, gratitudeGuideForEntry, gratitudePromptPacks } from "../src/lib/prompts";
 
@@ -212,5 +212,34 @@ describe("eagerEntryWindows", () => {
     expect(windows[0]).toEqual({ from: "2025-06-12" });
     expect(windows[1]).toEqual({ from: "2024-06-05", to: "2024-06-19" });
     expect(windows[2]).toEqual({ from: "2023-06-05", to: "2023-06-19" });
+  });
+});
+
+describe("calendarDayAction", () => {
+  const today = "2026-08-11";
+
+  it("opens days that already have an entry, even future-dated ones", () => {
+    expect(calendarDayAction({ date: "2026-08-01", hasEntry: true, canStart: true, today })).toBe("open");
+    expect(calendarDayAction({ date: "2026-08-01", hasEntry: true, canStart: false, today })).toBe("open");
+    expect(calendarDayAction({ date: "2026-08-20", hasEntry: true, canStart: true, today })).toBe("open");
+  });
+
+  it("starts a backfill on empty past days and today for members who can edit", () => {
+    expect(calendarDayAction({ date: "2026-08-01", hasEntry: false, canStart: true, today })).toBe("start");
+    expect(calendarDayAction({ date: today, hasEntry: false, canStart: true, today })).toBe("start");
+  });
+
+  it("keeps empty future days inert", () => {
+    expect(calendarDayAction({ date: "2026-08-12", hasEntry: false, canStart: true, today })).toBe("none");
+    expect(calendarDayAction({ date: "2027-01-01", hasEntry: false, canStart: true, today })).toBe("none");
+  });
+
+  it("keeps empty days inert for read-only viewers", () => {
+    expect(calendarDayAction({ date: "2026-08-01", hasEntry: false, canStart: false, today })).toBe("none");
+  });
+
+  it("compares dates across month and year boundaries", () => {
+    expect(calendarDayAction({ date: "2025-12-31", hasEntry: false, canStart: true, today: "2026-01-01" })).toBe("start");
+    expect(calendarDayAction({ date: "2026-02-01", hasEntry: false, canStart: true, today: "2026-01-31" })).toBe("none");
   });
 });

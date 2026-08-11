@@ -100,19 +100,45 @@ describe("validateSyncPayload", () => {
     expect(longCaption.ok).toBe(false);
   });
 
-  it("rejects a photo data url over the size cap", () => {
+  it("rejects a photo data url over the legacy size cap", () => {
     const photo = {
       id: crypto.randomUUID(),
       entryId: crypto.randomUUID(),
       storagePath: "",
       thumbnailPath: "",
-      previewUrl: "a".repeat(syncLimits.photoDataUrlChars + 1),
+      previewUrl: `data:image/jpeg;base64,${"a".repeat(syncLimits.photoDataUrlChars + 1)}`,
       caption: "",
       sortOrder: 0,
       createdAt: "2026-06-12T20:00:00.000Z"
     };
     const result = validateSyncPayload(makePayload({ entries: [makeEntry({ photos: [photo] })] }));
     expect(result.ok).toBe(false);
+  });
+
+  it("caps stored-photo preview URLs at the short https limit", () => {
+    function photoWithPreview(previewUrl: string) {
+      return {
+        id: crypto.randomUUID(),
+        entryId: crypto.randomUUID(),
+        storagePath: `${workspaceId}/2026-06-12/photo.jpg`,
+        thumbnailPath: `${workspaceId}/2026-06-12/photo-thumb.jpg`,
+        previewUrl,
+        caption: "",
+        sortOrder: 0,
+        createdAt: "2026-06-12T20:00:00.000Z"
+      };
+    }
+    const stored = validateSyncPayload(
+      makePayload({ entries: [makeEntry({ photos: [photoWithPreview(`https://storage.example/signed?token=${"a".repeat(400)}`)] })] })
+    );
+    expect(stored.ok).toBe(true);
+
+    // Only the legacy data: form may be megabytes; anything else this long is
+    // a runaway client, not a signed URL.
+    const oversized = validateSyncPayload(
+      makePayload({ entries: [makeEntry({ photos: [photoWithPreview(`https://storage.example/${"a".repeat(syncLimits.photoPreviewUrlChars + 1)}`)] })] })
+    );
+    expect(oversized.ok).toBe(false);
   });
 
   it("rejects oversized collections", () => {

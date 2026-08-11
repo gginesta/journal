@@ -351,13 +351,16 @@ function StarterGuideCard({
   );
 }
 
-function PromptPanel({
+// Also rendered inside EntryDetailModal so past days can be backfilled with
+// the exact Today editing behavior (own-session scoping included).
+export function PromptPanel({
   entry,
   prompts,
   canEdit,
   currentUserId,
   memberNames,
-  onUpdateEntry
+  onUpdateEntry,
+  primaryFieldId = "nice-thing-0"
 }: {
   entry: JournalEntry;
   prompts: PromptTemplate[];
@@ -365,6 +368,10 @@ function PromptPanel({
   currentUserId: string | null;
   memberNames: Record<string, string>;
   onUpdateEntry: (entryId: string, updater: (entry: JournalEntry) => JournalEntry) => void;
+  // The Today view anchors its "focus first reflection" affordance on this id;
+  // pass null anywhere a second PromptPanel could mount over Today (the entry
+  // modal) so the id stays unique in the document.
+  primaryFieldId?: string | null;
 }) {
   // Per-person sections: each member writes in their own session; unowned
   // legacy sessions belong to whoever edits them first.
@@ -432,7 +439,7 @@ function PromptPanel({
               {index + 1}
             </span>
             <textarea
-              id={index === 0 ? "nice-thing-0" : undefined}
+              id={index === 0 ? (primaryFieldId ?? undefined) : undefined}
               aria-label={`Nice thing ${index + 1}`}
               value={lines[index] ?? ""}
               onChange={(event) => {
