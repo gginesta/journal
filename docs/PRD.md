@@ -281,3 +281,4 @@ Premium should feel like a richer habit layer, not a ransom on personal memories
 - Whether Little Details should use fixed categories, custom categories, or a mix of both.
 - Whether Gratitude Guide prompt packs should remain fixed, become user-editable, or become Premium-expanded later.
 - Whether the long-term shared-memory product standardizes on Supabase accounts, iCloud-only native sync, or a bridge between both.
+- Decide the iOS backend (Supabase-direct vs dual-store CloudKit+Supabase) before opening the iOS beta beyond the household (improvement plan section 6.1).

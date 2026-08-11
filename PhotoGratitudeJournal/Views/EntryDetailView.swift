@@ -210,6 +210,10 @@ private struct EntryLittleDetailsSection: View {
 
                 ForEach(details) { detail in
                     VStack(alignment: .leading, spacing: 8) {
+                        Label(detail.detailCategory.title, systemImage: "tag")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+
                         Text(detail.text)
                             .font(.body)
                             .foregroundStyle(.primary)

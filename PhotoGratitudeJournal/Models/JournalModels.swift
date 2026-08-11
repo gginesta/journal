@@ -140,6 +140,9 @@ final class EntryPersonTag: Identifiable {
 final class MemoryDetail: Identifiable {
     var id: UUID = UUID()
     var text: String = ""
+    // SPEC-5 wire string; see MemoryDetailCategory. Default keeps existing
+    // rows valid (CloudKit-safe lightweight addition).
+    var category: String = "note"
     var order: Int = 0
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
@@ -150,6 +153,7 @@ final class MemoryDetail: Identifiable {
     init(
         id: UUID = UUID(),
         text: String,
+        category: MemoryDetailCategory = .note,
         order: Int = 0,
         createdAt: Date = .now,
         updatedAt: Date = .now,
@@ -158,11 +162,20 @@ final class MemoryDetail: Identifiable {
     ) {
         self.id = id
         self.text = text
+        self.category = category.rawValue
         self.order = order
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.entry = entry
         self.personLinks = personLinks
+    }
+
+    var detailCategory: MemoryDetailCategory {
+        get { MemoryDetailCategory(rawValue: category) ?? .note }
+        set {
+            category = newValue.rawValue
+            updatedAt = .now
+        }
     }
 
     var sortedPersonTags: [PersonTag] {
@@ -352,7 +365,9 @@ final class ReminderConfig: Identifiable {
     }
 
     var cadence: RitualCadence {
-        get { RitualCadence(rawValue: cadenceRawValue) ?? .evening }
+        // fromStoredValue maps legacy camelCase strings ("onceDaily",
+        // "morningEvening") persisted before the SPEC-5 snake_case rename.
+        get { RitualCadence.fromStoredValue(cadenceRawValue) ?? .evening }
         set { cadenceRawValue = newValue.rawValue }
     }
 }

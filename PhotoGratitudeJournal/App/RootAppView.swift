@@ -4,6 +4,7 @@ import SwiftUI
 
 struct RootAppView: View {
     @Environment(PrivacyLockService.self) private var privacyLock
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("hasCompletedFirstLaunchOnboarding") private var hasCompletedFirstLaunchOnboarding = false
     @State private var showingSaveFailureAlert = false
     @State private var selectedTab: AppTab = .today
@@ -47,6 +48,10 @@ struct RootAppView: View {
         }
         .onChange(of: hasCompletedFirstLaunchOnboarding) { _, isCompleted in
             guard isCompleted else { return }
+            Task { await privacyLock.lockIfNeeded() }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .background else { return }
             Task { await privacyLock.lockIfNeeded() }
         }
         .onReceive(NotificationCenter.default.publisher(for: Persistence.saveFailedNotification)) { _ in

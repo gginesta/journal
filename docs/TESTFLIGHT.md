@@ -17,10 +17,12 @@ Use this checklist to prepare the first private iPhone beta for the owner and sp
 - Confirm Apple Developer Program membership is active.
 - Create or verify the App Store Connect app record for `com.guill.PhotoGratitudeJournal`.
 - Assign the app to the correct team in Xcode Signing & Capabilities.
+- Fill in the Apple team id: `PhotoGratitudeJournal.xcodeproj/project.pbxproj` has four empty `DEVELOPMENT_TEAM = "";` entries (app target Debug + Release, test target Debug + Release) that must all be set to the owner's team id before archiving.
+- App icon: `Assets.xcassets/AppIcon.appiconset` ships a 1024 px PNG generated from the web PWA mark (`web/public/icon.svg`). If the mark changes, re-export a 1024×1024 opaque PNG from that SVG and replace `AppIcon.png`.
 - Enable iCloud with CloudKit for the app id.
 - Attach the private CloudKit container `iCloud.com.guill.PhotoGratitudeJournal`.
 - Confirm the entitlement file still references the same iCloud container.
-- Keep Push Notifications off unless a future remote-notification feature is added.
+- Keep Push Notifications off unless a future remote-notification feature is added. (The `UIBackgroundModes` `remote-notification` entry was removed from Info.plist accordingly; if look-back notifications ever ship, re-add it together with the `aps-environment` entitlement.)
 
 ## Signing And Archive
 

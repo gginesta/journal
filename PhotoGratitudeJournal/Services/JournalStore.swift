@@ -1,15 +1,9 @@
 import Foundation
 import SwiftData
 
+// SPEC-6: default prompts are seeded (PromptSeeder); generic person tags are
+// never auto-created — people exist only when the user adds them.
 enum JournalStore {
-    static let defaultPersonTagSeeds: [(name: String, colorHex: String)] = [
-        ("Me", "#5B8DEF"),
-        ("Kid 1", "#F4A261"),
-        ("Kid 2", "#2A9D8F"),
-        ("Partner", "#E76F51"),
-        ("Family", "#7C6F64")
-    ]
-
     static func entry(for day: Date, in context: ModelContext) -> JournalEntry {
         let targetDay = Calendar.current.startOfDay(for: day)
         let descriptor = FetchDescriptor<JournalEntry>(
@@ -28,23 +22,6 @@ enum JournalStore {
         context.insert(entry)
         Persistence.save(context, operation: "Create entry")
         return entry
-    }
-
-    static func seedDefaultPersonTagsIfNeeded(in context: ModelContext) {
-        let existingTags = allPersonTags(in: context)
-        let existingNames = Set(existingTags.map { normalizedName($0.name) })
-
-        for (index, seed) in defaultPersonTagSeeds.enumerated()
-        where !existingNames.contains(normalizedName(seed.name)) {
-            context.insert(PersonTag(
-                name: seed.name,
-                colorHex: seed.colorHex,
-                sortOrder: index,
-                isDefault: true
-            ))
-        }
-
-        Persistence.save(context, operation: "Seed person tags")
     }
 
     static func allPersonTags(in context: ModelContext) -> [PersonTag] {
@@ -173,6 +150,14 @@ enum JournalStore {
         entry.updatedAt = .now
         Persistence.save(context, operation: "Add little detail")
         return detail
+    }
+
+    static func updateDetailCategory(_ detail: MemoryDetail, category: MemoryDetailCategory, in context: ModelContext) {
+        guard detail.detailCategory != category else { return }
+
+        detail.detailCategory = category
+        detail.entry?.updatedAt = .now
+        Persistence.save(context, operation: "Update detail category")
     }
 
     static func assignPersonTag(_ person: PersonTag, to detail: MemoryDetail, in context: ModelContext) {

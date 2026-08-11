@@ -44,7 +44,6 @@ struct TodayView: View {
         .background(Color(.systemGroupedBackground))
         .navigationTitle("Today")
         .task {
-            JournalStore.seedDefaultPersonTagsIfNeeded(in: modelContext)
             let todayEntry = JournalStore.entry(for: .now, in: modelContext)
             entry = todayEntry
         }
@@ -499,6 +498,23 @@ private struct LittleDetailRow: View {
                     Persistence.save(modelContext, operation: "Update detail tags")
                 }
 
+            Menu {
+                Picker("Category", selection: categoryBinding) {
+                    ForEach(MemoryDetailCategory.allCases) { category in
+                        Text(category.title).tag(category)
+                    }
+                }
+            } label: {
+                Label(detail.detailCategory.title, systemImage: "tag")
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: 34)
+                    .background(Color.rose.opacity(0.12), in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.rose)
+            .accessibilityLabel("Detail category, \(detail.detailCategory.title)")
+
             PeopleChipRow(
                 people: people,
                 selectedPersonIDs: Set(detail.sortedPersonTags.map(\.id)),
@@ -518,6 +534,13 @@ private struct LittleDetailRow: View {
         }
         .padding(12)
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var categoryBinding: Binding<MemoryDetailCategory> {
+        Binding(
+            get: { detail.detailCategory },
+            set: { JournalStore.updateDetailCategory(detail, category: $0, in: modelContext) }
+        )
     }
 
     private func togglePerson(_ person: PersonTag) {

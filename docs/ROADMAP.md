@@ -383,6 +383,7 @@ Work:
 - Add beta feedback workflow.
 - Add screenshots for App Store draft.
 - Keep `docs/TESTFLIGHT.md` and `docs/QA_TESTFLIGHT.md` current with the latest beta scope.
+- Decide the iOS backend (Supabase-direct vs dual-store CloudKit+Supabase) before opening the iOS beta beyond the household (improvement plan section 6.1).
 
 Acceptance criteria:
 

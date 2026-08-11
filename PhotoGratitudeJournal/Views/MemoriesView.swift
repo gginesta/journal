@@ -2,7 +2,6 @@ import SwiftData
 import SwiftUI
 
 struct MemoriesView: View {
-    @Environment(\.modelContext) private var modelContext
     @Environment(RouterPath.self) private var router
     @Query(sort: \JournalEntry.day, order: .reverse) private var entries: [JournalEntry]
     @Query(sort: \PersonTag.sortOrder) private var personTags: [PersonTag]
@@ -108,9 +107,6 @@ struct MemoriesView: View {
         .background(Color(.systemGroupedBackground))
         .navigationTitle("Memories")
         .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search memories")
-        .task {
-            JournalStore.seedDefaultPersonTagsIfNeeded(in: modelContext)
-        }
     }
 
     private var normalizedSearchText: String {
@@ -186,6 +182,8 @@ struct MemoriesView: View {
 
         for detail in entry.sortedDetails {
             fields.append(detail.text)
+            fields.append(detail.detailCategory.title)
+            fields.append(detail.category)
             fields += detail.sortedPersonTags.map(\.name)
         }
 
@@ -422,13 +420,26 @@ private struct MemoryMetadataSummary: View {
                 }
 
                 if !details.isEmpty {
-                    Label("\(details.count)", systemImage: "sparkles")
+                    Label(detailSummary, systemImage: "sparkles")
                 }
             }
             .font(.caption.weight(.semibold))
             .foregroundStyle(.secondary)
             .lineLimit(1)
         }
+    }
+
+    // "2 · Phrase, Milestone" when details carry categories; plain count when
+    // every detail is the default note category.
+    private var detailSummary: String {
+        var seenCategories = Set<MemoryDetailCategory>()
+        let categoryTitles = details
+            .map(\.detailCategory)
+            .filter { $0 != .note && seenCategories.insert($0).inserted }
+            .map(\.title)
+
+        guard !categoryTitles.isEmpty else { return "\(details.count)" }
+        return "\(details.count) · \(categoryTitles.joined(separator: ", "))"
     }
 }
 
