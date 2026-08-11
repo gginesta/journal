@@ -1,3 +1,5 @@
+import type { ExperienceMode } from "@/lib/experience-mode";
+
 export type WorkspaceKind = "personal" | "household";
 export type WorkspaceRole = "owner" | "editor" | "viewer";
 export type WorkspaceInvitationState = "invited" | "accepted";
@@ -138,6 +140,9 @@ export type JournalBootstrap = {
   prompts: PromptTemplate[];
   entries: JournalEntry[];
   reminders: ReminderPreferences;
+  // Per-user Simple/Full presentation preference (SPEC-7). Presentation-only:
+  // it never changes data or the sync protocol.
+  experienceMode: ExperienceMode;
 };
 
 export type MemoryMatch = {

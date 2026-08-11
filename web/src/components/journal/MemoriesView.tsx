@@ -5,6 +5,7 @@ import { ArrowRight, CalendarDays, Camera, CheckCircle2, Plus, Search, Sparkles,
 import type { LucideIcon } from "lucide-react";
 import type { JournalEntry, MemoryDetail, PersonTag } from "@/types/journal";
 import { formatDisplayDate, toLocalDate } from "@/lib/dates";
+import { isFeatureVisible, type ExperienceMode } from "@/lib/experience-mode";
 import { entryPeople, firstResponseExcerpt, isEntryComplete, searchEntries } from "@/lib/journal-logic";
 import { listMemoryDetails } from "@/lib/memory-details";
 import { detailCategories, type DetailCategory } from "@/components/journal/helpers";
@@ -16,6 +17,7 @@ type MemoryMode = "entries" | "details";
 
 export function MemoriesView({
   entries,
+  experienceMode,
   people,
   onOpenToday,
   onOpenEntry,
@@ -27,6 +29,7 @@ export function MemoriesView({
   onLoadOlder
 }: {
   entries: JournalEntry[];
+  experienceMode: ExperienceMode;
   people: PersonTag[];
   onOpenToday: () => void;
   onOpenEntry: (entryId: string) => void;
@@ -42,6 +45,11 @@ export function MemoriesView({
   const [personId, setPersonId] = useState<string | null>(null);
   const [filter, setFilter] = useState<MemoryFilter>("all");
   const debouncedQuery = useDebouncedValue(query);
+  // SPEC-7: Simple keeps search (it still matches details/people text) but
+  // hides the filter chips and the Little Details repository management mode.
+  const showRepository = isFeatureVisible(experienceMode, "detailsRepository");
+  const showFilters = isFeatureVisible(experienceMode, "memoriesFilters");
+  const activeMode: MemoryMode = showRepository ? mode : "entries";
   const { completeCount, photoCount, detailCount } = useMemo(
     () => ({
       completeCount: entries.filter(isEntryComplete).length,
@@ -64,27 +72,29 @@ export function MemoriesView({
   return (
     <div className="mx-auto grid max-w-6xl gap-5">
       <PageHeader title="Memories" subtitle="Browse the good things by photo, person, text, and date." />
-      <div className="inline-grid w-full grid-cols-2 rounded-2xl border border-journal-line bg-journal-surface p-1 sm:w-fit">
-        {[
-          { id: "entries", title: "Entries" },
-          { id: "details", title: "Little Details" }
-        ].map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => setMode(item.id as MemoryMode)}
-            className={clsx(
-              "min-h-10 rounded-xl px-4 text-sm font-bold transition",
-              mode === item.id ? "bg-rose text-white shadow-sm" : "text-warm-gray hover:bg-journal-raised"
-            )}
-            aria-pressed={mode === item.id}
-          >
-            {item.title}
-          </button>
-        ))}
-      </div>
+      {showRepository ? (
+        <div className="inline-grid w-full grid-cols-2 rounded-2xl border border-journal-line bg-journal-surface p-1 sm:w-fit">
+          {[
+            { id: "entries", title: "Entries" },
+            { id: "details", title: "Little Details" }
+          ].map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setMode(item.id as MemoryMode)}
+              className={clsx(
+                "min-h-10 rounded-xl px-4 text-sm font-bold transition",
+                activeMode === item.id ? "bg-rose text-white shadow-sm" : "text-warm-gray hover:bg-journal-raised"
+              )}
+              aria-pressed={activeMode === item.id}
+            >
+              {item.title}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
-      {mode === "details" ? (
+      {activeMode === "details" ? (
         <LittleDetailsRepository
           entries={entries}
           people={people}
@@ -118,7 +128,7 @@ export function MemoriesView({
         </section>
       ) : null}
       <div className="rounded-journal border border-journal-line bg-journal-surface p-4">
-        <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
+        <div className={clsx("grid gap-3", showFilters ? "lg:grid-cols-[1fr_auto]" : "")}>
           <label className="relative">
             <Search aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-gray" size={18} />
             <input
@@ -128,20 +138,24 @@ export function MemoriesView({
               className="min-h-12 w-full rounded-2xl border border-journal-line bg-white pl-10 pr-3 outline-none focus:ring-4 focus:ring-rose/15"
             />
           </label>
-          <select
-            value={filter}
-            aria-label="Filter memories"
-            onChange={(event) => setFilter(event.target.value as MemoryFilter)}
-            className="min-h-12 rounded-2xl border border-journal-line bg-white px-3 font-semibold outline-none"
-          >
-            <option value="all">All memories</option>
-            <option value="photos">Photos</option>
-            <option value="text">Text only</option>
-          </select>
+          {showFilters ? (
+            <select
+              value={filter}
+              aria-label="Filter memories"
+              onChange={(event) => setFilter(event.target.value as MemoryFilter)}
+              className="min-h-12 rounded-2xl border border-journal-line bg-white px-3 font-semibold outline-none"
+            >
+              <option value="all">All memories</option>
+              <option value="photos">Photos</option>
+              <option value="text">Text only</option>
+            </select>
+          ) : null}
         </div>
-        <div className="mt-4">
-          <PersonChips people={people} selectedIds={personId ? [personId] : []} onToggle={(id) => setPersonId(personId === id ? null : id)} />
-        </div>
+        {showFilters ? (
+          <div className="mt-4">
+            <PersonChips people={people} selectedIds={personId ? [personId] : []} onToggle={(id) => setPersonId(personId === id ? null : id)} />
+          </div>
+        ) : null}
       </div>
 
       {filtered.length === 0 ? (

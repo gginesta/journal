@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { JournalEntry } from "../src/types/journal";
 import { isEntryComplete, streakSummary } from "../src/lib/journal-logic";
+import { featureKeys, isFeatureVisible, simpleFeatures, visibleTabs } from "../src/lib/experience-mode";
 
 // Shared cross-platform fixtures (see docs/SPEC.md). The iOS test target
 // asserts the same cases, so a platform can only drift by editing a fixture.
@@ -85,4 +86,39 @@ describe("SPEC-2 streak conformance", () => {
       expect(streakSummary(entries, testCase.today)).toEqual(testCase.expected);
     });
   }
+});
+
+describe("SPEC-7 experience-mode conformance", () => {
+  type ExperienceModeFixture = {
+    featureKeys: string[];
+    simpleFeatures: string[];
+    tabs: { simple: string[]; full: string[] };
+  };
+
+  const path = fileURLToPath(new URL("../../spec/fixtures/experience-mode.json", import.meta.url));
+  const fixture = JSON.parse(readFileSync(path, "utf8")) as ExperienceModeFixture;
+
+  it("the module's feature-key universe matches the fixture", () => {
+    expect([...featureKeys].sort()).toEqual([...fixture.featureKeys].sort());
+  });
+
+  it("the Simple feature set matches the fixture", () => {
+    expect([...simpleFeatures].sort()).toEqual([...fixture.simpleFeatures].sort());
+  });
+
+  it("Full shows every feature", () => {
+    for (const feature of featureKeys) {
+      expect(isFeatureVisible("full", feature)).toBe(true);
+    }
+  });
+
+  it("Simple shows exactly the fixture's Simple features", () => {
+    const visibleInSimple = featureKeys.filter((feature) => isFeatureVisible("simple", feature));
+    expect(visibleInSimple.sort()).toEqual([...fixture.simpleFeatures].sort());
+  });
+
+  it("visible tabs per mode match the fixture", () => {
+    expect(visibleTabs("simple")).toEqual(fixture.tabs.simple);
+    expect(visibleTabs("full")).toEqual(fixture.tabs.full);
+  });
 });

@@ -2,6 +2,7 @@ import { useState } from "react";
 import clsx from "clsx";
 import { ArrowRight, CheckCircle2, Clock3, Sparkles, X } from "lucide-react";
 import type { JournalBootstrap, PersonTag, ReminderPreferences, RitualCadence } from "@/types/journal";
+import type { ExperienceMode } from "@/lib/experience-mode";
 import {
   findPersonalizedPersonName,
   onboardingFocusOptions,
@@ -18,6 +19,7 @@ export function OnboardingOverlay({
   profile,
   people,
   mode,
+  experienceMode,
   workspaceName,
   reminders,
   onComplete,
@@ -26,6 +28,7 @@ export function OnboardingOverlay({
   profile: JournalBootstrap["profile"];
   people: PersonTag[];
   mode: "setup" | "welcome-only";
+  experienceMode: ExperienceMode;
   workspaceName: string;
   reminders: ReminderPreferences;
   onComplete: (setup: OnboardingSetup) => void;
@@ -56,7 +59,12 @@ export function OnboardingOverlay({
     kind: "payoff" as OnboardingStepKind,
     title: "The payoff",
     heading: "Memory Lane starts sooner than you think.",
-    body: "After a few kept days, the app brings back yesterday, last week, and one month ago, then three months and yearly moments as your archive grows."
+    // SPEC-7: new users start in Simple, so the final step mentions Full once.
+    body:
+      "After a few kept days, the app brings back yesterday, last week, and one month ago, then three months and yearly moments as your archive grows." +
+      (experienceMode === "simple"
+        ? " Want moods, people tags, and Little Details? Turn on the Full experience in Settings anytime."
+        : "")
   };
 
   const steps =

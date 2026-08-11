@@ -3,6 +3,7 @@ import clsx from "clsx";
 import { ArrowRight, CheckCircle2, ChevronDown, Heart, Plus, Sparkles, Trash2, Users } from "lucide-react";
 import type { JournalEntry, JournalSession, MemoryDetail, PersonTag, PromptTemplate, Workspace } from "@/types/journal";
 import { formatDisplayDate, toLocalDate } from "@/lib/dates";
+import { isFeatureVisible, type ExperienceMode } from "@/lib/experience-mode";
 import { firstResponseExcerpt, isEntryComplete, memoryLaneMatches, streakSummary } from "@/lib/journal-logic";
 import { addSuggestionToReflectionText, gratitudeGuideForEntry } from "@/lib/prompts";
 import { meaningfulFirstMemoryEntries } from "@/lib/first-memory-celebration";
@@ -29,6 +30,7 @@ import {
 export function TodayView({
   entry,
   entries,
+  experienceMode,
   people,
   workspace,
   prompts,
@@ -49,6 +51,7 @@ export function TodayView({
 }: {
   entry: JournalEntry;
   entries: JournalEntry[];
+  experienceMode: ExperienceMode;
   people: PersonTag[];
   workspace: Workspace | null;
   prompts: PromptTemplate[];
@@ -165,9 +168,17 @@ export function TodayView({
         />
 
         <PromptPanel entry={entry} prompts={prompts} canEdit={canEdit} currentUserId={currentUserId} memberNames={memberNames} onUpdateEntry={onUpdateEntry} />
-        <PeoplePanel entry={entry} people={people} canEdit={canEdit} onUpdateEntry={onUpdateEntry} onAddPerson={onAddPerson} />
-        <LittleDetailsPanel entry={entry} people={people} workspace={workspace} canEdit={canEdit} onUpdateEntry={onUpdateEntry} />
-        <MoodPanel entry={entry} canEdit={canEdit} onUpdateEntry={onUpdateEntry} />
+        {/* SPEC-7: Simple hides the metadata inputs. Their stored data still
+            renders in the entry detail modal and stays searchable. */}
+        {isFeatureVisible(experienceMode, "peopleTags") ? (
+          <PeoplePanel entry={entry} people={people} canEdit={canEdit} onUpdateEntry={onUpdateEntry} onAddPerson={onAddPerson} />
+        ) : null}
+        {isFeatureVisible(experienceMode, "littleDetailsPanel") ? (
+          <LittleDetailsPanel entry={entry} people={people} workspace={workspace} canEdit={canEdit} onUpdateEntry={onUpdateEntry} />
+        ) : null}
+        {isFeatureVisible(experienceMode, "moodPicker") ? (
+          <MoodPanel entry={entry} canEdit={canEdit} onUpdateEntry={onUpdateEntry} />
+        ) : null}
       </section>
 
       <aside aria-label="More for today" className="grid content-start gap-5">
@@ -178,16 +189,26 @@ export function TodayView({
           aria-expanded={showMoreForToday}
           className="flex min-h-12 items-center justify-between rounded-journal border border-journal-line bg-journal-surface px-5 text-left text-sm font-bold text-soft-ink xl:hidden"
         >
-          More for today: a look back, gentle starters
+          {isFeatureVisible(experienceMode, "gratitudeGuide")
+            ? "More for today: a look back, gentle starters"
+            : "More for today: a look back"}
           <ChevronDown aria-hidden="true" size={18} className={clsx("transition", showMoreForToday ? "rotate-180" : "")} />
         </button>
         <div className={clsx("grid gap-5", showMoreForToday ? "" : "hidden xl:grid")}>
-          <PickMeUpMemoryCard entries={entries} onOpenEntry={onOpenEntry} />
-          <GratitudeGuideCard guide={guide} canEdit={canEdit} onUseSuggestion={useGuideSuggestion} />
+          {/* SPEC-7: Memory Lane is the one aside kept in Simple — the
+              read-only rediscovery payoff that makes the ritual worth it. */}
+          {isFeatureVisible(experienceMode, "pickMeUpMemory") ? (
+            <PickMeUpMemoryCard entries={entries} onOpenEntry={onOpenEntry} />
+          ) : null}
+          {isFeatureVisible(experienceMode, "gratitudeGuide") ? (
+            <GratitudeGuideCard guide={guide} canEdit={canEdit} onUseSuggestion={useGuideSuggestion} />
+          ) : null}
           <MemoryLanePanel matches={matches} entries={entries} onOpenEntry={onOpenEntry} />
-          <div className="hidden xl:block">
-            <PromptSnapshot prompts={prompts} />
-          </div>
+          {isFeatureVisible(experienceMode, "promptSnapshot") ? (
+            <div className="hidden xl:block">
+              <PromptSnapshot prompts={prompts} />
+            </div>
+          ) : null}
         </div>
       </aside>
     </div>

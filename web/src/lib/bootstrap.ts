@@ -10,6 +10,7 @@ import type {
   WorkspaceMember
 } from "@/types/journal";
 import { makeDemoBootstrap } from "@/data/demo";
+import { isExperienceMode, type ExperienceMode } from "@/lib/experience-mode";
 import { eagerEntryWindows } from "@/lib/journal-logic";
 import { isDemoMode } from "@/lib/supabase/env";
 import { createSupabaseServerClient, type SupabaseServerClient } from "@/lib/supabase/server";
@@ -34,6 +35,7 @@ type ProfileRow = {
   id: string;
   email: string;
   display_name: string;
+  experience_mode?: string;
 };
 
 type PersonRow = {
@@ -142,7 +144,7 @@ export async function loadJournalBootstrap(): Promise<JournalBootstrap> {
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id,email,display_name")
+      .select("id,email,display_name,experience_mode")
       .eq("id", user.id)
       .single(),
     supabase
@@ -238,8 +240,16 @@ export async function loadJournalBootstrap(): Promise<JournalBootstrap> {
     people: ((peopleResult.data ?? []) as PersonRow[]).map(mapPerson),
     prompts: ((promptsResult.data ?? []) as PromptRow[]).map(mapPrompt),
     entries: rawEntries.map((entry) => mapEntry(entry, signedPhotoUrls)),
-    reminders: mapReminders(remindersResult.data as ReminderRow | null)
+    reminders: mapReminders(remindersResult.data as ReminderRow | null),
+    experienceMode: mapExperienceMode((profileResult.data as ProfileRow | null)?.experience_mode)
   };
+}
+
+// The 202608110002 migration defaults new profiles to 'simple' and backfills
+// existing ones to 'full', so a missing/unknown value only occurs before the
+// migration runs — where every user is a grandfathered Full user.
+function mapExperienceMode(value: string | undefined): ExperienceMode {
+  return isExperienceMode(value) ? value : "full";
 }
 
 function makeUnavailableBootstrap(profile: Profile | null, pendingInvites: PendingWorkspaceInvite[] = []): JournalBootstrap {
@@ -254,7 +264,10 @@ function makeUnavailableBootstrap(profile: Profile | null, pendingInvites: Pendi
     people: [],
     prompts: [],
     entries: [],
-    reminders: mapReminders(null)
+    reminders: mapReminders(null),
+    // The recovery screen renders instead of the journal, so the value is
+    // inert; 'full' matches the grandfathered default for existing accounts.
+    experienceMode: "full"
   };
 }
 

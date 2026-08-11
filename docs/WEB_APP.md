@@ -106,6 +106,10 @@ Demo mode is enabled only when `NEXT_PUBLIC_DEMO_MODE` is exactly `true`, or whe
 - Settings:
   - Workspace switching, prompt editing, people tags, reminders, export, delete controls, and sign out remain understandable in both demo and Supabase modes.
   - Workspace copy reflects solo, partner, family, or custom journal contexts without making family use mandatory.
+- Experience mode (Simple/Full, SPEC-7 in `docs/SPEC.md`):
+  - The Experience section at the top of Settings switches between Simple (photo + three nice things + done, with Memory Lane and search kept) and Full (everything: moods, people tags, Little Details, Gratitude Guide, Calendar, Insights, prompt/people-tag editors, details repository).
+  - The toggle is presentation-only: switching never deletes data — anything added in Full still shows in entry detail and search while in Simple, and comes back editable in Full.
+  - New accounts start in Simple (`profiles.experience_mode`, migration `202608110002`); existing accounts are grandfathered into Full; demo mode starts in Full and keeps the choice in its own localStorage key so "delete workspace entries" never resets it. Authenticated changes persist through `POST /api/profile`, deliberately outside `/api/journal/sync`.
 
 ## Local Setup
 

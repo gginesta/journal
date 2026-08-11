@@ -22,6 +22,7 @@ import {
   type OnboardingSetup
 } from "@/lib/onboarding";
 import { demoStorageFullMessage, writeDemoStateToStorage } from "@/lib/demo-storage";
+import { isExperienceMode, visibleTabs, type ExperienceMode } from "@/lib/experience-mode";
 import { isPendingUploadPhoto, selectDirtyEntries, serializeEntryForSync, stripPendingUploadPhotos } from "@/lib/journal-sync-delta";
 import { canMutateWorkspaceRole } from "@/lib/journal-sync-safety";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -66,9 +67,14 @@ const EntryDetailModal = dynamic(() => import("@/components/journal/EntryDetailM
 });
 
 const storageKey = "photo-gratitude-web-state-v1";
+// Demo-mode home of the Simple/Full preference. Deliberately separate from the
+// state blob above so "delete all data" (which rewrites the blob) never resets
+// the experience choice.
+const modeStorageKey = "photo-gratitude-web-mode-v1";
 
 export function JournalApp({ initialData, appVersion }: { initialData: JournalBootstrap; appVersion: string }) {
   const [tab, setTab] = useState<AppTab>("today");
+  const [experienceMode, setExperienceMode] = useState<ExperienceMode>(initialData.experienceMode);
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(initialData.activeWorkspaceId);
   const [workspaces, setWorkspaces] = useState(initialData.workspaces);
@@ -125,6 +131,15 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
     () => workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null,
     [workspaces, activeWorkspaceId]
   );
+
+  // Demo persistence for the experience mode: its own key, read once on
+  // mount and written only by updateExperienceMode (never by the state-blob
+  // effect below), so clearing demo data leaves the preference alone.
+  useEffect(() => {
+    if (initialData.mode !== "demo") return;
+    const stored = window.localStorage.getItem(modeStorageKey);
+    if (isExperienceMode(stored)) setExperienceMode(stored);
+  }, [initialData.mode]);
 
   useEffect(() => {
     if (initialData.mode !== "demo") return;
@@ -503,6 +518,31 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
     });
   }
 
+  // Presentation-only preference (SPEC-7): allowed for every role — a viewer
+  // picks their own density. Persists through POST /api/profile in Supabase
+  // mode and the dedicated localStorage key in demo mode; the UI switches
+  // optimistically either way and a failed save only surfaces a message.
+  function updateExperienceMode(mode: ExperienceMode) {
+    setExperienceMode(mode);
+    setTab((current) => (visibleTabs(mode).some((visible) => visible === current) ? current : "today"));
+    if (initialData.mode !== "supabase") {
+      window.localStorage.setItem(modeStorageKey, mode);
+      return;
+    }
+    void (async () => {
+      try {
+        const response = await fetch("/api/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ experienceMode: mode })
+        });
+        if (!response.ok) throw new Error(await responseErrorMessage(response, "The experience choice could not be saved"));
+      } catch (error) {
+        setSaveError(error instanceof Error ? error.message : "The experience choice could not be saved");
+      }
+    })();
+  }
+
   const updateReminders: React.Dispatch<React.SetStateAction<ReminderPreferences>> = (value) => {
     if (blockReadOnlyMutation()) return;
     markPendingSave();
@@ -784,6 +824,7 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
         <Sidebar
           activeTab={tab}
           setTab={setTab}
+          experienceMode={experienceMode}
           workspaces={workspaces}
           activeWorkspaceId={activeWorkspaceId}
           setActiveWorkspaceId={setActiveWorkspaceId}
@@ -827,6 +868,7 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
             <TodayView
               entry={todayEntry}
               entries={workspaceEntries}
+              experienceMode={experienceMode}
               people={workspacePeople}
               workspace={activeWorkspace}
               prompts={workspacePrompts}
@@ -853,6 +895,7 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
           {tab === "memories" ? (
             <MemoriesView
               entries={workspaceEntries}
+              experienceMode={experienceMode}
               people={workspacePeople}
               onOpenToday={() => setTab("today")}
               onOpenEntry={setSelectedEntryId}
@@ -880,6 +923,8 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
             <SettingsView
               profile={initialData.profile}
               mode={initialData.mode}
+              experienceMode={experienceMode}
+              onChangeExperienceMode={updateExperienceMode}
               workspaces={workspaces}
               activeWorkspaceId={activeWorkspaceId}
               workspaceMembers={activeWorkspaceMembers}
@@ -903,7 +948,7 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
         </main>
       </div>
 
-      <MobileTabs activeTab={tab} setTab={setTab} />
+      <MobileTabs activeTab={tab} setTab={setTab} experienceMode={experienceMode} />
       {selectedEntry ? (
         <EntryDetailModal
           entry={selectedEntry}
@@ -921,6 +966,7 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
           profile={initialData.profile}
           people={workspacePeople}
           mode={onboardingMode}
+          experienceMode={experienceMode}
           workspaceName={activeWorkspace?.name ?? "your journal"}
           reminders={reminders}
           onComplete={completeOnboarding}

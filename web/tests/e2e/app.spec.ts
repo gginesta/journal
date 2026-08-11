@@ -249,6 +249,51 @@ test("photo polish lets a demo user caption a photo and use the pick-me-up memor
   await expect(page.locator("article").filter({ hasText: caption })).toBeVisible();
 });
 
+test("experience toggle switches Simple and Full without losing data", async ({ page }) => {
+  const detail = "Tiny detail kept in Full";
+
+  await openFreshApp(page);
+  await page.getByRole("button", { name: "Skip tour" }).click();
+
+  // The demo showcase starts in Full: the metadata surfaces are present and a
+  // Little Detail can be saved before any switching.
+  await expect(page.getByRole("heading", { name: "Mood, optional" })).toBeVisible();
+  await page.getByPlaceholder("A phrase, phase, favorite, or tiny milestone").fill(detail);
+  await page.getByLabel("Add little detail").click();
+  await expect(page.locator("article").filter({ hasText: detail })).toBeVisible();
+
+  await page.getByRole("button", { name: "Settings" }).first().click();
+  await expect(page.getByRole("heading", { name: "Experience" })).toBeVisible();
+  await expect(page.getByText("Switching never deletes anything; what you added in Full stays saved and comes right back.")).toBeVisible();
+  await page.getByRole("radio", { name: /^Simple/ }).click();
+  await expect(page.getByRole("radio", { name: /^Simple/ })).toBeChecked();
+
+  // Simple: the analysis tabs disappear and customization sections hide.
+  await expect(page.getByRole("button", { name: "Calendar", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Insights", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Prompts", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "People Tags" })).toHaveCount(0);
+
+  // Simple Today: ritual only — no mood picker, people tags, or Little Details.
+  await page.getByRole("button", { name: "Today" }).first().click();
+  await expect(page.getByRole("heading", { name: "What felt good today?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Three nice things" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Mood, optional" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "People, optional" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Little Details" })).toHaveCount(0);
+
+  // Back to Full: everything returns, including the detail saved earlier.
+  await page.getByRole("button", { name: "Settings" }).first().click();
+  await page.getByRole("radio", { name: /^Full/ }).click();
+  await expect(page.getByRole("radio", { name: /^Full/ })).toBeChecked();
+  await expect(page.getByRole("button", { name: "Calendar", exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Insights", exact: true }).first()).toBeVisible();
+
+  await page.getByRole("button", { name: "Today" }).first().click();
+  await expect(page.getByRole("heading", { name: "Mood, optional" })).toBeVisible();
+  await expect(page.locator("article").filter({ hasText: detail })).toBeVisible();
+});
+
 test("demo user can add and remove a photo without requiring reflection text", async ({ page }) => {
   const tinyPhoto = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/l7Q5YQAAAABJRU5ErkJggg==",

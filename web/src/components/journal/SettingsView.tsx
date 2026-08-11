@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { CalendarPlus, Download, LogOut, Plus, Sparkles, Trash2 } from "lucide-react";
+import { CalendarPlus, CheckCircle2, Download, LogOut, Plus, Sparkles, Trash2 } from "lucide-react";
 import type {
   JournalEntry,
   PersonTag,
@@ -12,6 +12,7 @@ import type {
   WorkspaceRole
 } from "@/types/journal";
 import { SharedJournalCopy } from "@/components/wow/SharedJournalCopy";
+import { isFeatureVisible, type ExperienceMode } from "@/lib/experience-mode";
 import { responseErrorMessage } from "@/components/journal/helpers";
 import { PageHeader } from "@/components/journal/shared";
 import { buildReminderIcs } from "@/lib/reminder-ics";
@@ -20,6 +21,8 @@ import { getPushDeviceStatus, subscribeThisDevice, unsubscribeThisDevice, type P
 export function SettingsView({
   profile,
   mode,
+  experienceMode,
+  onChangeExperienceMode,
   workspaces,
   activeWorkspaceId,
   workspaceMembers,
@@ -41,6 +44,8 @@ export function SettingsView({
 }: {
   profile: { email: string; displayName: string } | null;
   mode: "demo" | "supabase";
+  experienceMode: ExperienceMode;
+  onChangeExperienceMode: (mode: ExperienceMode) => void;
   workspaces: Workspace[];
   activeWorkspaceId: string;
   workspaceMembers: WorkspaceMember[];
@@ -65,6 +70,7 @@ export function SettingsView({
   return (
     <div className="mx-auto grid max-w-5xl gap-5">
       <PageHeader title="Settings" subtitle="Plain controls for privacy, prompts, people, export, and household access." />
+      <ExperienceSection experienceMode={experienceMode} onChangeExperienceMode={onChangeExperienceMode} />
       <SettingsSection title="Account">
         <p className="text-warm-gray">{profile?.email ?? "Local demo user"}</p>
         <div className="mt-3 flex flex-wrap gap-2">
@@ -120,6 +126,8 @@ export function SettingsView({
         setReminders={setReminders}
       />
 
+      {/* SPEC-7: prompt and people-tag customization are Full-mode surfaces. */}
+      {isFeatureVisible(experienceMode, "promptEditor") ? (
       <SettingsSection title="Prompts">
         {!canEdit ? <ReadOnlySettingsCopy /> : null}
         <div className="grid gap-3">
@@ -139,7 +147,9 @@ export function SettingsView({
           ))}
         </div>
       </SettingsSection>
+      ) : null}
 
+      {isFeatureVisible(experienceMode, "peopleTagEditor") ? (
       <SettingsSection title="People Tags">
         {!canEdit ? <ReadOnlySettingsCopy /> : null}
         <div className="grid gap-2 sm:grid-cols-2">
@@ -159,6 +169,7 @@ export function SettingsView({
           ))}
         </div>
       </SettingsSection>
+      ) : null}
 
       <SettingsSection title="Data">
         <div className="flex flex-wrap gap-2">
@@ -191,6 +202,61 @@ export function SettingsView({
         </div>
       </SettingsSection>
     </div>
+  );
+}
+
+// SPEC-7: the Simple/Full toggle. Presentation-only, so it stays enabled for
+// every role — a viewer picks their own density too.
+function ExperienceSection({
+  experienceMode,
+  onChangeExperienceMode
+}: {
+  experienceMode: ExperienceMode;
+  onChangeExperienceMode: (mode: ExperienceMode) => void;
+}) {
+  const options: Array<{ id: ExperienceMode; title: string; text: string }> = [
+    {
+      id: "simple",
+      title: "Simple",
+      text: "A one-minute ritual — one photo, three nice things, done. Memory Lane still brings back the good days."
+    },
+    {
+      id: "full",
+      title: "Full",
+      text: "Everything — moods, people tags, Little Details, Gratitude Guide, Calendar and Insights."
+    }
+  ];
+
+  return (
+    <SettingsSection title="Experience">
+      <div role="radiogroup" aria-label="Experience" className="grid gap-2 sm:grid-cols-2">
+        {options.map((option) => {
+          const active = experienceMode === option.id;
+          return (
+            <button
+              key={option.id}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => onChangeExperienceMode(option.id)}
+              className={clsx(
+                "rounded-[20px] border p-4 text-left transition",
+                active ? "border-rose/30 bg-rose/10" : "border-journal-line bg-white hover:border-rose/20"
+              )}
+            >
+              <span className="flex items-center gap-2 font-bold text-ink">
+                {active ? <CheckCircle2 aria-hidden="true" size={16} className="text-rose" /> : null}
+                {option.title}
+              </span>
+              <span className={clsx("mt-1 block text-sm leading-5", active ? "text-soft-ink" : "text-warm-gray")}>{option.text}</span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-3 text-sm leading-6 text-warm-gray">
+        Switching never deletes anything; what you added in Full stays saved and comes right back.
+      </p>
+    </SettingsSection>
   );
 }
 

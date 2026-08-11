@@ -1,0 +1,83 @@
+{
+  "spec": "SPEC-3",
+  "description": "memoryLaneMatches(entries, today). Entries are {id, date, complete}. Only strictly-past complete entries are eligible; ladder order with per-target tolerances; an entry serves at most one target; cap 4; 'Recent good thing' fallback when no target matches. Expected rows are ordered.",
+  "cases": [
+    {
+      "name": "exact one-year anniversary matches at distance zero",
+      "today": "2026-08-11",
+      "entries": [
+        { "id": "e1", "date": "2025-08-11", "complete": true }
+      ],
+      "expected": [
+        { "label": "1 year ago", "entryId": "e1", "dayDistance": 0 }
+      ]
+    },
+    {
+      "name": "tolerance boundary included: three days off the one-year target",
+      "today": "2026-08-11",
+      "entries": [
+        { "id": "e1", "date": "2025-08-08", "complete": true }
+      ],
+      "expected": [
+        { "label": "1 year ago", "entryId": "e1", "dayDistance": 3 }
+      ]
+    },
+    {
+      "name": "beyond tolerance: no ladder match falls back to recent good thing",
+      "today": "2026-08-11",
+      "entries": [
+        { "id": "e1", "date": "2025-08-07", "complete": true }
+      ],
+      "expected": [
+        { "label": "Recent good thing", "entryId": "e1", "dayDistance": 369 }
+      ]
+    },
+    {
+      "name": "incomplete entries are excluded even on an exact anniversary",
+      "today": "2026-08-11",
+      "entries": [
+        { "id": "e1", "date": "2025-08-11", "complete": false },
+        { "id": "e2", "date": "2026-07-02", "complete": true }
+      ],
+      "expected": [
+        { "label": "Recent good thing", "entryId": "e2", "dayDistance": 40 }
+      ]
+    },
+    {
+      "name": "cap at four matches in ladder order",
+      "today": "2026-08-11",
+      "entries": [
+        { "id": "month", "date": "2026-07-11", "complete": true },
+        { "id": "twoWeeks", "date": "2026-07-28", "complete": true },
+        { "id": "oneWeek", "date": "2026-08-04", "complete": true },
+        { "id": "threeDays", "date": "2026-08-08", "complete": true },
+        { "id": "yesterday", "date": "2026-08-10", "complete": true }
+      ],
+      "expected": [
+        { "label": "1 month ago", "entryId": "month", "dayDistance": 0 },
+        { "label": "2 weeks ago", "entryId": "twoWeeks", "dayDistance": 0 },
+        { "label": "1 week ago", "entryId": "oneWeek", "dayDistance": 0 },
+        { "label": "3 days ago", "entryId": "threeDays", "dayDistance": 0 }
+      ]
+    },
+    {
+      "name": "today's entry is strictly excluded, even from the fallback",
+      "today": "2026-08-11",
+      "entries": [
+        { "id": "e1", "date": "2026-08-11", "complete": true }
+      ],
+      "expected": []
+    },
+    {
+      "name": "distance tie prefers the more recent entry",
+      "today": "2026-08-11",
+      "entries": [
+        { "id": "older", "date": "2025-08-10", "complete": true },
+        { "id": "newer", "date": "2025-08-12", "complete": true }
+      ],
+      "expected": [
+        { "label": "1 year ago", "entryId": "newer", "dayDistance": 1 }
+      ]
+    }
+  ]
+}
