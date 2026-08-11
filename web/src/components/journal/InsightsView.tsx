@@ -1,16 +1,24 @@
+import { useMemo } from "react";
 import type { JournalEntry } from "@/types/journal";
+import { toLocalDate } from "@/lib/dates";
 import { isEntryComplete, streakSummary } from "@/lib/journal-logic";
 import { moodOptions } from "@/components/journal/helpers";
 import { PageHeader } from "@/components/journal/shared";
 
 export function InsightsView({ entries }: { entries: JournalEntry[] }) {
-  const summary = streakSummary(entries);
-  const photoDays = entries.filter((entry) => entry.photos.length > 0).length;
-  const completeDays = entries.filter(isEntryComplete).length;
-  const moodCounts = moodOptions.map((mood) => ({
-    ...mood,
-    count: entries.filter((entry) => entry.mood === mood.id).length
-  }));
+  const today = toLocalDate();
+  const { summary, photoDays, completeDays, moodCounts } = useMemo(
+    () => ({
+      summary: streakSummary(entries, today),
+      photoDays: entries.filter((entry) => entry.photos.length > 0).length,
+      completeDays: entries.filter(isEntryComplete).length,
+      moodCounts: moodOptions.map((mood) => ({
+        ...mood,
+        count: entries.filter((entry) => entry.mood === mood.id).length
+      }))
+    }),
+    [entries, today]
+  );
 
   return (
     <div className="mx-auto grid max-w-5xl gap-5">

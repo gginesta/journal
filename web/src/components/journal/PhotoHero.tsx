@@ -83,6 +83,7 @@ export function PhotoHero({
             ? {
                 ...photo,
                 previewUrl,
+                thumbnailUrl: undefined,
                 storagePath: "",
                 thumbnailPath: "",
                 createdAt: new Date().toISOString()
@@ -203,7 +204,7 @@ export function PhotoHero({
             {orderedPhotos.map((photo, index) => (
               <article key={photo.id} className="grid gap-3 rounded-[22px] border border-journal-line bg-white p-3 shadow-sm">
                 <div className="grid grid-cols-[76px_1fr] gap-3">
-                  <img src={photo.previewUrl} alt="" className="h-[76px] w-[76px] rounded-2xl object-cover" />
+                  <img src={photo.thumbnailUrl || photo.previewUrl} alt="" className="h-[76px] w-[76px] rounded-2xl object-cover" />
                   <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.12em] text-warm-gray">
                     {index === 0 ? "Cover caption" : "Second photo caption"}
                     <input

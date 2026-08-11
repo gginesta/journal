@@ -72,6 +72,10 @@ export type PhotoAttachment = {
   storagePath: string;
   thumbnailPath: string;
   previewUrl: string;
+  // Signed thumbnail URL for small renditions. Derived presentation data like
+  // previewUrl — never serialized into the sync payload or dirty check. Absent
+  // for just-added photos and demo fixtures; renderers fall back to previewUrl.
+  thumbnailUrl?: string;
   caption: string;
   sortOrder: number;
   createdAt: string;

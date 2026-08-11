@@ -14,9 +14,11 @@ import type {
 
 export type SyncPayload = {
   workspaceId: string;
-  people: PersonTag[];
-  prompts: PromptTemplate[];
-  reminders: ReminderPreferences;
+  // Delta-synced sections: a client omits any section the server has already
+  // acknowledged, and the route skips the corresponding upserts.
+  people?: PersonTag[];
+  prompts?: PromptTemplate[];
+  reminders?: ReminderPreferences;
   entries: JournalEntry[];
 };
 
@@ -191,17 +193,21 @@ export function validateSyncPayload(value: unknown): SyncPayloadValidation {
   if (!isRecord(value)) return fail("Sync payload must be a JSON object");
   if (!isUuid(value.workspaceId)) return fail("workspaceId must be a valid id");
 
-  if (!Array.isArray(value.people) || value.people.length > syncLimits.people) {
-    return fail("people must be a list within the allowed size");
+  if (value.people !== undefined) {
+    if (!Array.isArray(value.people) || value.people.length > syncLimits.people) {
+      return fail("people must be a list within the allowed size");
+    }
+    if (!value.people.every(isPersonTag)) return fail("people contains an invalid person tag");
   }
-  if (!value.people.every(isPersonTag)) return fail("people contains an invalid person tag");
 
-  if (!Array.isArray(value.prompts) || value.prompts.length > syncLimits.prompts) {
-    return fail("prompts must be a list within the allowed size");
+  if (value.prompts !== undefined) {
+    if (!Array.isArray(value.prompts) || value.prompts.length > syncLimits.prompts) {
+      return fail("prompts must be a list within the allowed size");
+    }
+    if (!value.prompts.every(isPromptTemplate)) return fail("prompts contains an invalid prompt");
   }
-  if (!value.prompts.every(isPromptTemplate)) return fail("prompts contains an invalid prompt");
 
-  if (!isReminderPreferences(value.reminders)) return fail("reminders is invalid");
+  if (value.reminders !== undefined && !isReminderPreferences(value.reminders)) return fail("reminders is invalid");
 
   if (!Array.isArray(value.entries) || value.entries.length > syncLimits.entries) {
     return fail("entries must be a list within the allowed size");

@@ -82,6 +82,14 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
   const ackedEntrySerializations = useRef<Map<string, string>>(
     new Map(initialData.entries.map((entry) => [entry.id, serializeEntryForSync(entry)]))
   );
+  // Same acked pattern for the people/prompts/reminders sections: each is
+  // included in a sync POST only when it differs from what the server last
+  // acknowledged (bootstrap data is server state, so it starts acked).
+  const ackedSectionSerializations = useRef({
+    people: JSON.stringify(initialData.people.filter((person) => person.workspaceId === initialData.activeWorkspaceId)),
+    prompts: JSON.stringify(initialData.prompts.filter((prompt) => prompt.workspaceId === initialData.activeWorkspaceId)),
+    reminders: JSON.stringify(initialData.reminders)
+  });
 
   const onboardingKey = useMemo(() => `${onboardingStorageKey}:${initialData.profile?.id ?? "demo"}`, [initialData.profile?.id]);
   const firstMemoryKey = useMemo(() => firstMemoryCelebrationStorageKey(activeWorkspaceId), [activeWorkspaceId]);
@@ -273,17 +281,23 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
       try {
         const dirtyEntries = selectDirtyEntries(workspaceEntries, ackedEntrySerializations.current);
         const sentSerializations = new Map(dirtyEntries.map((entry) => [entry.id, serializeEntryForSync(entry)]));
+        const ackedSections = ackedSectionSerializations.current;
+        const peopleJson = JSON.stringify(workspacePeople);
+        const promptsJson = JSON.stringify(workspacePrompts);
+        const remindersJson = JSON.stringify(reminders);
         const response = await fetch("/api/journal/sync", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           signal: controller.signal,
           body: JSON.stringify({
             workspaceId: activeWorkspaceId,
-            people: workspacePeople,
-            prompts: workspacePrompts,
-            reminders,
+            ...(peopleJson === ackedSections.people ? {} : { people: workspacePeople }),
+            ...(promptsJson === ackedSections.prompts ? {} : { prompts: workspacePrompts }),
+            ...(remindersJson === ackedSections.reminders ? {} : { reminders }),
             entries: dirtyEntries.map((entry) => ({
               ...entry,
+              // Derived presentation data; JSON.stringify drops the undefined.
+              photos: entry.photos.map((photo) => ({ ...photo, thumbnailUrl: undefined })),
               syncedAt: serverEntryBaselines.current.get(entry.id) ?? null
             }))
           })
@@ -291,6 +305,9 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
 
         if (!response.ok) throw new Error(await responseErrorMessage(response, "Sync failed"));
         const result = (await response.json()) as { ok?: boolean; applied?: Record<string, string>; stale?: string[] };
+        ackedSections.people = peopleJson;
+        ackedSections.prompts = promptsJson;
+        ackedSections.reminders = remindersJson;
         for (const [entryId, serverUpdatedAt] of Object.entries(result.applied ?? {})) {
           serverEntryBaselines.current.set(entryId, serverUpdatedAt);
           const sent = sentSerializations.get(entryId);

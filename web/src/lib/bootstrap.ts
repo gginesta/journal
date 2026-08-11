@@ -10,7 +10,7 @@ import type {
 import { makeDemoBootstrap } from "@/data/demo";
 import { eagerEntryWindows } from "@/lib/journal-logic";
 import { isDemoMode } from "@/lib/supabase/env";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, type SupabaseServerClient } from "@/lib/supabase/server";
 
 type WorkspaceRow = {
   id: string;
@@ -209,9 +209,11 @@ export async function loadJournalBootstrap(): Promise<JournalBootstrap> {
   ]);
 
   const rawEntries = (entriesResult.data ?? []) as EntryRow[];
-  const signedPhotoUrls = await createPhotoUrlMap(rawEntries);
   const memberRows = (membersResult.data ?? []) as WorkspaceMemberRow[];
-  const memberProfiles = await loadMemberProfiles(memberRows.map((member) => member.user_id));
+  const [signedPhotoUrls, memberProfiles] = await Promise.all([
+    createPhotoUrlMap(supabase, rawEntries),
+    loadMemberProfiles(supabase, memberRows.map((member) => member.user_id))
+  ]);
 
   return {
     mode: "supabase",
@@ -231,11 +233,10 @@ export async function loadJournalBootstrap(): Promise<JournalBootstrap> {
   };
 }
 
-async function loadMemberProfiles(userIds: string[]): Promise<Map<string, ProfileRow>> {
-  const supabase = await createSupabaseServerClient();
+async function loadMemberProfiles(supabase: SupabaseServerClient, userIds: string[]): Promise<Map<string, ProfileRow>> {
   const uniqueIds = Array.from(new Set(userIds));
   const profiles = new Map<string, ProfileRow>();
-  if (!supabase || uniqueIds.length === 0) return profiles;
+  if (uniqueIds.length === 0) return profiles;
 
   const { data } = await supabase.from("profiles").select("id,email,display_name").in("id", uniqueIds);
   for (const profile of (data ?? []) as ProfileRow[]) {
@@ -283,17 +284,24 @@ function mapPrompt(row: PromptRow): PromptTemplate {
   };
 }
 
-export async function createPhotoUrlMap(entries: EntryRow[]): Promise<Map<string, string>> {
-  const supabase = await createSupabaseServerClient();
-  const paths = entries.flatMap((entry) => (entry.photo_attachments ?? []).map((photo) => photo.storage_path).filter(Boolean));
+// One map keyed by storage path, covering both the full-size photos and their
+// thumbnails (paths never collide: thumbnails carry a `-thumb` suffix).
+export async function createPhotoUrlMap(supabase: SupabaseServerClient, entries: EntryRow[]): Promise<Map<string, string>> {
+  const photos = entries.flatMap((entry) => entry.photo_attachments ?? []);
   const urls = new Map<string, string>();
-  if (!supabase || paths.length === 0) return urls;
 
-  const { data } = await supabase.storage.from("journal-photos").createSignedUrls(paths, 60 * 60 * 24 * 7);
-
-  for (const result of data ?? []) {
-    if (result.path && result.signedUrl && !result.error) urls.set(result.path, result.signedUrl);
+  async function signPaths(bucket: string, paths: string[]) {
+    if (paths.length === 0) return;
+    const { data } = await supabase.storage.from(bucket).createSignedUrls(paths, 60 * 60 * 24 * 7);
+    for (const result of data ?? []) {
+      if (result.path && result.signedUrl && !result.error) urls.set(result.path, result.signedUrl);
+    }
   }
+
+  await Promise.all([
+    signPaths("journal-photos", photos.map((photo) => photo.storage_path).filter(Boolean)),
+    signPaths("journal-thumbnails", photos.map((photo) => photo.thumbnail_path).filter(Boolean))
+  ]);
   return urls;
 }
 
@@ -307,16 +315,21 @@ export function mapEntry(row: EntryRow, signedPhotoUrls = new Map<string, string
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     personTagIds: (row.entry_person_tags ?? []).map((link) => link.person_tag_id),
-    photos: (row.photo_attachments ?? []).map((photo) => ({
-      id: photo.id,
-      entryId: photo.entry_id,
-      storagePath: photo.storage_path,
-      thumbnailPath: photo.thumbnail_path,
-      previewUrl: signedPhotoUrls.get(photo.storage_path) ?? "",
-      caption: photo.caption ?? "",
-      sortOrder: photo.sort_order,
-      createdAt: photo.created_at
-    })),
+    photos: (row.photo_attachments ?? []).map((photo) => {
+      const previewUrl = signedPhotoUrls.get(photo.storage_path) ?? "";
+      return {
+        id: photo.id,
+        entryId: photo.entry_id,
+        storagePath: photo.storage_path,
+        thumbnailPath: photo.thumbnail_path,
+        previewUrl,
+        // Photos from before thumbnail generation may have no thumbnail yet.
+        thumbnailUrl: signedPhotoUrls.get(photo.thumbnail_path) || previewUrl,
+        caption: photo.caption ?? "",
+        sortOrder: photo.sort_order,
+        createdAt: photo.created_at
+      };
+    }),
     sessions: (row.journal_sessions ?? []).map((session) => ({
       id: session.id,
       kind: session.kind,

@@ -68,8 +68,12 @@ export function TodayView({
   memberNames?: Record<string, string>;
 }) {
   const [showMoreForToday, setShowMoreForToday] = useState(false);
-  const summary = streakSummary(entries);
-  const matches = memoryLaneMatches(entries).filter((match) => match.entryId !== entry.id);
+  const today = toLocalDate();
+  const summary = useMemo(() => streakSummary(entries, today), [entries, today]);
+  const matches = useMemo(
+    () => memoryLaneMatches(entries, today).filter((match) => match.entryId !== entry.id),
+    [entries, today, entry.id]
+  );
   const firstMeaningfulEntry = meaningfulFirstMemoryEntries(entries)[0] ?? entry;
   const guide = gratitudeGuideForEntry({
     localDate: entry.localDate,
@@ -261,7 +265,7 @@ function PickMeUpMemoryCard({
         onClick={() => onOpenEntry(memory.id)}
         className="group overflow-hidden rounded-[22px] bg-journal-raised text-left transition hover:-translate-y-0.5 hover:bg-white hover:shadow-sm"
       >
-        <JournalPhoto src={photo?.previewUrl} alt={photo?.caption || ""} className="h-32 w-full object-cover" loading="lazy" />
+        <JournalPhoto src={photo?.thumbnailUrl || photo?.previewUrl} alt={photo?.caption || ""} className="h-32 w-full object-cover" loading="lazy" />
         <div className="p-4">
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-rose">{formatDisplayDate(memory.localDate, "short")}</p>
           <p className="mt-2 line-clamp-3 text-sm font-semibold leading-5 text-soft-ink">

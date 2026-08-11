@@ -9,6 +9,8 @@ type CookieToSet = {
   options: CookieOptions;
 };
 
+export type SupabaseServerClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
+
 export async function createSupabaseServerClient() {
   if (!hasSupabaseEnv()) return null;
 

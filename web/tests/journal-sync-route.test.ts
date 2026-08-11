@@ -210,6 +210,51 @@ describe("POST /api/journal/sync", () => {
     expect(body.applied).toEqual({});
   });
 
+  it("skips section upserts and person-tag reconciliation when the sections are omitted", async () => {
+    const fake = useFake(createFakeSupabase({ role: "editor" }));
+    const response = await POST(syncRequest({ workspaceId, entries: [makeEntry()] }));
+    expect(response.status).toBe(200);
+    expect(fake.calls.some((call) => call.table === "person_tags")).toBe(false);
+    expect(fake.calls.some((call) => call.table === "prompt_templates")).toBe(false);
+    expect(fake.calls.some((call) => call.table === "reminder_preferences")).toBe(false);
+    expect(fake.calls.some((call) => call.table === "rpc:sync_journal_entry")).toBe(true);
+  });
+
+  it("still reconciles person-tag deletions when a people section is present", async () => {
+    const fake = useFake(createFakeSupabase({ role: "editor" }));
+    const response = await POST(syncRequest(makePayload({ people: [] })));
+    expect(response.status).toBe(200);
+    expect(fake.calls.some((call) => call.table === "person_tags" && call.method === "select")).toBe(true);
+  });
+
+  it("maps applied and stale outcomes to the right entries when syncing several at once", async () => {
+    useFake(
+      createFakeSupabase({
+        role: "editor",
+        results: {
+          "rpc:sync_journal_entry": [
+            { data: { status: "applied", server_updated_at: "2026-06-12T20:00:01.000Z" }, error: null },
+            { data: { status: "stale", server_updated_at: "2026-06-12T21:00:00.000Z" }, error: null },
+            { data: { status: "applied", server_updated_at: "2026-06-12T20:00:03.000Z" }, error: null }
+          ]
+        }
+      })
+    );
+    const entryIds = [
+      "44444444-4444-4444-8444-444444444444",
+      "55555555-5555-4555-8555-555555555555",
+      "66666666-6666-4666-8666-666666666666"
+    ];
+    const response = await POST(syncRequest(makePayload({ entries: entryIds.map((id) => makeEntry({ id })) })));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.stale).toEqual([entryIds[1]]);
+    expect(body.applied).toEqual({
+      [entryIds[0]]: "2026-06-12T20:00:01.000Z",
+      [entryIds[2]]: "2026-06-12T20:00:03.000Z"
+    });
+  });
+
   it("filters out entries that belong to a different workspace", async () => {
     const fake = useFake(createFakeSupabase({ role: "editor" }));
     const response = await POST(syncRequest(makePayload({ entries: [makeEntry({ workspaceId: otherWorkspaceId })] })));

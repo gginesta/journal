@@ -16,7 +16,10 @@ export function serializeEntryForSync(entry: JournalEntry): string {
       id: photo.id,
       storagePath: photo.storagePath,
       thumbnailPath: photo.thumbnailPath,
-      previewUrl: photo.previewUrl,
+      // Cheap change signal instead of the photo bytes: a newly added photo
+      // carries a base64 data URL until upload; a stored photo's signed https
+      // URL can refresh without marking the entry dirty.
+      hasPendingUpload: photo.previewUrl.startsWith("data:"),
       caption: photo.caption,
       sortOrder: photo.sortOrder
     })),

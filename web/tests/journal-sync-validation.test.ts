@@ -50,6 +50,22 @@ describe("validateSyncPayload", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("accepts a payload with the delta-gated sections omitted", () => {
+    const result = validateSyncPayload({ workspaceId, entries: [makeEntry()] });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.payload.people).toBeUndefined();
+      expect(result.payload.prompts).toBeUndefined();
+      expect(result.payload.reminders).toBeUndefined();
+    }
+  });
+
+  it("still rejects invalid sections when they are present", () => {
+    expect(validateSyncPayload(makePayload({ people: [{ id: "not-a-uuid" }] })).ok).toBe(false);
+    expect(validateSyncPayload(makePayload({ prompts: "nope" })).ok).toBe(false);
+    expect(validateSyncPayload(makePayload({ reminders: null })).ok).toBe(false);
+  });
+
   it("rejects non-object payloads and missing workspace ids", () => {
     expect(validateSyncPayload(null).ok).toBe(false);
     expect(validateSyncPayload([]).ok).toBe(false);

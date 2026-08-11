@@ -1,5 +1,5 @@
 import { tagChipStyle } from "@/lib/tag-colors";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import { ArrowRight, CalendarDays, Camera, CheckCircle2, Plus, Search, Sparkles, Trash2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -41,18 +41,25 @@ export function MemoriesView({
   const [query, setQuery] = useState("");
   const [personId, setPersonId] = useState<string | null>(null);
   const [filter, setFilter] = useState<MemoryFilter>("all");
-  const completeCount = entries.filter(isEntryComplete).length;
-  const photoCount = entries.filter((entry) => entry.photos.length > 0).length;
-  const detailCount = entries.reduce((count, entry) => count + entry.details.filter((detail) => detail.text.trim()).length, 0);
+  const debouncedQuery = useDebouncedValue(query);
+  const { completeCount, photoCount, detailCount } = useMemo(
+    () => ({
+      completeCount: entries.filter(isEntryComplete).length,
+      photoCount: entries.filter((entry) => entry.photos.length > 0).length,
+      detailCount: entries.reduce((count, entry) => count + entry.details.filter((detail) => detail.text.trim()).length, 0)
+    }),
+    [entries]
+  );
 
+  const searched = useMemo(() => searchEntries(entries, people, debouncedQuery), [entries, people, debouncedQuery]);
   const filtered = useMemo(() => {
-    return searchEntries(entries, people, query).filter((entry) => {
+    return searched.filter((entry) => {
       if (personId && !entryPeople(entry, people).some((person) => person.id === personId)) return false;
       if (filter === "photos") return entry.photos.length > 0;
       if (filter === "text") return entry.photos.length === 0;
       return true;
     });
-  }, [entries, people, query, personId, filter]);
+  }, [searched, people, personId, filter]);
 
   return (
     <div className="mx-auto grid max-w-6xl gap-5">
@@ -187,9 +194,10 @@ function LittleDetailsRepository({
   const [newCategory, setNewCategory] = useState<DetailCategory>("note");
   const [newPersonIds, setNewPersonIds] = useState<string[]>([]);
 
+  const debouncedQuery = useDebouncedValue(query);
   const details = useMemo(
-    () => listMemoryDetails(entries, people, { query, personId, category }),
-    [entries, people, query, personId, category]
+    () => listMemoryDetails(entries, people, { query: debouncedQuery, personId, category }),
+    [entries, people, debouncedQuery, personId, category]
   );
 
   function toggleNewPerson(personIdToToggle: string) {
@@ -435,7 +443,7 @@ export function MemoryCard({
     <article className="overflow-hidden rounded-journal border border-journal-line bg-journal-surface shadow-sm transition hover:-translate-y-0.5 hover:shadow-photo">
       <button type="button" onClick={() => onOpen?.(entry.id)} className="block h-full w-full text-left">
       {photo?.previewUrl ? (
-        <JournalPhoto src={photo.previewUrl} alt="" className={clsx("w-full object-cover", compact ? "h-40" : "h-60")} loading="lazy" />
+        <JournalPhoto src={photo.thumbnailUrl || photo.previewUrl} alt="" className={clsx("w-full object-cover", compact ? "h-40" : "h-60")} loading="lazy" />
       ) : null}
       <div className="p-4">
         <div className="flex items-center justify-between gap-3">
@@ -462,6 +470,17 @@ export function MemoryCard({
       </button>
     </article>
   );
+}
+
+// Search re-scans the whole archive; a short debounce keeps that scan off the
+// per-keystroke render path.
+function useDebouncedValue<T>(value: T, delayMs = 150): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), delayMs);
+    return () => window.clearTimeout(timer);
+  }, [value, delayMs]);
+  return debounced;
 }
 
 function MemoryStatPill({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
