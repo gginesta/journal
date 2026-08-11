@@ -50,7 +50,7 @@ The app can run without Supabase credentials using:
 NEXT_PUBLIC_DEMO_MODE=true
 ```
 
-Demo mode stores changes in browser local storage. This is only for UX review and PC testing; production data should use Supabase. When Supabase mode is enabled, server data is treated as the source of truth and demo local storage is ignored.
+Demo mode is enabled only when `NEXT_PUBLIC_DEMO_MODE` is exactly `true`, or when the Supabase env vars are absent (env-less local dev). Any other value disables it — a typo'd flag runs the real app instead of silently serving fixture data. Demo mode stores changes in browser local storage. This is only for UX review and PC testing; production data should use Supabase. When Supabase mode is enabled, server data is treated as the source of truth and demo local storage is ignored.
 
 ## Supabase Sync Behavior
 

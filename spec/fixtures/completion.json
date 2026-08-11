@@ -1,0 +1,14 @@
+{
+  "spec": "SPEC-1",
+  "description": "isEntryComplete: >=1 non-blank prompt response OR >=1 photo. Little Details never count.",
+  "cases": [
+    { "name": "text only", "responses": ["A kind call"], "photoCount": 0, "details": [], "expected": true },
+    { "name": "photo only", "responses": [], "photoCount": 1, "details": [], "expected": true },
+    { "name": "text and photo", "responses": ["Beach morning"], "photoCount": 2, "details": [], "expected": true },
+    { "name": "empty entry", "responses": [], "photoCount": 0, "details": [], "expected": false },
+    { "name": "whitespace-only response is blank", "responses": ["   "], "photoCount": 0, "details": [], "expected": false },
+    { "name": "little details alone do not count", "responses": [], "photoCount": 0, "details": ["Still says lellow"], "expected": false },
+    { "name": "blank response with details still incomplete", "responses": ["  "], "photoCount": 0, "details": ["Asked for the dinosaur spoon"], "expected": false },
+    { "name": "one blank and one real response", "responses": ["", "Quiet walk after dinner"], "photoCount": 0, "details": [], "expected": true }
+  ]
+}

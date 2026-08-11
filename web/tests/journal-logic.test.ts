@@ -65,6 +65,34 @@ describe("journal logic", () => {
     expect(summary).toEqual({ current: 3, longest: 3, completedDays: 4 });
   });
 
+  it("keeps the streak alive while today is still unfinished (SPEC-2 grace rule)", () => {
+    const summary = streakSummary([
+      entry("a", "2026-05-20", "Good"),
+      entry("b", "2026-05-19", "Good"),
+      entry("c", "2026-05-18", "Good")
+    ], "2026-05-21");
+
+    expect(summary).toEqual({ current: 3, longest: 3, completedDays: 3 });
+  });
+
+  it("resets the current streak once both today and yesterday are incomplete", () => {
+    const summary = streakSummary([
+      entry("a", "2026-05-19", "Good"),
+      entry("b", "2026-05-18", "Good")
+    ], "2026-05-21");
+
+    expect(summary).toEqual({ current: 0, longest: 2, completedDays: 2 });
+  });
+
+  it("counts today plus the grace day when today is complete", () => {
+    const summary = streakSummary([
+      entry("a", "2026-05-21", "Good"),
+      entry("b", "2026-05-20", "Good")
+    ], "2026-05-21");
+
+    expect(summary).toEqual({ current: 2, longest: 2, completedDays: 2 });
+  });
+
   it("finds memory lane matches within three days", () => {
     const matches = memoryLaneMatches([
       entry("near", "2025-05-19", "Park"),

@@ -122,6 +122,10 @@ export type PendingWorkspaceInvite = {
 
 export type JournalBootstrap = {
   mode: "demo" | "supabase";
+  // Set when an authenticated user's workspaces could not be loaded. /app
+  // renders an explicit recovery screen instead of the journal — never demo
+  // fixtures.
+  workspaceUnavailable?: boolean;
   profile: Profile | null;
   pendingInvites: PendingWorkspaceInvite[];
   workspaces: Workspace[];

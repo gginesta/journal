@@ -17,11 +17,11 @@ import {
 } from "@/components/journal/helpers";
 import { MemoryLanePanel } from "@/components/journal/MemoryLane";
 import { PhotoHero } from "@/components/journal/PhotoHero";
-import { ReadOnlyNotice } from "@/components/journal/SettingsView";
 import {
   JournalPhoto,
   PersonChips,
   PromptSnapshot,
+  ReadOnlyNotice,
   SaveStatePill,
   SectionTitle
 } from "@/components/journal/shared";

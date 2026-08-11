@@ -53,11 +53,14 @@ export function streakSummary(entries: JournalEntry[], today = toLocalDate()): {
   let current = 0;
   let cursor = today;
   const dateSet = new Set(completeDates);
+  // SPEC-2 grace rule: an unfinished today does not break the streak until
+  // the day actually ends — walk from yesterday instead.
+  if (!dateSet.has(cursor) && dateSet.has(addDays(today, -1))) {
+    cursor = addDays(today, -1);
+  }
   while (dateSet.has(cursor)) {
     current += 1;
-    const date = new Date(`${cursor}T00:00:00`);
-    date.setDate(date.getDate() - 1);
-    cursor = toLocalDate(date);
+    cursor = addDays(cursor, -1);
   }
 
   return { current, longest, completedDays: completeDates.length };

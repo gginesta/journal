@@ -23,6 +23,7 @@ Before starting meaningful work, read:
 - Store photos as files and keep SwiftData records lightweight.
 - Preserve owner/editor/viewer semantics for household workspaces.
 - Update the beta version when shipping tester-visible web changes.
+- Changes touching a SPEC-numbered rule (`docs/SPEC.md`) must update SPEC.md, the `spec/fixtures/` file, and both platforms' conformance tests in the same PR.
 
 ## Before Opening A Pull Request
 

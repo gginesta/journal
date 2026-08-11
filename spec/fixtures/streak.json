@@ -1,0 +1,48 @@
+{
+  "spec": "SPEC-2",
+  "description": "streakSummary(completeDates, today) -> { current, longest, completedDays }. completeDates are distinct days with a complete entry (SPEC-1).",
+  "cases": [
+    {
+      "name": "today complete extends the run",
+      "completeDates": ["2026-05-19", "2026-05-20", "2026-05-21"],
+      "today": "2026-05-21",
+      "expected": { "current": 3, "longest": 3, "completedDays": 3 }
+    },
+    {
+      "name": "grace rule: today incomplete, yesterday complete keeps the streak",
+      "completeDates": ["2026-05-18", "2026-05-19", "2026-05-20"],
+      "today": "2026-05-21",
+      "expected": { "current": 3, "longest": 3, "completedDays": 3 }
+    },
+    {
+      "name": "no grace beyond one day: today and yesterday incomplete resets to zero",
+      "completeDates": ["2026-05-18", "2026-05-19"],
+      "today": "2026-05-21",
+      "expected": { "current": 0, "longest": 2, "completedDays": 2 }
+    },
+    {
+      "name": "single complete day today",
+      "completeDates": ["2026-05-21"],
+      "today": "2026-05-21",
+      "expected": { "current": 1, "longest": 1, "completedDays": 1 }
+    },
+    {
+      "name": "gap in history: longest counts the older run",
+      "completeDates": ["2026-05-10", "2026-05-11", "2026-05-12", "2026-05-13", "2026-05-20", "2026-05-21"],
+      "today": "2026-05-21",
+      "expected": { "current": 2, "longest": 4, "completedDays": 6 }
+    },
+    {
+      "name": "grace rule across a month boundary",
+      "completeDates": ["2026-05-30", "2026-05-31"],
+      "today": "2026-06-01",
+      "expected": { "current": 2, "longest": 2, "completedDays": 2 }
+    },
+    {
+      "name": "no complete days",
+      "completeDates": [],
+      "today": "2026-05-21",
+      "expected": { "current": 0, "longest": 0, "completedDays": 0 }
+    }
+  ]
+}

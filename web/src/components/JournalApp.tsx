@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type {
   JournalBootstrap,
@@ -27,20 +28,41 @@ import {
   firstMemoryCelebrationStorageKey,
   shouldShowFirstMemoryCelebration
 } from "@/lib/first-memory-celebration";
-import { CalendarView } from "@/components/journal/CalendarView";
-import { EntryDetailModal } from "@/components/journal/EntryDetailModal";
 import {
   responseErrorMessage,
   type AppTab,
   type DetailCategory,
   type SaveState
 } from "@/components/journal/helpers";
-import { InsightsView } from "@/components/journal/InsightsView";
 import { MemoriesView } from "@/components/journal/MemoriesView";
-import { OnboardingOverlay } from "@/components/journal/Onboarding";
-import { SettingsView } from "@/components/journal/SettingsView";
 import { MobileTabs, Sidebar } from "@/components/journal/Sidebar";
 import { TodayView } from "@/components/journal/TodayView";
+
+// Today + Memories are the daily path and stay in the main chunk; the other
+// surfaces load on demand so the ritual chunk stays lean as features grow.
+function LazyViewFallback() {
+  return (
+    <p role="status" className="mx-auto max-w-6xl py-12 text-center text-sm text-warm-gray">
+      Loading…
+    </p>
+  );
+}
+
+const CalendarView = dynamic(() => import("@/components/journal/CalendarView").then((mod) => mod.CalendarView), {
+  loading: LazyViewFallback
+});
+const InsightsView = dynamic(() => import("@/components/journal/InsightsView").then((mod) => mod.InsightsView), {
+  loading: LazyViewFallback
+});
+const SettingsView = dynamic(() => import("@/components/journal/SettingsView").then((mod) => mod.SettingsView), {
+  loading: LazyViewFallback
+});
+const OnboardingOverlay = dynamic(() => import("@/components/journal/Onboarding").then((mod) => mod.OnboardingOverlay), {
+  loading: () => null
+});
+const EntryDetailModal = dynamic(() => import("@/components/journal/EntryDetailModal").then((mod) => mod.EntryDetailModal), {
+  loading: () => null
+});
 
 const storageKey = "photo-gratitude-web-state-v1";
 

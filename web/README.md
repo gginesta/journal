@@ -24,7 +24,7 @@ npm.cmd run dev
 
 `NEXT_PUBLIC_DEMO_MODE=true` lets the app run locally without Supabase credentials. The UI remains fully interactive through browser state so product review can continue before the Supabase project is connected.
 
-With `NEXT_PUBLIC_DEMO_MODE=false`, authenticated edits autosave through Supabase-backed API routes. Demo local storage is ignored in that mode so server data stays authoritative.
+Demo mode is on only when `NEXT_PUBLIC_DEMO_MODE` is exactly `true` (or when the Supabase env vars are missing). With any other value and Supabase configured, authenticated edits autosave through Supabase-backed API routes. Demo local storage is ignored in that mode so server data stays authoritative.
 
 In demo mode, the homepage primary CTA reads `Open the demo`. In Supabase mode, it reads `Open the beta`. Both routes point to `/app`; `/app` redirects unauthenticated Supabase users to `/login`.
 

@@ -6,7 +6,13 @@ const baseUrl = `http://127.0.0.1:${port}`;
 const server = spawn(
   process.execPath,
   ["./node_modules/next/dist/bin/next", "start", "--hostname", "127.0.0.1", "--port", port],
-  { stdio: "inherit", shell: false }
+  {
+    stdio: "inherit",
+    shell: false,
+    // The E2E suite exercises the local demo; demo mode requires an explicit
+    // "true" (it no longer fails open when the flag is unset).
+    env: { ...process.env, NEXT_PUBLIC_DEMO_MODE: "true" }
+  }
 );
 
 let stopped = false;

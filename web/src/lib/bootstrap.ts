@@ -1,7 +1,9 @@
 import type {
   JournalBootstrap,
   JournalEntry,
+  PendingWorkspaceInvite,
   PersonTag,
+  Profile,
   PromptTemplate,
   ReminderPreferences,
   Workspace,
@@ -120,7 +122,9 @@ export async function loadJournalBootstrap(): Promise<JournalBootstrap> {
   }
 
   const supabase = await createSupabaseServerClient();
-  if (!supabase) return makeDemoBootstrap();
+  // Unreachable while isDemoMode() covers missing Supabase env, but never
+  // fall back to demo fixtures outside demo mode.
+  if (!supabase) return makeUnavailableBootstrap(null);
 
   const {
     data: { user }
@@ -171,9 +175,17 @@ export async function loadJournalBootstrap(): Promise<JournalBootstrap> {
     role: workspace.workspace_members[0]?.role ?? "viewer"
   }));
 
+  const profile: Profile = {
+    id: user.id,
+    email: user.email ?? profileResult.data?.email ?? "",
+    displayName: profileResult.data?.display_name ?? user.email ?? "Journal user"
+  };
+
   const activeWorkspaceId = workspaces[0]?.id;
   if (!activeWorkspaceId) {
-    return makeDemoBootstrap();
+    // An authenticated user must never see demo fixtures: signal the failure
+    // so /app renders a recovery screen instead.
+    return makeUnavailableBootstrap(profile, pendingInvites);
   }
 
   const workspaceIds = workspaces.map((workspace) => workspace.id);
@@ -218,11 +230,7 @@ export async function loadJournalBootstrap(): Promise<JournalBootstrap> {
   return {
     mode: "supabase",
     pendingInvites,
-    profile: {
-      id: user.id,
-      email: user.email ?? profileResult.data?.email ?? "",
-      displayName: profileResult.data?.display_name ?? user.email ?? "Journal user"
-    },
+    profile,
     workspaces,
     workspaceMembers: memberRows.map((member) => mapWorkspaceMember(member, memberProfiles, user.id)),
     activeWorkspaceId,
@@ -230,6 +238,22 @@ export async function loadJournalBootstrap(): Promise<JournalBootstrap> {
     prompts: ((promptsResult.data ?? []) as PromptRow[]).map(mapPrompt),
     entries: rawEntries.map((entry) => mapEntry(entry, signedPhotoUrls)),
     reminders: mapReminders(remindersResult.data as ReminderRow | null)
+  };
+}
+
+function makeUnavailableBootstrap(profile: Profile | null, pendingInvites: PendingWorkspaceInvite[] = []): JournalBootstrap {
+  return {
+    mode: "supabase",
+    workspaceUnavailable: true,
+    profile,
+    pendingInvites,
+    workspaces: [],
+    workspaceMembers: [],
+    activeWorkspaceId: "",
+    people: [],
+    prompts: [],
+    entries: [],
+    reminders: mapReminders(null)
   };
 }
 
@@ -292,7 +316,9 @@ export async function createPhotoUrlMap(supabase: SupabaseServerClient, entries:
 
   async function signPaths(bucket: string, paths: string[]) {
     if (paths.length === 0) return;
-    const { data } = await supabase.storage.from(bucket).createSignedUrls(paths, 60 * 60 * 24 * 7);
+    // 24 h: these quasi-bearer links land in server-rendered HTML, and both
+    // bootstrap and archive paging re-sign on every load anyway.
+    const { data } = await supabase.storage.from(bucket).createSignedUrls(paths, 60 * 60 * 24);
     for (const result of data ?? []) {
       if (result.path && result.signedUrl && !result.error) urls.set(result.path, result.signedUrl);
     }

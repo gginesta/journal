@@ -21,6 +21,7 @@ Run applicable checks and mark them:
 - [ ] iOS build/tests on macOS if native files changed
 - [ ] Manual mobile pass
 - [ ] Supabase/RLS check if database, auth, or Storage changed
+- [ ] Touched a SPEC-numbered rule → `docs/SPEC.md`, the `spec/fixtures/` file, and both platforms' tests updated in this PR
 
 ## Screenshots / Notes
 

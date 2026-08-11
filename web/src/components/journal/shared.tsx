@@ -117,6 +117,14 @@ export function PersonChips({
   );
 }
 
+export function ReadOnlyNotice() {
+  return (
+    <section className="rounded-journal border border-journal-line bg-journal-surface p-4 text-sm leading-6 text-warm-gray">
+      Viewer access is read-only for this workspace. Memories, prompts, people tags, photos, and deletes are disabled.
+    </section>
+  );
+}
+
 export function PageHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <header>

@@ -20,7 +20,10 @@ export default defineConfig({
         command: `${next} start --hostname 127.0.0.1 --port ${port}`,
         url: `${baseURL}/manifest.webmanifest`,
         reuseExistingServer: false,
-        timeout: 120_000
+        timeout: 120_000,
+        // The E2E suite exercises the local demo; demo mode requires an
+        // explicit "true" (it no longer fails open when the flag is unset).
+        env: { NEXT_PUBLIC_DEMO_MODE: "true" }
       },
   use: {
     baseURL,
