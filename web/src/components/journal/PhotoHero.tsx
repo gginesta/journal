@@ -1,36 +1,92 @@
 /* eslint-disable @next/next/no-img-element -- Journal photos can be local data URLs or private signed storage URLs. */
 
-import { useMemo, useRef, useState } from "react";
-import { Camera, ChevronLeft, ChevronRight, ImagePlus, X } from "lucide-react";
+// The keepsake photo hero (Warm Album redesign): one emotional anchor card
+// with shadow-photo. New photos "develop" — the low-res thumb shows instantly
+// (never a bare spinner), a leaf hairline creeps along the slot's bottom edge,
+// and the image settles from 8px blur / 96% scale when ready. 0, 1, and 2
+// photos are all steady states.
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Camera, ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
+import clsx from "clsx";
 import type { JournalEntry, PhotoAttachment } from "@/types/journal";
 import { fileToCompressedDataUrl, normalizePhotoOrder } from "@/components/journal/helpers";
+
+type DevelopingPhoto = {
+  objectUrl: string;
+  file: File;
+  failed: boolean;
+};
 
 export function PhotoHero({
   entry,
   canEdit,
-  onChangePhotos,
-  showGuidance = true
+  onChangePhotos
 }: {
   entry: JournalEntry;
   canEdit: boolean;
   onChangePhotos: (updater: (photos: PhotoAttachment[]) => PhotoAttachment[]) => void;
-  // First-photo guidance retires once the workspace has kept any photo.
-  showGuidance?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const replaceInputRef = useRef<HTMLInputElement | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [replacePhotoId, setReplacePhotoId] = useState<string | null>(null);
+  const [developing, setDeveloping] = useState<DevelopingPhoto | null>(null);
+  const [justDevelopedId, setJustDevelopedId] = useState<string | null>(null);
+  const [coverSlidesLeft, setCoverSlidesLeft] = useState(false);
+  const previousCount = useRef(entry.photos.length);
   const orderedPhotos = useMemo(() => normalizePhotoOrder(entry.photos), [entry.photos]);
   const heroPhoto = orderedPhotos[0];
+  const secondPhoto = orderedPhotos[1];
   const remainingSlots = Math.max(0, 2 - orderedPhotos.length);
-  const hasPhotos = orderedPhotos.length > 0;
+
+  // Second photo arriving slides the first left (350ms) into the cover slot.
+  useEffect(() => {
+    if (previousCount.current === 1 && orderedPhotos.length === 2) {
+      setCoverSlidesLeft(true);
+      const timer = window.setTimeout(() => setCoverSlidesLeft(false), 400);
+      previousCount.current = orderedPhotos.length;
+      return () => window.clearTimeout(timer);
+    }
+    previousCount.current = orderedPhotos.length;
+  }, [orderedPhotos.length]);
+
+  useEffect(() => {
+    if (!justDevelopedId) return;
+    const timer = window.setTimeout(() => setJustDevelopedId(null), 600);
+    return () => window.clearTimeout(timer);
+  }, [justDevelopedId]);
+
+  async function developFile(file: File, existingObjectUrl?: string) {
+    const objectUrl = existingObjectUrl ?? URL.createObjectURL(file);
+    setDeveloping({ objectUrl, file, failed: false });
+    try {
+      const previewUrl = await fileToCompressedDataUrl(file);
+      const photo: PhotoAttachment = {
+        id: crypto.randomUUID(),
+        entryId: entry.id,
+        storagePath: "",
+        thumbnailPath: "",
+        previewUrl,
+        caption: "",
+        sortOrder: 2,
+        createdAt: new Date().toISOString()
+      };
+      onChangePhotos((current) => normalizePhotoOrder([...current, photo]).slice(0, 2));
+      URL.revokeObjectURL(objectUrl);
+      setDeveloping(null);
+      setJustDevelopedId(photo.id);
+      setStatus("Photo saved. Future-you gets a little more context.");
+      return true;
+    } catch {
+      setDeveloping({ objectUrl, file, failed: true });
+      setStatus(null);
+      return false;
+    }
+  }
 
   async function handleFiles(files: FileList | null) {
-    if (!canEdit) return;
-    if (!files) return;
-    setError(null);
+    if (!canEdit || !files) return;
     const selected = Array.from(files).slice(0, remainingSlots);
     if (selected.length === 0) {
       setStatus("Two photos is the beta limit for a calm daily entry.");
@@ -38,33 +94,23 @@ export function PhotoHero({
     }
     if (files.length > selected.length) {
       setStatus("Kept the first photos only. One or two is plenty for the day.");
-    } else {
-      setStatus("Preparing photo...");
     }
+    if (inputRef.current) inputRef.current.value = "";
+    for (const file of selected) {
+      const ok = await developFile(file);
+      if (!ok) break;
+    }
+  }
 
-    try {
-      const newPhotos: PhotoAttachment[] = [];
-      for (const file of selected) {
-        const previewUrl = await fileToCompressedDataUrl(file);
-        newPhotos.push({
-          id: crypto.randomUUID(),
-          entryId: entry.id,
-          storagePath: "",
-          thumbnailPath: "",
-          previewUrl,
-          caption: "",
-          sortOrder: orderedPhotos.length + newPhotos.length,
-          createdAt: new Date().toISOString()
-        });
-      }
-      onChangePhotos((current) => [...current, ...newPhotos]);
-      setStatus(newPhotos.length === 1 ? "Photo saved. Future-you gets a little more context." : "Photos saved. Pick the cover that feels most like today.");
-    } catch {
-      setError("That photo could not be added. Try a smaller image or a different file.");
-      setStatus(null);
-    } finally {
-      if (inputRef.current) inputRef.current.value = "";
-    }
+  function retryDevelop() {
+    if (!developing) return;
+    void developFile(developing.file, developing.objectUrl);
+  }
+
+  function dismissFailedDevelop() {
+    if (developing) URL.revokeObjectURL(developing.objectUrl);
+    setDeveloping(null);
+    setStatus(null);
   }
 
   async function handleReplaceFile(files: FileList | null) {
@@ -72,9 +118,7 @@ export function PhotoHero({
     const file = files?.[0];
     const targetId = replacePhotoId;
     if (!file || !targetId) return;
-    setError(null);
     setStatus("Replacing photo...");
-
     try {
       const previewUrl = await fileToCompressedDataUrl(file);
       onChangePhotos((current) =>
@@ -91,10 +135,10 @@ export function PhotoHero({
             : photo
         )
       );
+      setJustDevelopedId(targetId);
       setStatus("Photo replaced. Caption and order stayed with the memory.");
     } catch {
-      setError("That replacement could not be added. Try a smaller image or a different file.");
-      setStatus(null);
+      setStatus("That replacement could not be added. Try a smaller image or a different file.");
     } finally {
       setReplacePhotoId(null);
       if (replaceInputRef.current) replaceInputRef.current.value = "";
@@ -132,80 +176,178 @@ export function PhotoHero({
     window.setTimeout(() => replaceInputRef.current?.click(), 0);
   }
 
-  return (
-    <section className="overflow-hidden rounded-[24px] bg-ink shadow-photo sm:rounded-[28px]">
-      <button
-        type="button"
-        onClick={() => {
-          if (canEdit) inputRef.current?.click();
-        }}
+  const hiddenInputs = (
+    <>
+      <input
+        ref={inputRef}
+        className="hidden"
+        type="file"
+        accept="image/*"
+        multiple
+        aria-label="Add journal photos"
         disabled={!canEdit}
-        className="relative flex min-h-[260px] w-full items-end overflow-hidden p-4 text-left text-white sm:min-h-[470px] sm:p-6"
-      >
-        {heroPhoto ? (
-          <img
-            src={heroPhoto.previewUrl}
-            alt={heroPhoto.caption || "Today's journal photo"}
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-        ) : (
-          <div className="absolute inset-0 bg-[linear-gradient(135deg,#8da38e,#e6c392_52%,#b96464)]" />
-        )}
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,0.58))]" />
-        <div className="relative max-w-md pr-8">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-white/80">{hasPhotos ? "Photo of the day" : "Memory starts here"}</p>
-          <h2 className="mt-2 text-2xl font-bold leading-tight sm:text-3xl">
-            {hasPhotos ? heroPhoto.caption.trim() || "Let the photo hold most of the story." : "Start with one photo, if one moment stands out."}
-          </h2>
-          <p className="mt-2 text-sm text-white/86">
-            {orderedPhotos.length < 2 ? "One or two photos is plenty. Text is optional." : "Two photos saved. Reorder or remove if today feels simpler."}
-          </p>
-        </div>
-      </button>
+        onChange={(event) => handleFiles(event.target.files)}
+      />
+      <input
+        ref={replaceInputRef}
+        className="hidden"
+        type="file"
+        accept="image/*"
+        aria-label="Replace selected journal photo"
+        disabled={!canEdit}
+        onChange={(event) => handleReplaceFile(event.target.files)}
+      />
+    </>
+  );
 
-      <div className="grid gap-4 bg-journal-surface p-4">
-        <input
-          ref={inputRef}
-          className="hidden"
-          type="file"
-          accept="image/*"
-          multiple
-          aria-label="Add journal photos"
-          disabled={!canEdit}
-          onChange={(event) => handleFiles(event.target.files)}
-        />
-        <input
-          ref={replaceInputRef}
-          className="hidden"
-          type="file"
-          accept="image/*"
-          aria-label="Replace selected journal photo"
-          disabled={!canEdit}
-          onChange={(event) => handleReplaceFile(event.target.files)}
-        />
+  const statusLine = (
+    <p className={clsx("text-[13px] leading-5 text-warm-gray", status ? null : "sr-only")} aria-live="polite">
+      {status ?? ""}
+    </p>
+  );
 
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            disabled={!canEdit || remainingSlots === 0}
-            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-rose px-4 text-sm font-bold text-white"
-          >
-            <ImagePlus aria-hidden="true" size={18} />
-            {orderedPhotos.length === 0 ? "Add photo" : remainingSlots > 0 ? "Add one more" : "Two photos saved"}
-          </button>
-          <div className="min-w-[180px] flex-1 text-sm text-warm-gray" aria-live="polite">
-            {error ? <p className="font-semibold text-rose">{error}</p> : <p>{status ?? `${remainingSlots} photo slot${remainingSlots === 1 ? "" : "s"} open.`}</p>}
+  // Empty steady state (day one, or after removing): the dashed invitation.
+  if (orderedPhotos.length === 0 && !developing) {
+    return (
+      <section aria-label="Today's photo">
+        {hiddenInputs}
+        <button
+          type="button"
+          onClick={() => {
+            if (canEdit) inputRef.current?.click();
+          }}
+          disabled={!canEdit}
+          className="flex min-h-[280px] w-full flex-col items-center justify-center gap-3 rounded-journal border-[1.5px] border-dashed border-rose/35 bg-journal-surface/70 p-6 text-center transition hover:bg-journal-surface focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-rose/30"
+        >
+          <span className="grid h-14 w-14 place-items-center rounded-full bg-rose/10 text-rose">
+            <Camera aria-hidden="true" size={26} />
+          </span>
+          <span className="text-[15px] font-bold text-soft-ink">Add a photo from today</span>
+          <span className="max-w-60 text-[13px] leading-6 text-warm-gray">
+            Any photo counts &mdash; a meal, a sky, a mess. Or skip it: one line is enough.
+          </span>
+        </button>
+        <div className="mt-2 px-1">{statusLine}</div>
+      </section>
+    );
+  }
+
+  const developingSlot = developing ? (
+    <div className="relative overflow-hidden rounded-card bg-journal-raised">
+      <img
+        src={developing.objectUrl}
+        alt="Photo still developing"
+        className="block h-full min-h-24 w-full scale-[0.96] object-cover opacity-60 blur-[8px]"
+      />
+      {!developing.failed ? (
+        <span aria-hidden="true" className="wa-hairline absolute inset-x-0 bottom-0 h-0.5 bg-leaf" />
+      ) : null}
+    </div>
+  ) : null;
+
+  return (
+    <section aria-label="Today's photo" className="rounded-journal border border-journal-line bg-journal-surface p-3 pb-3.5 shadow-photo">
+      {hiddenInputs}
+
+      {secondPhoto || developing ? (
+        <div className="grid grid-cols-[1.5fr_1fr] gap-2">
+          {heroPhoto ? (
+            <img
+              key={heroPhoto.id}
+              src={heroPhoto.previewUrl}
+              alt={heroPhoto.caption || "Today's journal photo"}
+              className={clsx(
+                "block h-[220px] w-full rounded-card object-cover sm:h-[280px]",
+                coverSlidesLeft ? "wa-slide-left" : null,
+                justDevelopedId === heroPhoto.id ? "wa-develop" : null
+              )}
+            />
+          ) : (
+            developingSlot
+          )}
+          <div className="grid grid-rows-2 gap-2">
+            {secondPhoto ? (
+              <img
+                key={secondPhoto.id}
+                src={secondPhoto.previewUrl}
+                alt={secondPhoto.caption || "Second journal photo"}
+                className={clsx("block h-full min-h-24 w-full rounded-card object-cover", justDevelopedId === secondPhoto.id ? "wa-develop" : null)}
+              />
+            ) : heroPhoto && developing ? (
+              developingSlot
+            ) : null}
+            <div className="grid place-items-center rounded-card border-[1.5px] border-dashed border-journal-line bg-journal-raised/90 text-xs font-semibold text-warm-gray">
+              {orderedPhotos.length === 2 ? "2 of 2" : "1 of 2"}
+            </div>
           </div>
         </div>
+      ) : heroPhoto ? (
+        <img
+          key={heroPhoto.id}
+          src={heroPhoto.previewUrl}
+          alt={heroPhoto.caption || "Today's journal photo"}
+          className={clsx(
+            "block h-[240px] w-full rounded-card object-cover sm:h-[290px]",
+            justDevelopedId === heroPhoto.id ? "wa-develop" : null
+          )}
+        />
+      ) : null}
 
-        {orderedPhotos.length > 0 ? (
-          <div className="grid gap-3 sm:grid-cols-2">
+      {developing?.failed ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-card bg-journal-raised p-3">
+          <p className="min-w-40 flex-1 text-sm font-semibold text-soft-ink">Didn&rsquo;t make it &mdash; try again</p>
+          <button
+            type="button"
+            onClick={retryDevelop}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-rose px-4 text-sm font-bold text-white transition hover:bg-rose-pressed focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-rose/30"
+          >
+            Try again
+          </button>
+          <button
+            type="button"
+            onClick={dismissFailedDevelop}
+            className="inline-flex min-h-11 items-center rounded-full bg-white px-4 text-sm font-bold text-warm-gray focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-rose/30"
+          >
+            Not now
+          </button>
+        </div>
+      ) : null}
+
+      {heroPhoto ? (
+        <div className="mt-3 flex items-center gap-2.5">
+          <input
+            value={heroPhoto.caption}
+            maxLength={300}
+            onChange={(event) => updateCaption(heroPhoto.id, event.target.value)}
+            placeholder="What should this photo remember?"
+            aria-label="Cover caption"
+            disabled={!canEdit}
+            className="min-h-11 min-w-0 flex-1 rounded-control border-0 bg-transparent px-1 text-sm text-soft-ink outline-none placeholder:text-warm-gray focus-visible:ring-4 focus-visible:ring-rose/15"
+          />
+          {canEdit && remainingSlots > 0 && !developing ? (
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              aria-label="Add a second photo"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-[1.5px] border-dashed border-rose/40 bg-rose/5 text-rose transition hover:bg-rose/10 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-rose/30"
+            >
+              <Plus aria-hidden="true" size={18} />
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="mt-1 px-1">{statusLine}</div>
+
+      {canEdit && orderedPhotos.length > 0 ? (
+        <details className="mt-2 rounded-card bg-journal-raised/60 px-3 py-2">
+          <summary className="cursor-pointer text-[13px] font-bold text-warm-gray">Adjust photos</summary>
+          <div className="mt-3 grid gap-3">
             {orderedPhotos.map((photo, index) => (
-              <article key={photo.id} className="grid gap-3 rounded-[22px] border border-journal-line bg-white p-3 shadow-sm">
-                <div className="grid grid-cols-[76px_1fr] gap-3">
-                  <img src={photo.thumbnailUrl || photo.previewUrl} alt="" className="h-[76px] w-[76px] rounded-2xl object-cover" />
-                  <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.12em] text-warm-gray">
+              <article key={photo.id} className="grid gap-3 rounded-card border border-journal-line bg-white p-3">
+                <div className="grid grid-cols-[56px_1fr] items-center gap-3">
+                  <img src={photo.thumbnailUrl || photo.previewUrl} alt="" className="h-14 w-14 rounded-control object-cover" />
+                  <label className="grid gap-1 text-[11px] font-bold uppercase tracking-[0.12em] text-warm-gray">
                     {index === 0 ? "Cover caption" : "Second photo caption"}
                     <input
                       value={photo.caption}
@@ -213,7 +355,7 @@ export function PhotoHero({
                       onChange={(event) => updateCaption(photo.id, event.target.value)}
                       placeholder={index === 0 ? "What should this photo remember?" : "Add a small note"}
                       disabled={!canEdit}
-                      className="min-h-10 min-w-0 rounded-2xl border border-journal-line bg-journal-raised px-3 text-sm font-semibold normal-case tracking-normal text-soft-ink outline-none focus:ring-4 focus:ring-rose/15"
+                      className="min-h-10 min-w-0 rounded-control border border-journal-line bg-journal-raised px-3 text-sm font-semibold normal-case tracking-normal text-soft-ink outline-none focus:ring-4 focus:ring-rose/15"
                     />
                   </label>
                 </div>
@@ -222,7 +364,7 @@ export function PhotoHero({
                     type="button"
                     onClick={() => movePhoto(photo.id, -1)}
                     disabled={!canEdit || index === 0}
-                    className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-journal-raised px-3 text-xs font-bold text-soft-ink"
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-journal-raised px-3 text-xs font-bold text-soft-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-rose/30"
                     aria-label="Move photo earlier"
                   >
                     <ChevronLeft aria-hidden="true" size={14} />
@@ -232,7 +374,7 @@ export function PhotoHero({
                     type="button"
                     onClick={() => movePhoto(photo.id, 1)}
                     disabled={!canEdit || index === orderedPhotos.length - 1}
-                    className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-journal-raised px-3 text-xs font-bold text-soft-ink"
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-journal-raised px-3 text-xs font-bold text-soft-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-rose/30"
                     aria-label="Move photo later"
                   >
                     Later
@@ -242,7 +384,7 @@ export function PhotoHero({
                     type="button"
                     onClick={() => beginReplace(photo.id)}
                     disabled={!canEdit}
-                    className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-rose/10 px-3 text-xs font-bold text-rose"
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-rose/10 px-3 text-xs font-bold text-rose focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-rose/30"
                     aria-label="Replace photo"
                   >
                     <Camera aria-hidden="true" size={14} />
@@ -252,7 +394,7 @@ export function PhotoHero({
                     type="button"
                     onClick={() => removePhoto(photo.id)}
                     disabled={!canEdit}
-                    className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-journal-raised px-3 text-xs font-bold text-warm-gray"
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-journal-raised px-3 text-xs font-bold text-warm-gray focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-rose/30"
                     aria-label="Remove photo"
                   >
                     <X aria-hidden="true" size={14} />
@@ -262,14 +404,8 @@ export function PhotoHero({
               </article>
             ))}
           </div>
-        ) : showGuidance ? (
-          <div className="grid gap-2 rounded-[22px] border border-dashed border-rose/25 bg-white/72 p-4 text-sm text-warm-gray sm:grid-cols-3">
-            <p><span className="font-bold text-soft-ink">Pick one moment.</span> A meal, a face, the sky, the ordinary proof.</p>
-            <p><span className="font-bold text-soft-ink">Add a caption later.</span> The photo can be the whole entry.</p>
-            <p><span className="font-bold text-soft-ink">Keep it light.</span> Two photos max keeps the ritual calm.</p>
-          </div>
-        ) : null}
-      </div>
+        </details>
+      ) : null}
     </section>
   );
 }

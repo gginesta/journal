@@ -91,6 +91,7 @@ export function MemoriesView({
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
+              aria-label={activeMode === "details" ? "Search little details" : "Search memories"}
               placeholder={activeMode === "details" ? "Search little details, dates, or people" : "Search moments, details, captions…"}
               className={clsx(
                 "min-h-12 w-full rounded-card border border-journal-line bg-journal-surface pl-11 pr-4 text-base text-ink shadow-card outline-none placeholder:text-warm-gray focus:ring-4 focus:ring-rose/15",
@@ -300,7 +301,7 @@ function LittleDetailsSummary({
         </button>
       </div>
       {presentCategories.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="mt-1 flex flex-wrap gap-1.5">
           {presentCategories.map((option) => (
             <button
               key={option.id}
@@ -471,107 +472,139 @@ function LittleDetailsRepository({
       ) : (
         <div className="grid gap-2.5">
           {details.map((item) => (
-            <article key={item.id} className="rounded-journal border border-journal-line bg-journal-surface p-4 shadow-card">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onOpenEntry(item.entry.id)}
-                    className={clsx("inline-flex min-h-11 items-center gap-1.5 rounded-full bg-rose/10 px-3 text-xs font-bold text-rose hover:bg-rose/15", slowOut, focusRing)}
-                  >
-                    <CalendarDays aria-hidden="true" size={14} />
-                    {formatDisplayDate(item.localDate, "short")}
-                  </button>
-                  <span className="inline-flex min-h-8 items-center rounded-full bg-journal-raised px-3 text-xs font-bold text-warm-gray">
-                    {item.categoryLabel}
-                  </span>
-                  {item.people.map((person) => (
-                    <span
-                      key={person.id}
-                      className="inline-flex min-h-8 items-center rounded-full px-3 text-xs font-bold"
-                      style={tagChipStyle(person.color)}
-                    >
-                      {person.name}
-                    </span>
-                  ))}
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onOpenEntry(item.entry.id)}
-                    className={clsx("inline-flex min-h-11 items-center gap-1.5 rounded-full bg-journal-raised px-3 text-xs font-bold text-soft-ink hover:bg-rose/10 hover:text-rose", slowOut, focusRing)}
-                  >
-                    Open entry
-                    <ArrowRight aria-hidden="true" size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDeleteDetail(item.entry.id, item.detail.id)}
-                    disabled={!canEdit}
-                    className={clsx("grid min-h-11 w-11 place-items-center rounded-full bg-journal-raised text-warm-gray hover:text-rose", slowOut, focusRing)}
-                    aria-label="Delete little detail"
-                  >
-                    <Trash2 aria-hidden="true" size={16} />
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid gap-2.5 lg:grid-cols-[170px_1fr]">
-                <select
-                  value={item.detail.category}
-                  onChange={(event) =>
-                    onUpdateDetail(item.entry.id, item.detail.id, (detail) => ({
-                      ...detail,
-                      category: event.target.value as DetailCategory
-                    }))
-                  }
-                  disabled={!canEdit}
-                  className="min-h-11 rounded-control border border-journal-line bg-journal-surface px-3 text-sm font-semibold outline-none focus:ring-4 focus:ring-rose/15"
-                  aria-label="Edit detail category"
-                >
-                  {detailCategories.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.title}
-                    </option>
-                  ))}
-                </select>
-                <textarea
-                  value={item.detail.text}
-                  onChange={(event) =>
-                    onUpdateDetail(item.entry.id, item.detail.id, (detail) => ({
-                      ...detail,
-                      text: event.target.value
-                    }))
-                  }
-                  disabled={!canEdit}
-                  className="min-h-16 rounded-control border border-journal-line bg-journal-surface p-3 text-base outline-none focus:ring-4 focus:ring-rose/15"
-                  aria-label="Edit little detail"
-                />
-              </div>
-
-              {people.length > 0 ? (
-                <div className="mt-3">
-                  <PersonChips
-                    compact
-                    people={people}
-                    selectedIds={item.detail.personTagIds}
-                    disabled={!canEdit}
-                    onToggle={(personIdToToggle) =>
-                      onUpdateDetail(item.entry.id, item.detail.id, (detail) => ({
-                        ...detail,
-                        personTagIds: detail.personTagIds.includes(personIdToToggle)
-                          ? detail.personTagIds.filter((id) => id !== personIdToToggle)
-                          : [...detail.personTagIds, personIdToToggle]
-                      }))
-                    }
-                  />
-                </div>
-              ) : null}
-            </article>
+            <LittleDetailRow
+              key={item.id}
+              item={item}
+              people={people}
+              canEdit={canEdit}
+              onOpenEntry={onOpenEntry}
+              onUpdateDetail={onUpdateDetail}
+              onDeleteDetail={onDeleteDetail}
+            />
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+// The clean-list row from the mockup: the detail reads as kept text with its
+// person · date meta, and editing controls stay tucked behind an Edit toggle.
+function LittleDetailRow({
+  item,
+  people,
+  canEdit,
+  onOpenEntry,
+  onUpdateDetail,
+  onDeleteDetail
+}: {
+  item: ReturnType<typeof listMemoryDetails>[number];
+  people: PersonTag[];
+  canEdit: boolean;
+  onOpenEntry: (entryId: string) => void;
+  onUpdateDetail: (entryId: string, detailId: string, updater: (detail: MemoryDetail) => MemoryDetail) => void;
+  onDeleteDetail: (entryId: string, detailId: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  return (
+    <article className="rounded-journal border border-journal-line bg-journal-surface p-4 shadow-card">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] leading-[22px] text-ink">{item.detail.text}</p>
+          <p className="mt-1 text-xs font-semibold text-warm-gray">
+            {[item.people.map((person) => person.name).join(", ") || null, item.categoryLabel, formatDisplayDate(item.localDate, "short")]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        </div>
+        <div className="flex gap-1.5">
+          <button
+            type="button"
+            onClick={() => onOpenEntry(item.entry.id)}
+            className={clsx("inline-flex min-h-11 items-center gap-1.5 rounded-full bg-journal-raised px-3 text-xs font-bold text-soft-ink hover:bg-rose/10 hover:text-rose", slowOut, focusRing)}
+          >
+            <CalendarDays aria-hidden="true" size={14} />
+            Open entry
+          </button>
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={() => setEditing((current) => !current)}
+              aria-pressed={editing}
+              className={clsx(
+                "inline-flex min-h-11 items-center rounded-full px-3 text-xs font-bold",
+                slowOut,
+                focusRing,
+                editing ? "bg-rose/10 text-rose" : "bg-journal-raised text-soft-ink hover:bg-rose/10 hover:text-rose"
+              )}
+            >
+              Edit
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => onDeleteDetail(item.entry.id, item.detail.id)}
+            disabled={!canEdit}
+            className={clsx("grid min-h-11 w-11 place-items-center rounded-full bg-journal-raised text-warm-gray hover:text-rose", slowOut, focusRing)}
+            aria-label="Delete little detail"
+          >
+            <Trash2 aria-hidden="true" size={16} />
+          </button>
+        </div>
+      </div>
+
+      {editing && canEdit ? (
+        <div className="mt-3 border-t border-journal-line pt-3">
+          <div className="grid gap-2.5 lg:grid-cols-[170px_1fr]">
+            <select
+              value={item.detail.category}
+              onChange={(event) =>
+                onUpdateDetail(item.entry.id, item.detail.id, (detail) => ({
+                  ...detail,
+                  category: event.target.value as DetailCategory
+                }))
+              }
+              className="min-h-11 rounded-control border border-journal-line bg-journal-surface px-3 text-sm font-semibold outline-none focus:ring-4 focus:ring-rose/15"
+              aria-label="Edit detail category"
+            >
+              {detailCategories.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.title}
+                </option>
+              ))}
+            </select>
+            <textarea
+              value={item.detail.text}
+              onChange={(event) =>
+                onUpdateDetail(item.entry.id, item.detail.id, (detail) => ({
+                  ...detail,
+                  text: event.target.value
+                }))
+              }
+              className="min-h-16 rounded-control border border-journal-line bg-journal-surface p-3 text-base outline-none focus:ring-4 focus:ring-rose/15"
+              aria-label="Edit little detail"
+            />
+          </div>
+          {people.length > 0 ? (
+            <div className="mt-3">
+              <PersonChips
+                compact
+                people={people}
+                selectedIds={item.detail.personTagIds}
+                onToggle={(personIdToToggle) =>
+                  onUpdateDetail(item.entry.id, item.detail.id, (detail) => ({
+                    ...detail,
+                    personTagIds: detail.personTagIds.includes(personIdToToggle)
+                      ? detail.personTagIds.filter((id) => id !== personIdToToggle)
+                      : [...detail.personTagIds, personIdToToggle]
+                  }))
+                }
+              />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </article>
   );
 }
 
