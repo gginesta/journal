@@ -12,8 +12,8 @@ struct InsightsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(spacing: 12) {
-                    InsightMetric(title: "Current", value: "\(summary.current)", subtitle: "day streak", systemImage: "flame.fill")
-                    InsightMetric(title: "Longest", value: "\(summary.longest)", subtitle: "best streak", systemImage: "trophy.fill")
+                    InsightMetric(title: "Current", value: "\(summary.current)", subtitle: "days kept", systemImage: "sparkles")
+                    InsightMetric(title: "Longest", value: "\(summary.longest)", subtitle: "best run", systemImage: "trophy.fill")
                 }
 
                 InsightMetric(title: "Completed", value: "\(summary.completedDays)", subtitle: "journal days", systemImage: "checkmark.circle.fill")

@@ -354,7 +354,7 @@ private struct OnboardingChoiceRow: View {
             .background(Color.journalSurfaceRaised.opacity(isSelected ? 1 : 0.55), in: RoundedRectangle(cornerRadius: JournalTheme.Radius.medium, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: JournalTheme.Radius.medium, style: .continuous)
-                    .stroke(isSelected ? Color.rose.opacity(0.35) : Color.ink.opacity(0.06), lineWidth: 1)
+                    .stroke(isSelected ? Color.rose.opacity(0.35) : Color.journalLine, lineWidth: 1)
             }
         }
         .buttonStyle(.plain)

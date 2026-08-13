@@ -1,4 +1,5 @@
 import type { JournalEntry, PersonTag, ReminderPreferences } from "@/types/journal";
+import type { ExperienceMode } from "./experience-mode";
 import { isEntryComplete } from "./journal-logic";
 
 export type OnboardingFocus = "self" | "partner" | "family" | "other";
@@ -12,13 +13,19 @@ export type OnboardingSetup = {
     others: string[];
   };
   reminders?: ReminderPreferences;
+  // Warm Album onboarding step 4 ("How much journal do you want?"). Optional so
+  // existing completion handlers keep compiling; SPEC-7 semantics unchanged —
+  // this is the same presentation-only preference the Settings toggle writes.
+  experienceMode?: ExperienceMode;
 };
 
+// Step 2 "starting shape" labels (Warm Album onboarding mockup). The `text`
+// blurbs survive as accessible descriptions of each shape.
 export const onboardingFocusOptions: Array<{ id: OnboardingFocus; title: string; text: string }> = [
   { id: "self", title: "Just me", text: "Personal milestones, moods, routines, and small wins." },
-  { id: "partner", title: "Me and my partner", text: "Dates, quiet teamwork, home rhythms, and things worth remembering together." },
-  { id: "family", title: "Family / kids", text: "Funny phrases, phases, favorites, and shared days with a household." },
-  { id: "other", title: "Other people or themes", text: "Friends, travel, work wins, creative projects, or any thread you want to find again." }
+  { id: "partner", title: "Me + partner", text: "Dates, quiet teamwork, home rhythms, and things worth remembering together." },
+  { id: "family", title: "Family", text: "Funny phrases, phases, favorites, and shared days with a household." },
+  { id: "other", title: "My own mix", text: "Friends, travel, work wins, creative projects, or any thread you want to find again." }
 ];
 
 export const onboardingStorageVersion = "v5";
