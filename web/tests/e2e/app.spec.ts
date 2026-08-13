@@ -92,7 +92,7 @@ test("demo user can complete family onboarding, edit today, and find the saved m
 
   await page.getByRole("button", { name: "Memories" }).first().click();
   await expect(page.getByRole("heading", { name: "Memories" })).toBeVisible();
-  await page.getByPlaceholder("Search memories, people, prompts, or little details").fill("pancakes");
+  await page.getByPlaceholder("Search moments, details, captions").fill("pancakes");
   const memoryCard = page.locator("article").filter({ hasText: response });
   await expect(memoryCard).toBeVisible();
   await expect(memoryCard.getByText(person)).toBeVisible();
