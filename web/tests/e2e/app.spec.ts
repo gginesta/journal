@@ -49,6 +49,17 @@ async function continueFromWelcome(page: Page) {
   await expect(page.getByRole("heading", { name: "Who’s in your story?" })).toBeVisible();
 }
 
+// Open Settings the way a user does on the current layout: on the mobile Full
+// nav Settings lives under the "More" menu; desktop and Simple mode expose a
+// direct Settings button.
+async function openSettings(page: Page) {
+  const more = page.getByRole("button", { name: "More", exact: true });
+  if (await more.isVisible()) {
+    await more.click();
+  }
+  await page.getByRole("button", { name: "Settings" }).first().click();
+}
+
 // Call this while on the "Who’s in your story?" (people) step to advance
 // through the rhythm and mode steps and finish onboarding.
 async function startToday(page: Page) {
@@ -126,7 +137,7 @@ test("demo user can choose just me and other onboarding shapes without family-on
   await startToday(page);
   await expect(page.getByRole("button", { name: "Solo Tester" }).first()).toBeVisible();
 
-  await page.getByRole("button", { name: "Settings" }).first().click();
+  await openSettings(page);
   await expect(page.getByRole("heading", { name: "Beta" })).toBeVisible();
   await expect(page.getByText(`App version ${packageJson.version}`)).toBeVisible();
   await page.getByRole("button", { name: "Replay welcome" }).click();
@@ -166,7 +177,7 @@ test("first personal memory gets a soft Memory Lane celebration", async ({ page 
 
   await openFreshApp(page);
   await page.getByRole("button", { name: "Skip tour" }).click();
-  await page.getByRole("button", { name: "Settings" }).first().click();
+  await openSettings(page);
   await page.getByRole("button", { name: "Add personal journal" }).click();
   await page.getByRole("button", { name: "Today" }).first().click();
 
@@ -229,10 +240,13 @@ test("photo polish lets a demo user caption a photo and use the pick-me-up memor
     buffer: tinyPng
   });
   await expect(page.getByText("Photo saved. Future-you gets a little more context.")).toBeVisible();
-  await page.getByPlaceholder("What should this photo remember?").fill(caption);
-  await expect(page.getByRole("heading", { name: caption })).toBeVisible();
-  await expect(page.getByText("Photo day")).toBeVisible();
-  await expect(page.getByText("1 caption")).toBeVisible();
+  await page.getByPlaceholder("What should this photo remember?").first().fill(caption);
+  await expect(page.getByLabel("Cover caption").first()).toHaveValue(caption);
+
+  // The quiet exhale: keeping the day settles into the saved band (no stats grid).
+  await page.getByRole("button", { name: "Keep today" }).click();
+  await expect(page.getByText("Saved to your story")).toBeVisible();
+  await expect(page.getByText(/1 photo · .*kept/)).toBeVisible();
 
   // On phone widths the look-back content sits behind the "More for today" disclosure.
   const moreForToday = page.getByRole("button", { name: /More for today/ });
@@ -259,12 +273,12 @@ test("experience toggle switches Simple and Full without losing data", async ({ 
 
   // The demo showcase starts in Full: the metadata surfaces are present and a
   // Little Detail can be saved before any switching.
-  await expect(page.getByRole("heading", { name: "Mood, optional" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "How was today" })).toBeVisible();
   await page.getByPlaceholder("A phrase, phase, favorite, or tiny milestone").fill(detail);
   await page.getByLabel("Add little detail").click();
   await expect(page.locator("article").filter({ hasText: detail })).toBeVisible();
 
-  await page.getByRole("button", { name: "Settings" }).first().click();
+  await openSettings(page);
   await expect(page.getByRole("heading", { name: "How much journal do you want?" })).toBeVisible();
   await expect(page.getByText("Two ways to keep the same journal. Switch anytime — nothing is ever deleted, and everything you added stays saved and searchable.")).toBeVisible();
   await page.getByRole("radio", { name: /^Simple/ }).click();
@@ -280,19 +294,19 @@ test("experience toggle switches Simple and Full without losing data", async ({ 
   await page.getByRole("button", { name: "Today" }).first().click();
   await expect(page.getByRole("heading", { name: "What felt good today?" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Three nice things" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Mood, optional" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "How was today" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "People, optional" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Little Details" })).toHaveCount(0);
 
   // Back to Full: everything returns, including the detail saved earlier.
-  await page.getByRole("button", { name: "Settings" }).first().click();
+  await openSettings(page);
   await page.getByRole("radio", { name: /^Full/ }).click();
   await expect(page.getByRole("radio", { name: /^Full/ })).toBeChecked();
   await expect(page.getByRole("button", { name: "Calendar", exact: true }).first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Insights", exact: true }).first()).toBeVisible();
 
   await page.getByRole("button", { name: "Today" }).first().click();
-  await expect(page.getByRole("heading", { name: "Mood, optional" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "How was today" })).toBeVisible();
   await expect(page.locator("article").filter({ hasText: detail })).toBeVisible();
 });
 
@@ -306,7 +320,8 @@ test("demo user can add and remove a photo without requiring reflection text", a
   await continueFromWelcome(page);
   await startToday(page);
 
-  await expect(page.getByRole("heading", { name: "Start with one photo, if one moment stands out." })).toBeVisible();
+  // 0 photos is a steady state: the dashed keepsake slot invites, never nags.
+  await expect(page.getByRole("button", { name: "Add a photo from today" })).toBeVisible();
   await page.getByLabel("Add journal photos").setInputFiles({
     name: "one-good-moment.png",
     mimeType: "image/png",
@@ -314,10 +329,15 @@ test("demo user can add and remove a photo without requiring reflection text", a
   });
 
   await expect(page.getByText("Photo saved. Future-you gets a little more context.")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Let the photo hold most of the story." })).toBeVisible();
-  await expect(page.getByText(/1 photo.*saved/)).toBeVisible();
+  await expect(page.getByLabel("Cover caption").first()).toBeVisible();
 
+  // Keeping the day plays the quiet exhale once and settles into the band.
+  await page.getByRole("button", { name: "Keep today" }).click();
+  await expect(page.getByText("Saved to your story")).toBeVisible();
+  await expect(page.getByText(/1 photo.*kept/)).toBeVisible();
+
+  await page.getByText("Adjust photos").click();
   await page.getByRole("button", { name: "Remove photo" }).click();
-  await expect(page.getByRole("heading", { name: "Start with one photo, if one moment stands out." })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add a photo from today" })).toBeVisible();
   await expect(page.getByText("Photo removed. The entry is still yours to shape.")).toBeVisible();
 });

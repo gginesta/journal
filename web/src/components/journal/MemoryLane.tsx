@@ -1,5 +1,3 @@
-/* eslint-disable @next/next/no-img-element -- Journal photos can be local data URLs or private signed storage URLs. */
-
 // Memory Lane — Today's signature slot (Warm Album redesign). The first match
 // arrives as a blurred keepsake that clears on tap ("the wrapping paper");
 // each card unwraps once per day and stays open on revisits.

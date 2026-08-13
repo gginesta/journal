@@ -54,23 +54,23 @@ await shot(m, "m03-onboarding-welcome");
 await axe(m, "onboarding-welcome-mobile");
 
 await m.getByRole("button", { name: "Continue" }).click();
-await m.getByRole("heading", { name: "Let's make this yours." }).waitFor();
+await m.getByRole("heading", { name: "Who’s in your story?" }).waitFor();
 await shot(m, "m04-onboarding-people-justme");
-await m.getByRole("button", { name: "Family / kids" }).click();
+await m.getByRole("button", { name: "Family", exact: true }).click();
 await m.getByLabel("Child", { exact: true }).fill("Leo");
 await m.getByLabel("Partner").fill("Steph");
 await shot(m, "m05-onboarding-people-family", true);
 await axe(m, "onboarding-people-mobile");
 
 await m.getByRole("button", { name: "Continue" }).click();
-await m.getByRole("heading", { name: "Want a quiet reminder?" }).waitFor();
+await m.getByRole("heading", { name: "When’s your moment?" }).waitFor();
 await shot(m, "m06-onboarding-reminders", true);
 
 await m.getByRole("button", { name: "Continue" }).click();
-await m.getByRole("heading", { name: "Memory Lane starts sooner than you think." }).waitFor();
+await m.getByRole("heading", { name: "How much journal do you want?" }).waitFor();
 await shot(m, "m07-onboarding-payoff");
 
-await m.getByRole("button", { name: "Add your first memory" }).click();
+await m.getByRole("button", { name: "Start with tonight" }).click();
 await m.getByRole("heading", { name: "What felt good today?" }).waitFor();
 await shot(m, "m08-today-empty", true);
 await axe(m, "today-empty-mobile");
@@ -109,11 +109,11 @@ await shot(d, "d01-homepage", true);
 await freshApp(d);
 await shot(d, "d02-onboarding-welcome");
 await d.getByRole("button", { name: "Continue" }).click();
-await d.getByRole("heading", { name: "Let's make this yours." }).waitFor();
+await d.getByRole("heading", { name: "Who’s in your story?" }).waitFor();
 await d.getByRole("button", { name: "Continue" }).click();
-await d.getByRole("heading", { name: "Want a quiet reminder?" }).waitFor();
+await d.getByRole("heading", { name: "When’s your moment?" }).waitFor();
 await d.getByRole("button", { name: "Continue" }).click();
-await d.getByRole("button", { name: "Add your first memory" }).click();
+await d.getByRole("button", { name: "Start with tonight" }).click();
 await d.getByRole("heading", { name: "What felt good today?" }).waitFor();
 await shot(d, "d03-today-empty", true);
 

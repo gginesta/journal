@@ -233,11 +233,11 @@ export function PhotoHero({
   }
 
   const developingSlot = developing ? (
-    <div className="relative overflow-hidden rounded-card bg-journal-raised">
+    <div className="relative h-full min-h-24 overflow-hidden rounded-card bg-journal-raised">
       <img
         src={developing.objectUrl}
         alt="Photo still developing"
-        className="block h-full min-h-24 w-full scale-[0.96] object-cover opacity-60 blur-[8px]"
+        className="block h-full w-full scale-[0.96] object-cover opacity-60 blur-[8px]"
       />
       {!developing.failed ? (
         <span aria-hidden="true" className="wa-hairline absolute inset-x-0 bottom-0 h-0.5 bg-leaf" />
@@ -249,7 +249,9 @@ export function PhotoHero({
     <section aria-label="Today's photo" className="rounded-journal border border-journal-line bg-journal-surface p-3 pb-3.5 shadow-photo">
       {hiddenInputs}
 
-      {secondPhoto || developing ? (
+      {!heroPhoto && developing ? (
+        <div className="h-[240px] sm:h-[290px]">{developingSlot}</div>
+      ) : secondPhoto || (heroPhoto && developing) ? (
         <div className="grid grid-cols-[1.5fr_1fr] gap-2">
           {heroPhoto ? (
             <img
@@ -262,9 +264,7 @@ export function PhotoHero({
                 justDevelopedId === heroPhoto.id ? "wa-develop" : null
               )}
             />
-          ) : (
-            developingSlot
-          )}
+          ) : null}
           <div className="grid grid-rows-2 gap-2">
             {secondPhoto ? (
               <img
@@ -273,7 +273,7 @@ export function PhotoHero({
                 alt={secondPhoto.caption || "Second journal photo"}
                 className={clsx("block h-full min-h-24 w-full rounded-card object-cover", justDevelopedId === secondPhoto.id ? "wa-develop" : null)}
               />
-            ) : heroPhoto && developing ? (
+            ) : developing ? (
               developingSlot
             ) : null}
             <div className="grid place-items-center rounded-card border-[1.5px] border-dashed border-journal-line bg-journal-raised/90 text-xs font-semibold text-warm-gray">
