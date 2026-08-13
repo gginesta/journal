@@ -50,7 +50,9 @@ export const syncLimits = {
   // stores these the old way.
   photoDataUrlChars: 11_500_000,
   // Body cap for the out-of-band photo upload route (compressed image bytes).
-  photoUploadBytes: 8_000_000
+  // Kept under Vercel's ~4.5MB request-body limit so the route's friendly 413
+  // is reachable; the client compressor (1600px JPEG q0.82) stays well below.
+  photoUploadBytes: 4_000_000
 } as const;
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

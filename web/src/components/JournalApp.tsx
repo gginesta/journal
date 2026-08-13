@@ -36,8 +36,11 @@ import {
   type DetailCategory,
   type SaveState
 } from "@/components/journal/helpers";
+import clsx from "clsx";
+import { CalendarDays, Camera, Home, MoreHorizontal, Settings as SettingsIcon, Sparkles } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { MemoriesView } from "@/components/journal/MemoriesView";
-import { MobileTabs, Sidebar } from "@/components/journal/Sidebar";
+import { Sidebar } from "@/components/journal/Sidebar";
 import { TodayView } from "@/components/journal/TodayView";
 
 // Today + Memories are the daily path and stay in the main chunk; the other
@@ -74,6 +77,9 @@ const modeStorageKey = "photo-gratitude-web-mode-v1";
 
 export function JournalApp({ initialData, appVersion }: { initialData: JournalBootstrap; appVersion: string }) {
   const [tab, setTab] = useState<AppTab>("today");
+  // Bumped by the mobile "More" menu's Gratitude Guide entry so Today can open
+  // its gentle starters (SPEC-7 keeps the guide reachable in Full mode).
+  const [guideRequestToken, setGuideRequestToken] = useState(0);
   const [experienceMode, setExperienceMode] = useState<ExperienceMode>(initialData.experienceMode);
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(initialData.activeWorkspaceId);
@@ -778,6 +784,11 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
   function completeOnboarding(setup?: OnboardingSetup) {
     if (setup) {
       applyOnboardingSetup(setup);
+      // Onboarding step 4 is the Simple/Full choice — persist it the same way
+      // the Settings toggle does.
+      if (setup.experienceMode && setup.experienceMode !== experienceMode) {
+        updateExperienceMode(setup.experienceMode);
+      }
       if (setup.reminders) {
         // Stamp the device timezone the same way SettingsView does — without it
         // the dispatcher schedules onboarding-enabled reminders on UTC.
@@ -883,6 +894,7 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
               currentUserId={initialData.profile?.id ?? null}
               memberNames={memberNames}
               canEdit={canEditActiveWorkspace}
+              guideRequestToken={guideRequestToken}
               showStarterGuide={showStarterGuide}
               showFirstMemoryCelebration={shouldShowFirstMemoryCelebration({
                 entries: workspaceEntries,
@@ -953,7 +965,15 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
         </main>
       </div>
 
-      <MobileTabs activeTab={tab} setTab={setTab} experienceMode={experienceMode} />
+      <MobileNav
+        activeTab={tab}
+        setTab={setTab}
+        experienceMode={experienceMode}
+        onOpenGuide={() => {
+          setTab("today");
+          setGuideRequestToken((current) => current + 1);
+        }}
+      />
       {selectedEntry ? (
         <EntryDetailModal
           entry={selectedEntry}
@@ -979,6 +999,106 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
         />
       ) : null}
     </div>
+  );
+}
+
+// Warm Album mobile navigation. Simple mode keeps its three tabs; Full mode is
+// four tabs plus "More", where Settings and the Gratitude Guide live. This is
+// presentation only — every SPEC-7 capability stays reachable.
+const mobileTabItems: Array<{ id: AppTab; title: string; icon: LucideIcon }> = [
+  { id: "today", title: "Today", icon: Home },
+  { id: "memories", title: "Memories", icon: Camera },
+  { id: "calendar", title: "Calendar", icon: CalendarDays },
+  { id: "insights", title: "Insights", icon: Sparkles },
+  { id: "settings", title: "Settings", icon: SettingsIcon }
+];
+
+function MobileNav({
+  activeTab,
+  setTab,
+  experienceMode,
+  onOpenGuide
+}: {
+  activeTab: AppTab;
+  setTab: (tab: AppTab) => void;
+  experienceMode: ExperienceMode;
+  onOpenGuide: () => void;
+}) {
+  const [moreOpen, setMoreOpen] = useState(false);
+  const isFull = experienceMode === "full";
+  const visible = visibleTabs(experienceMode);
+  const tabItems = mobileTabItems.filter(
+    (item) => visible.some((tab) => tab === item.id) && !(isFull && item.id === "settings")
+  );
+
+  function choose(tab: AppTab) {
+    setMoreOpen(false);
+    setTab(tab);
+  }
+
+  return (
+    <nav
+      aria-label="Journal tabs"
+      className="fixed inset-x-0 bottom-0 z-20 border-t border-journal-line bg-journal-surface/95 px-2 py-2 backdrop-blur lg:hidden"
+    >
+      {isFull && moreOpen ? (
+        <div className="absolute inset-x-3 bottom-full mb-2 grid gap-1 rounded-journal border border-journal-line bg-journal-surface p-2 shadow-journal">
+          <button
+            type="button"
+            onClick={() => choose("settings")}
+            className="flex min-h-12 items-center gap-3 rounded-2xl px-4 text-left text-sm font-bold text-soft-ink transition hover:bg-journal-raised"
+          >
+            <SettingsIcon aria-hidden="true" size={19} />
+            Settings
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMoreOpen(false);
+              onOpenGuide();
+            }}
+            className="flex min-h-12 items-center gap-3 rounded-2xl px-4 text-left text-sm font-bold text-soft-ink transition hover:bg-journal-raised"
+          >
+            <Sparkles aria-hidden="true" size={19} />
+            Gratitude Guide
+          </button>
+        </div>
+      ) : null}
+      <div className={clsx("grid", isFull ? "grid-cols-5" : "grid-cols-3")}>
+        {tabItems.map((item) => {
+          const Icon = item.icon;
+          const active = item.id === activeTab && !(isFull && moreOpen);
+          return (
+            <button
+              key={item.id}
+              onClick={() => choose(item.id)}
+              className={clsx(
+                "grid min-h-14 place-items-center gap-1 rounded-2xl text-[11px] font-bold",
+                active ? "bg-rose/10 text-rose" : "text-warm-gray"
+              )}
+            >
+              <Icon aria-hidden="true" size={19} />
+              {item.title}
+            </button>
+          );
+        })}
+        {isFull ? (
+          <button
+            type="button"
+            onClick={() => setMoreOpen((current) => !current)}
+            aria-expanded={moreOpen}
+            aria-haspopup="menu"
+            className={clsx(
+              "grid min-h-14 place-items-center gap-1 rounded-2xl text-[11px] font-bold",
+              moreOpen || activeTab === "settings" ? "bg-rose/10 text-rose" : "text-warm-gray"
+            )}
+          >
+            <MoreHorizontal aria-hidden="true" size={19} />
+            More
+          </button>
+        ) : null}
+      </div>
+    </nav>
   );
 }
 

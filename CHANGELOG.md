@@ -2,6 +2,29 @@
 
 All notable changes to Photo Gratitude Journal will be documented here.
 
+## [0.4.0] - 2026-08-13
+
+The "Warm Album" redesign, from the Claude-designed handover recorded in `docs/DESIGN_HANDOFF.md`. Presentation only — the SPEC-7 capability map, data model, and sync behavior are unchanged.
+
+### Changed
+
+- New design token set on both platforms: evolved warm palette with rose/leaf variants, warm-brown shadows, control/card/journal/hero radii, system-sans type scale — plus a warm-charcoal dark palette (iOS adapts to system dark mode; photos stay untinted).
+- Today rebuilt around one keepsake photo hero: three nice things become a numbered add-as-you-go list ("Add another, if it fits"), full-mode extras (mood faces with labels, people, Little Details) demoted to quiet optional rows, and completion replaced by the "quiet exhale" — checkmark draws, "Saved to your story", one leaf glow breath, once per day, no stats grid.
+- Streaks can no longer scold: "N days kept" in warm-gray, no broken-chain states anywhere (Today, Insights, iOS).
+- Memory Lane is the ritual's payoff: a blurred look-back that unwraps on tap (once per card per day), in a fixed slot after completion — no longer buried in a disclosure.
+- Memories: month sections with "days kept" counts, album-print photo cards, paper note cards for text-only days, a Little Details repository summary, and a day-one empty state ("Your album starts tonight").
+- Insights is a story, not analytics: days kept with reassurance copy, a monthly letter composed from real counts, a year-in-photos mosaic, gentle mood patterns.
+- Onboarding is four steps under a minute (welcome → people → rhythm → mode) ending in "Start with tonight"; the Simple/Full choice (Simple pre-selected) now happens at onboarding and is framed — there and in Settings — as two sizes of the same journal, with "nothing is ever deleted" explicit.
+- Mobile navigation: Simple mode has 3 tabs; Full mode has 4 tabs plus a More menu holding Settings and the Gratitude Guide.
+- Photo adding "develops" (blurred thumb sharpens on arrival, leaf progress hairline, failure keeps the thumb with a retry row); all motion honors reduced-motion preferences.
+
+### Fixed (pre-merge review)
+
+- The out-of-band photo upload route now enforces the same 10-photos-per-entry cap as the sync path.
+- Reminder pushes are sent with bounded concurrency so large batches cannot hit the serverless timeout and silently drop the tail.
+- The photo upload size cap now sits under the hosting platform's request-body limit, so oversized uploads get the friendly error instead of an opaque one.
+- Removed the superseded mobile tab bar component left behind by the navigation redesign.
+
 ## [0.3.0] - 2026-08-13
 
 The five-wave improvement plan (`docs/IMPROVEMENT_PLAN.md`), reviewed and merged as one release. Web and iOS now share the same version number, and the Version check workflow fails CI if they diverge.

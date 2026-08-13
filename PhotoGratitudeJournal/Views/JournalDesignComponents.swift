@@ -81,30 +81,36 @@ struct JournalSection<Content: View>: View {
 
 struct StreakPill: View {
     let days: Int
-    var label: String = "day streak"
+    var label: String = "days kept"
     var isActive: Bool = true
 
+    // "N days kept" stays warm-gray and secondary in every state — never rose,
+    // and a missed day never changes the styling or the copy.
     var body: some View {
         Label {
-            Text("\(days) \(label)")
+            Text(text)
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
         } icon: {
-            Image(systemName: isActive ? "flame.fill" : "sparkle")
+            Image(systemName: "sparkles")
                 .accessibilityHidden(true)
         }
         .font(.subheadline.weight(.semibold))
-        .foregroundStyle(isActive ? Color.rose : Color.warmGray)
+        .foregroundStyle(Color.warmGray)
         .padding(.horizontal, 12)
         .frame(minHeight: JournalTheme.Layout.minimumTapTarget)
-        .background((isActive ? Color.rose : Color.warmGray).opacity(0.12), in: Capsule())
-        .accessibilityLabel(isActive ? "\(days) day streak" : "Streak starts with the next entry")
+        .background(Color.warmGray.opacity(0.12), in: Capsule())
+        .accessibilityLabel(text)
+    }
+
+    private var text: String {
+        days == 1 ? "1 day kept" : "\(days) \(label)"
     }
 }
 
 struct CompletionBanner: View {
     let isComplete: Bool
-    var completeTitle: String = "Saved for today"
+    var completeTitle: String = "Saved to your story"
     var incompleteTitle: String = "Open for today"
     var completeMessage: String = "Your moment is tucked away."
     var incompleteMessage: String = "A photo or a few words is enough."

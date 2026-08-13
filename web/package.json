@@ -1,6 +1,6 @@
 {
   "name": "photo-gratitude-journal-web",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "regenerate:thumbnails": "node scripts/regenerate-thumbnails.mjs",
-    "test": "vitest run tests/auth-callback.test.ts tests/journal-sync-delta.test.ts tests/tag-colors.test.ts tests/auth-email-copy.test.ts tests/demo-storage.test.ts tests/early-memory-lane.test.ts tests/experience-mode.test.ts tests/first-memory-celebration.test.ts tests/journal-logic.test.ts tests/journal-photos-route.test.ts tests/journal-sync-route.test.ts tests/journal-sync-safety.test.ts tests/journal-sync-validation.test.ts tests/onboarding.test.ts tests/profile-route.test.ts tests/push-subscriptions-route.test.ts tests/reminder-ics.test.ts tests/reminder-schedule.test.ts tests/shared-journal-copy.test.ts tests/spec-conformance.test.ts tests/spec-conformance-memory-lane.test.ts tests/supabase-env.test.ts tests/web-push.test.ts --environment node --globals",
+    "test": "vitest run tests/auth-callback.test.ts tests/journal-sync-delta.test.ts tests/tag-colors.test.ts tests/auth-email-copy.test.ts tests/demo-storage.test.ts tests/early-memory-lane.test.ts tests/experience-mode.test.ts tests/first-memory-celebration.test.ts tests/insights-story.test.ts tests/journal-logic.test.ts tests/journal-photos-route.test.ts tests/journal-sync-route.test.ts tests/journal-sync-safety.test.ts tests/journal-sync-validation.test.ts tests/memories-helpers.test.ts tests/onboarding.test.ts tests/profile-route.test.ts tests/push-subscriptions-route.test.ts tests/reminder-ics.test.ts tests/reminder-schedule.test.ts tests/shared-journal-copy.test.ts tests/spec-conformance.test.ts tests/spec-conformance-memory-lane.test.ts tests/supabase-env.test.ts tests/today-warm-album.test.ts tests/web-push.test.ts --environment node --globals",
     "pretest:e2e": "npm run build",
     "test:e2e": "node scripts/run-e2e.mjs"
   },
