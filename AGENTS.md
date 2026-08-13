@@ -48,7 +48,7 @@ The app is not a social network, camera roll clone, clinical mental-health tool,
 ## Engineering Guardrails
 
 - Do not commit secrets. Prior conversations may contain Supabase credentials; never copy them into docs or code.
-- Keep `web/package.json` version aligned with visible Settings > Beta and docs when shipping a beta change.
+- Version bumps are release-wide: bump `web/package.json` and every `MARKETING_VERSION` in `PhotoGratitudeJournal.xcodeproj/project.pbxproj` together (semver: minor for feature releases, patch for fixes). The Version check workflow fails CI when they diverge. The web app shows the version in Settings > Beta and the login footer — never hand-copy version numbers into docs or UI.
 - Demo mode and Supabase mode must stay separate. Demo localStorage must never overwrite authenticated Supabase data.
 - Supabase role/RLS behavior is security-sensitive. Review `docs/WEB_APP.md` and the Supabase migration before changing tables, policies, Storage paths, or `SECURITY DEFINER` functions.
 - Use workspace-scoped data access. Journal rows, people tags, details, photos, prompts, and reminders all belong to a workspace.

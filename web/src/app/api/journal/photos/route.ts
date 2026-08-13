@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { canMutateWorkspaceRole, imageExtensionForContentType } from "@/lib/journal-sync-safety";
-import { syncLimits } from "@/lib/journal-sync-validation";
+import { imageExtensionForContentType } from "@/lib/journal-sync-safety";
+import { isUuid, syncLimits } from "@/lib/journal-sync-validation";
+import { getWorkspaceMutationAccess } from "@/lib/workspace-access";
 import { makePhotoThumbnail } from "@/lib/photo-thumbnails";
 import { logApiFailure } from "@/lib/server-log";
-import { createSupabaseServerClient, type SupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const localDatePattern = /^\d{4}-\d{2}-\d{2}$/;
 const signedUrlSeconds = 60 * 60 * 24;
 
@@ -49,13 +49,13 @@ export async function POST(request: Request) {
   const sortOrder = Number(form.get("sortOrder"));
   const file = form.get("file");
 
-  if (typeof workspaceId !== "string" || !uuidPattern.test(workspaceId)) {
+  if (!isUuid(workspaceId)) {
     return fail(400, "workspaceId must be a valid id", { user: user.id });
   }
-  if (typeof entryId !== "string" || !uuidPattern.test(entryId)) {
+  if (!isUuid(entryId)) {
     return fail(400, "entryId must be a valid id", { user: user.id, workspace: workspaceId });
   }
-  if (typeof photoId !== "string" || !uuidPattern.test(photoId)) {
+  if (!isUuid(photoId)) {
     return fail(400, "photoId must be a valid id", { user: user.id, workspace: workspaceId });
   }
   if (typeof localDate !== "string" || !localDatePattern.test(localDate)) {
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
     return fail(413, "Photo is too large to upload", { user: user.id, workspace: workspaceId });
   }
 
-  const access = await getWorkspaceMutationAccess(supabase, workspaceId, user.id);
+  const access = await getWorkspaceMutationAccess(supabase, workspaceId, user.id, "Editor access is required to add photos to this workspace");
   if (!access.ok) {
     return fail(access.status, access.message, { user: user.id, workspace: workspaceId });
   }
@@ -159,23 +159,3 @@ export async function POST(request: Request) {
   return NextResponse.json({ storagePath, thumbnailPath, previewUrl, thumbnailUrl });
 }
 
-async function getWorkspaceMutationAccess(
-  supabase: SupabaseServerClient,
-  workspaceId: string,
-  userId: string
-): Promise<{ ok: true } | { ok: false; status: number; message: string }> {
-  const { data, error } = await supabase
-    .from("workspace_members")
-    .select("role")
-    .eq("workspace_id", workspaceId)
-    .eq("user_id", userId)
-    .eq("invitation_state", "accepted")
-    .maybeSingle();
-
-  if (error) return { ok: false, status: 500, message: error.message };
-  if (!canMutateWorkspaceRole(data?.role)) {
-    return { ok: false, status: 403, message: "Editor access is required to add photos to this workspace" };
-  }
-
-  return { ok: true };
-}

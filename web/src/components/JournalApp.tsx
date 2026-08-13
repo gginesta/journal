@@ -778,7 +778,12 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
   function completeOnboarding(setup?: OnboardingSetup) {
     if (setup) {
       applyOnboardingSetup(setup);
-      if (setup.reminders) updateReminders(setup.reminders);
+      if (setup.reminders) {
+        // Stamp the device timezone the same way SettingsView does — without it
+        // the dispatcher schedules onboarding-enabled reminders on UTC.
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
+        updateReminders({ ...setup.reminders, timezone: timezone ?? setup.reminders.timezone ?? null });
+      }
     }
     window.localStorage.setItem(onboardingKey, "complete");
     window.localStorage.removeItem(`${onboardingKey}:starter-dismissed`);

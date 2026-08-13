@@ -192,8 +192,6 @@ struct MemoriesView: View {
 
         for detail in entry.sortedDetails {
             fields.append(detail.text)
-            fields.append(detail.detailCategory.title)
-            fields.append(detail.category)
             fields += detail.sortedPersonTags.map(\.name)
         }
 

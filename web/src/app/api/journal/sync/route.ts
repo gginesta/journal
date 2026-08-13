@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import type { JournalEntry, PersonTag, PromptTemplate, ReminderPreferences } from "@/types/journal";
-import { canMutateWorkspaceRole, computePersonTagDeletions, isSafeWorkspaceStoragePath, parseImageDataUrl } from "@/lib/journal-sync-safety";
+import { computePersonTagDeletions, isSafeWorkspaceStoragePath, parseImageDataUrl } from "@/lib/journal-sync-safety";
 import { validateSyncPayload } from "@/lib/journal-sync-validation";
+import { getWorkspaceMutationAccess } from "@/lib/workspace-access";
 import { makePhotoThumbnail } from "@/lib/photo-thumbnails";
 import { logApiFailure } from "@/lib/server-log";
 import { createSupabaseServerClient, type SupabaseServerClient } from "@/lib/supabase/server";
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
   }
   const payload = validation.payload;
 
-  const access = await getWorkspaceMutationAccess(supabase, payload.workspaceId, user.id);
+  const access = await getWorkspaceMutationAccess(supabase, payload.workspaceId, user.id, "Editor access is required to sync this workspace");
   if (!access.ok) {
     return fail(access.status, access.message, { user: user.id, workspace: payload.workspaceId });
   }
@@ -67,27 +68,6 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ ok: true, applied: entryOutcome.applied, stale: entryOutcome.stale });
-}
-
-async function getWorkspaceMutationAccess(
-  supabase: SupabaseServerClient,
-  workspaceId: string,
-  userId: string
-): Promise<{ ok: true } | { ok: false; status: number; message: string }> {
-  const { data, error } = await supabase
-    .from("workspace_members")
-    .select("role")
-    .eq("workspace_id", workspaceId)
-    .eq("user_id", userId)
-    .eq("invitation_state", "accepted")
-    .maybeSingle();
-
-  if (error) return { ok: false, status: 500, message: error.message };
-  if (!canMutateWorkspaceRole(data?.role)) {
-    return { ok: false, status: 403, message: "Editor access is required to sync this workspace" };
-  }
-
-  return { ok: true };
 }
 
 async function upsertPeople(supabase: SupabaseServerClient, workspaceId: string, people: PersonTag[]) {
@@ -178,7 +158,9 @@ async function upsertReminders(supabase: SupabaseServerClient, workspaceId: stri
       reminders_enabled: reminders.remindersEnabled,
       evening_time: reminders.eveningTime,
       morning_time: reminders.morningTime,
-      timezone: reminders.timezone ?? null
+      // Older clients sync reminders without a timezone; leaving the column out
+      // of the payload preserves the stored value instead of nulling it to UTC.
+      ...(reminders.timezone ? { timezone: reminders.timezone } : {})
     },
     { onConflict: "workspace_id" }
   );

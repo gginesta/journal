@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
+import { isUuid } from "@/lib/journal-sync-validation";
 import { logApiFailure } from "@/lib/server-log";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const maxEndpointLength = 1_000;
 const maxKeyLength = 300;
 const maxUserAgentLength = 300;
@@ -45,10 +46,13 @@ export async function POST(request: Request) {
     return fail(400, "Subscription payload must be valid JSON", { user: user.id });
   }
 
-  if (!isRecord(body) || typeof body.workspaceId !== "string" || !uuidPattern.test(body.workspaceId)) {
+  if (!isRecord(body)) {
     return fail(400, "workspaceId must be a valid id", { user: user.id });
   }
   const workspaceId = body.workspaceId;
+  if (!isUuid(workspaceId)) {
+    return fail(400, "workspaceId must be a valid id", { user: user.id });
+  }
   if (!isEndpoint(body.endpoint)) {
     return fail(400, "endpoint must be an https push endpoint", { user: user.id });
   }
@@ -74,17 +78,23 @@ export async function POST(request: Request) {
     return fail(403, "Workspace membership is required for reminders", { user: user.id, workspace: workspaceId });
   }
 
-  const { error } = await supabase.from("push_subscriptions").upsert(
-    {
-      user_id: user.id,
-      workspace_id: workspaceId,
-      endpoint: body.endpoint,
-      keys_p256dh: body.keys.p256dh,
-      keys_auth: body.keys.auth,
-      user_agent: userAgent
-    },
-    { onConflict: "endpoint" }
-  );
+  // A browser hands every signed-in user the same push endpoint, so on a
+  // shared device the endpoint row may currently belong to a different user.
+  // RLS would reject updating their row; the write goes through the
+  // service-role client instead — safe because auth and workspace membership
+  // were verified above with the caller's own client.
+  const subscriptionRow = {
+    user_id: user.id,
+    workspace_id: workspaceId,
+    endpoint: body.endpoint,
+    keys_p256dh: body.keys.p256dh,
+    keys_auth: body.keys.auth,
+    user_agent: userAgent
+  };
+  const admin = createSupabaseAdminClient();
+  const { error } = admin
+    ? await admin.from("push_subscriptions").upsert(subscriptionRow, { onConflict: "endpoint" })
+    : await supabase.from("push_subscriptions").upsert(subscriptionRow, { onConflict: "endpoint" });
   if (error) {
     return fail(500, error.message, { user: user.id, workspace: workspaceId });
   }
