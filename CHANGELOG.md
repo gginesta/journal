@@ -2,6 +2,24 @@
 
 All notable changes to Photo Gratitude Journal will be documented here.
 
+## [0.3.0] - 2026-08-13
+
+The five-wave improvement plan (`docs/IMPROVEMENT_PLAN.md`), reviewed and merged as one release. Web and iOS now share the same version number, and the Version check workflow fails CI if they diverge.
+
+### Added
+
+- Simple/Full experience mode on web and iOS, driven by the shared `spec/fixtures/experience-mode.json` fixture with SPEC conformance tests on both platforms.
+- iOS parity features: Gratitude Guide with mood mapping, early Memory Lane look-backs, first-memory celebration, entry editing from the detail screen, and TestFlight preparation (Premium UI hidden for the beta).
+- Web performance core: faster bootstrap and interaction paths from Wave 1, plus the Wave 2 trust and loop fixes (out-of-band photo upload, calendar backfill).
+- The app version now also appears in the login page footer, so the deployed version can be checked without signing in.
+
+### Fixed
+
+- Reminders enabled during onboarding now record the device timezone, so they fire on local time instead of UTC.
+- A sync payload without a timezone no longer clears the stored reminder timezone (protects against older tabs reverting reminders to UTC).
+- A second household member on a shared device can now enable reminder notifications (the push-subscription write previously failed against the first member's row).
+- iOS Memories search no longer matches internal category names ("note", "quote"), aligning its results with web search.
+
 ## [0.2.12] - 2026-08-11
 
 Catch-up release recording the 2026-06-11 to 2026-06-13 audit-execution work (see `AUDIT.md` and `AUDIT_UX.md` for the full findings and execution logs).

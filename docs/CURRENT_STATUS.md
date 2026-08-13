@@ -11,7 +11,7 @@ The June 2026 audit cycle (`AUDIT.md`, `AUDIT_UX.md`) landed transactional sync,
 The active app version is:
 
 ```text
-0.2.12
+0.3.0
 ```
 
 The live URL is:
@@ -74,6 +74,8 @@ Routes:
 - `/auth/callback`: Supabase Auth callback
 
 ## What Was Recently Added
+
+Version `0.3.0` merged the five-wave improvement plan (see `docs/IMPROVEMENT_PLAN.md`): web performance and trust fixes, the Simple/Full experience mode on both platforms, iOS logic and experience parity with web, TestFlight prep, and pre-merge review fixes (reminder timezone handling, shared-device push subscriptions, iOS search parity). Web and iOS now share the version number, enforced by the Version check workflow.
 
 Version `0.2.12` added (the June audit-execution work, recorded late):
 
