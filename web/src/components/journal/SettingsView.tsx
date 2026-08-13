@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { CalendarPlus, CheckCircle2, Download, LogOut, Plus, Sparkles, Trash2 } from "lucide-react";
+import { CalendarPlus, Download, LogOut, Plus, Sparkles, Trash2 } from "lucide-react";
 import type {
   JournalEntry,
   PersonTag,
@@ -206,7 +206,9 @@ export function SettingsView({
 }
 
 // SPEC-7: the Simple/Full toggle. Presentation-only, so it stays enabled for
-// every role — a viewer picks their own density too.
+// every role — a viewer picks their own density too. Warm Album framing: two
+// sizes of the same journal, never a demo vs the real thing; nothing is ever
+// deleted on switch.
 function ExperienceSection({
   experienceMode,
   onChangeExperienceMode
@@ -218,18 +220,22 @@ function ExperienceSection({
     {
       id: "simple",
       title: "Simple",
-      text: "A one-minute ritual — one photo, three nice things, done. Memory Lane still brings back the good days."
+      text: "A photo, three lines, done. Today, Memories, and your look-backs — the whole ritual in about a minute."
     },
     {
       id: "full",
       title: "Full",
-      text: "Everything — moods, people tags, Little Details, Gratitude Guide, Calendar and Insights."
+      text: "Everything in Simple, plus mood, people tags, Little Details, the Gratitude Guide, Calendar, and Insights — for days you want to keep more."
     }
   ];
 
   return (
-    <SettingsSection title="Experience">
-      <div role="radiogroup" aria-label="Experience" className="grid gap-2 sm:grid-cols-2">
+    <section aria-label="Journal mode" className="rounded-journal border border-journal-line bg-journal-surface p-5 shadow-card">
+      <h2 className="text-[0.9375rem] font-bold text-ink">How much journal do you want?</h2>
+      <p className="mb-3.5 mt-1.5 text-[0.8125rem] leading-normal text-warm-gray">
+        Two ways to keep the same journal. Switch anytime — nothing is ever deleted, and everything you added stays saved and searchable.
+      </p>
+      <div role="radiogroup" aria-label="Journal mode" className="grid gap-2.5">
         {options.map((option) => {
           const active = experienceMode === option.id;
           return (
@@ -240,23 +246,26 @@ function ExperienceSection({
               aria-checked={active}
               onClick={() => onChangeExperienceMode(option.id)}
               className={clsx(
-                "rounded-[20px] border p-4 text-left transition",
-                active ? "border-rose/30 bg-rose/10" : "border-journal-line bg-white hover:border-rose/20"
+                "flex items-start gap-3 rounded-card border-[1.5px] p-3.5 text-left transition duration-200 ease-[cubic-bezier(.3,0,.2,1)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-rose/25 motion-reduce:transition-none",
+                active ? "border-rose/40 bg-rose/5" : "border-journal-line bg-journal-surface hover:border-rose/30"
               )}
             >
-              <span className="flex items-center gap-2 font-bold text-ink">
-                {active ? <CheckCircle2 aria-hidden="true" size={16} className="text-rose" /> : null}
-                {option.title}
+              <span
+                aria-hidden="true"
+                className={clsx("mt-0.5 grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full border-2", active ? "border-rose" : "border-ink/25")}
+              >
+                {active ? <span className="h-2.5 w-2.5 rounded-full bg-rose" /> : null}
               </span>
-              <span className={clsx("mt-1 block text-sm leading-5", active ? "text-soft-ink" : "text-warm-gray")}>{option.text}</span>
+              <span>
+                <span className="block text-[0.9375rem] font-bold text-ink">{option.title}</span>
+                <span className="mt-0.5 block text-[0.8125rem] leading-normal text-soft-ink">{option.text}</span>
+              </span>
             </button>
           );
         })}
       </div>
-      <p className="mt-3 text-sm leading-6 text-warm-gray">
-        Switching never deletes anything; what you added in Full stays saved and comes right back.
-      </p>
-    </SettingsSection>
+      <p className="mt-3 text-xs leading-normal text-warm-gray">In Simple, anything you kept in Full still shows up when you open a day.</p>
+    </section>
   );
 }
 
@@ -737,10 +746,11 @@ function MemberList({
   );
 }
 
+// Warm Album card framing: journal radius, warm card shadow, 22px section title.
 function SettingsSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-journal border border-journal-line bg-journal-surface p-5">
-      <h2 className="mb-4 text-xl font-bold">{title}</h2>
+    <section className="rounded-journal border border-journal-line bg-journal-surface p-5 shadow-card">
+      <h2 className="mb-4 text-[1.375rem] font-bold leading-[1.14]">{title}</h2>
       {children}
     </section>
   );
