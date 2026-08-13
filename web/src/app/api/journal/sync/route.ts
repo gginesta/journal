@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { JournalEntry, PersonTag, PromptTemplate, ReminderPreferences } from "@/types/journal";
+import { mapWithConcurrency } from "@/lib/concurrency";
 import { computePersonTagDeletions, isSafeWorkspaceStoragePath, parseImageDataUrl } from "@/lib/journal-sync-safety";
 import { validateSyncPayload } from "@/lib/journal-sync-validation";
 import { getWorkspaceMutationAccess } from "@/lib/workspace-access";
@@ -181,21 +182,6 @@ type SingleEntryOutcome = {
   stale: boolean;
   serverUpdatedAt: string | null;
 };
-
-// Entries are independent rows, so their transactional RPCs can overlap; the
-// small cap keeps a large backlog from stampeding the database.
-async function mapWithConcurrency<T, R>(items: T[], limit: number, task: (item: T) => Promise<R>): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let nextIndex = 0;
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (nextIndex < items.length) {
-      const index = nextIndex++;
-      results[index] = await task(items[index]);
-    }
-  });
-  await Promise.all(workers);
-  return results;
-}
 
 async function syncEntries(supabase: SupabaseServerClient, workspaceId: string, userId: string, entries: JournalEntry[]): Promise<EntrySyncOutcome> {
   const applied: Record<string, string> = {};

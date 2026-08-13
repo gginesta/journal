@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mapWithConcurrency } from "@/lib/concurrency";
 import { dueReminder, type ReminderKind, type ReminderSchedulePrefs } from "@/lib/reminder-schedule";
 import { sendWebPush, type VapidConfig } from "@/lib/web-push";
 import { logApiFailure } from "@/lib/server-log";
@@ -104,9 +105,13 @@ export async function GET(request: Request) {
   let sent = 0;
   let failed = 0;
   const expiredIds: string[] = [];
-  for (const subscription of (subRows ?? []) as SubscriptionRow[]) {
+  // Bounded fan-out: sequential sends grow linearly with subscriber count and
+  // can run a cron invocation into the platform's function timeout, silently
+  // dropping the tail of the reminder batch.
+  const dueSubscriptions = ((subRows ?? []) as SubscriptionRow[]).filter((subscription) => dueWorkspaces.has(subscription.workspace_id));
+  await mapWithConcurrency(dueSubscriptions, 6, async (subscription) => {
     const kind = dueWorkspaces.get(subscription.workspace_id);
-    if (!kind) continue;
+    if (!kind) return;
     try {
       const result = await sendWebPush(
         { endpoint: subscription.endpoint, p256dh: subscription.keys_p256dh, auth: subscription.keys_auth },
@@ -125,7 +130,7 @@ export async function GET(request: Request) {
       failed += 1;
       logApiFailure("push/dispatch", 500, error instanceof Error ? error.message : "Push send failed");
     }
-  }
+  });
 
   // 404/410 endpoints are gone for good (revoked permission, reinstalled
   // browser); drop them so future runs stay lean.

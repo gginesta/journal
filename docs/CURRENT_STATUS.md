@@ -11,7 +11,7 @@ The June 2026 audit cycle (`AUDIT.md`, `AUDIT_UX.md`) landed transactional sync,
 The active app version is:
 
 ```text
-0.3.0
+0.4.0
 ```
 
 The live URL is:
@@ -74,6 +74,8 @@ Routes:
 - `/auth/callback`: Supabase Auth callback
 
 ## What Was Recently Added
+
+Version `0.4.0` is the "Warm Album" redesign across web and iOS (see `docs/DESIGN_HANDOFF.md` and the CHANGELOG): keepsake-hero Today with the quiet-exhale completion, tap-to-unwrap Memory Lane, month-sectioned Memories with paper note cards, Insights as a story, 4-step onboarding ending in the Simple/Full choice, warm-charcoal dark tokens on iOS, and a no-scold "days kept" streak everywhere. Presentation only — SPEC-7 capabilities, data, and sync are unchanged.
 
 Version `0.3.0` merged the five-wave improvement plan (see `docs/IMPROVEMENT_PLAN.md`): web performance and trust fixes, the Simple/Full experience mode on both platforms, iOS logic and experience parity with web, TestFlight prep, and pre-merge review fixes (reminder timezone handling, shared-device push subscriptions, iOS search parity). Web and iOS now share the version number, enforced by the Version check workflow.
 

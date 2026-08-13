@@ -98,6 +98,21 @@ export async function POST(request: Request) {
   if (!entryRow) {
     return fail(404, "The entry for this photo has not synced yet", { user: user.id, workspace: workspaceId });
   }
+
+  // The in-band sync path validates photos-per-entry; this out-of-band route
+  // must hold the same line or an entry's photo rows and storage grow without
+  // bound. Replacing an existing photo id is always allowed.
+  const { data: existingPhotoRows, error: photoCountError } = await supabase
+    .from("photo_attachments")
+    .select("id")
+    .eq("entry_id", entryId);
+  if (photoCountError) {
+    return fail(500, photoCountError.message, { user: user.id, workspace: workspaceId });
+  }
+  const existingPhotoIds = new Set((existingPhotoRows ?? []).map((row: { id: string }) => row.id));
+  if (!existingPhotoIds.has(photoId) && existingPhotoIds.size >= syncLimits.photosPerEntry) {
+    return fail(400, "This entry already has the maximum number of photos", { user: user.id, workspace: workspaceId });
+  }
   const entryLocalDate = typeof entryRow.local_date === "string" && localDatePattern.test(entryRow.local_date) ? entryRow.local_date : localDate;
 
   const buffer = Buffer.from(await file.arrayBuffer());
