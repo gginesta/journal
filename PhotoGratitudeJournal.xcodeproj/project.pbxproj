@@ -41,6 +41,16 @@
 		A0010000000000000000001E /* JournalLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0020000000000000000001E /* JournalLogicTests.swift */; };
 		A00100000000000000000020 /* JournalDesignComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200000000000000000024 /* JournalDesignComponents.swift */; };
 		A00100000000000000000021 /* JournalPreviewFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200000000000000000025 /* JournalPreviewFixtures.swift */; };
+		A00100000000000000000022 /* JournalSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200000000000000000026 /* JournalSchema.swift */; };
+		A00100000000000000000023 /* SpecConformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200000000000000000027 /* SpecConformanceTests.swift */; };
+		A00100000000000000000024 /* completion.json in Resources */ = {isa = PBXBuildFile; fileRef = A00200000000000000000028 /* completion.json */; };
+		A00100000000000000000025 /* streak.json in Resources */ = {isa = PBXBuildFile; fileRef = A00200000000000000000029 /* streak.json */; };
+		A00100000000000000000026 /* memory-lane.json in Resources */ = {isa = PBXBuildFile; fileRef = A0020000000000000000002A /* memory-lane.json */; };
+		A00100000000000000000027 /* experience-mode.json in Resources */ = {isa = PBXBuildFile; fileRef = A0020000000000000000002B /* experience-mode.json */; };
+		A00100000000000000000028 /* ExperienceMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0020000000000000000002C /* ExperienceMode.swift */; };
+		A00100000000000000000029 /* GratitudeGuide.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0020000000000000000002D /* GratitudeGuide.swift */; };
+		A0010000000000000000002A /* EarlyMemoryLane.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0020000000000000000002E /* EarlyMemoryLane.swift */; };
+		A0010000000000000000002B /* FirstMemoryCelebration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0020000000000000000002F /* FirstMemoryCelebration.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -92,6 +102,16 @@
 		A00200000000000000000023 /* ExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportService.swift; sourceTree = "<group>"; };
 		A00200000000000000000024 /* JournalDesignComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JournalDesignComponents.swift; sourceTree = "<group>"; };
 		A00200000000000000000025 /* JournalPreviewFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JournalPreviewFixtures.swift; sourceTree = "<group>"; };
+		A00200000000000000000026 /* JournalSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JournalSchema.swift; sourceTree = "<group>"; };
+		A00200000000000000000027 /* SpecConformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecConformanceTests.swift; sourceTree = "<group>"; };
+		A00200000000000000000028 /* completion.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = completion.json; sourceTree = "<group>"; };
+		A00200000000000000000029 /* streak.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = streak.json; sourceTree = "<group>"; };
+		A0020000000000000000002A /* memory-lane.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "memory-lane.json"; sourceTree = "<group>"; };
+		A0020000000000000000002B /* experience-mode.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "experience-mode.json"; sourceTree = "<group>"; };
+		A0020000000000000000002C /* ExperienceMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExperienceMode.swift; sourceTree = "<group>"; };
+		A0020000000000000000002D /* GratitudeGuide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GratitudeGuide.swift; sourceTree = "<group>"; };
+		A0020000000000000000002E /* EarlyMemoryLane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EarlyMemoryLane.swift; sourceTree = "<group>"; };
+		A0020000000000000000002F /* FirstMemoryCelebration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirstMemoryCelebration.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -105,6 +125,7 @@
 			children = (
 				A00700000000000000000002 /* PhotoGratitudeJournal */,
 				A00700000000000000000008 /* PhotoGratitudeJournalTests */,
+				A0070000000000000000000A /* SpecFixtures */,
 				A00700000000000000000009 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -139,6 +160,7 @@
 			isa = PBXGroup;
 			children = (
 				A00200000000000000000007 /* JournalModels.swift */,
+				A00200000000000000000026 /* JournalSchema.swift */,
 				A00200000000000000000008 /* JournalTypes.swift */,
 			);
 			path = Models;
@@ -147,7 +169,11 @@
 		A00700000000000000000005 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				A0020000000000000000002E /* EarlyMemoryLane.swift */,
 				A00200000000000000000009 /* EntryCompletion.swift */,
+				A0020000000000000000002C /* ExperienceMode.swift */,
+				A0020000000000000000002F /* FirstMemoryCelebration.swift */,
+				A0020000000000000000002D /* GratitudeGuide.swift */,
 				A0020000000000000000000A /* JournalStore.swift */,
 				A0020000000000000000000B /* MemoryLane.swift */,
 				A0020000000000000000000C /* StreakCalculator.swift */,
@@ -195,8 +221,21 @@
 			isa = PBXGroup;
 			children = (
 				A0020000000000000000001E /* JournalLogicTests.swift */,
+				A00200000000000000000027 /* SpecConformanceTests.swift */,
 			);
 			path = PhotoGratitudeJournalTests;
+			sourceTree = "<group>";
+		};
+		A0070000000000000000000A /* SpecFixtures */ = {
+			isa = PBXGroup;
+			children = (
+				A00200000000000000000028 /* completion.json */,
+				A00200000000000000000029 /* streak.json */,
+				A0020000000000000000002A /* memory-lane.json */,
+				A0020000000000000000002B /* experience-mode.json */,
+			);
+			name = SpecFixtures;
+			path = "spec/fixtures";
 			sourceTree = "<group>";
 		};
 		A00700000000000000000009 /* Products */ = {
@@ -290,7 +329,17 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		A00A00000000000000000002 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		A00A00000000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A00100000000000000000024 /* completion.json in Resources */,
+				A00100000000000000000025 /* streak.json in Resources */,
+				A00100000000000000000026 /* memory-lane.json in Resources */,
+				A00100000000000000000027 /* experience-mode.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -305,8 +354,13 @@
 				A00100000000000000000005 /* RouterPath.swift in Sources */,
 				A00100000000000000000006 /* Theme.swift in Sources */,
 				A00100000000000000000007 /* JournalModels.swift in Sources */,
+				A00100000000000000000022 /* JournalSchema.swift in Sources */,
 				A00100000000000000000008 /* JournalTypes.swift in Sources */,
 				A00100000000000000000009 /* EntryCompletion.swift in Sources */,
+				A00100000000000000000028 /* ExperienceMode.swift in Sources */,
+				A00100000000000000000029 /* GratitudeGuide.swift in Sources */,
+				A0010000000000000000002A /* EarlyMemoryLane.swift in Sources */,
+				A0010000000000000000002B /* FirstMemoryCelebration.swift in Sources */,
 				A0010000000000000000000A /* JournalStore.swift in Sources */,
 				A0010000000000000000000B /* MemoryLane.swift in Sources */,
 				A0010000000000000000000C /* StreakCalculator.swift in Sources */,
@@ -338,6 +392,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A0010000000000000000001E /* JournalLogicTests.swift in Sources */,
+				A00100000000000000000023 /* SpecConformanceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -358,7 +413,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PhotoGratitudeJournal/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.guill.PhotoGratitudeJournal;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -378,7 +433,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PhotoGratitudeJournal/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.guill.PhotoGratitudeJournal;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";

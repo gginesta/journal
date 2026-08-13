@@ -1,11 +1,13 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type {
   JournalBootstrap,
   JournalEntry,
   MemoryDetail,
   PersonTag,
+  PhotoAttachment,
   PromptResponse,
   PromptTemplate,
   ReminderPreferences,
@@ -20,32 +22,59 @@ import {
   type OnboardingSetup
 } from "@/lib/onboarding";
 import { demoStorageFullMessage, writeDemoStateToStorage } from "@/lib/demo-storage";
-import { selectDirtyEntries, serializeEntryForSync } from "@/lib/journal-sync-delta";
+import { isExperienceMode, visibleTabs, type ExperienceMode } from "@/lib/experience-mode";
+import { isPendingUploadPhoto, selectDirtyEntries, serializeEntryForSync, stripPendingUploadPhotos } from "@/lib/journal-sync-delta";
 import { canMutateWorkspaceRole } from "@/lib/journal-sync-safety";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
   firstMemoryCelebrationStorageKey,
   shouldShowFirstMemoryCelebration
 } from "@/lib/first-memory-celebration";
-import { CalendarView } from "@/components/journal/CalendarView";
-import { EntryDetailModal } from "@/components/journal/EntryDetailModal";
 import {
   responseErrorMessage,
   type AppTab,
   type DetailCategory,
   type SaveState
 } from "@/components/journal/helpers";
-import { InsightsView } from "@/components/journal/InsightsView";
 import { MemoriesView } from "@/components/journal/MemoriesView";
-import { OnboardingOverlay } from "@/components/journal/Onboarding";
-import { SettingsView } from "@/components/journal/SettingsView";
 import { MobileTabs, Sidebar } from "@/components/journal/Sidebar";
 import { TodayView } from "@/components/journal/TodayView";
 
+// Today + Memories are the daily path and stay in the main chunk; the other
+// surfaces load on demand so the ritual chunk stays lean as features grow.
+function LazyViewFallback() {
+  return (
+    <p role="status" className="mx-auto max-w-6xl py-12 text-center text-sm text-warm-gray">
+      Loading…
+    </p>
+  );
+}
+
+const CalendarView = dynamic(() => import("@/components/journal/CalendarView").then((mod) => mod.CalendarView), {
+  loading: LazyViewFallback
+});
+const InsightsView = dynamic(() => import("@/components/journal/InsightsView").then((mod) => mod.InsightsView), {
+  loading: LazyViewFallback
+});
+const SettingsView = dynamic(() => import("@/components/journal/SettingsView").then((mod) => mod.SettingsView), {
+  loading: LazyViewFallback
+});
+const OnboardingOverlay = dynamic(() => import("@/components/journal/Onboarding").then((mod) => mod.OnboardingOverlay), {
+  loading: () => null
+});
+const EntryDetailModal = dynamic(() => import("@/components/journal/EntryDetailModal").then((mod) => mod.EntryDetailModal), {
+  loading: () => null
+});
+
 const storageKey = "photo-gratitude-web-state-v1";
+// Demo-mode home of the Simple/Full preference. Deliberately separate from the
+// state blob above so "delete all data" (which rewrites the blob) never resets
+// the experience choice.
+const modeStorageKey = "photo-gratitude-web-mode-v1";
 
 export function JournalApp({ initialData, appVersion }: { initialData: JournalBootstrap; appVersion: string }) {
   const [tab, setTab] = useState<AppTab>("today");
+  const [experienceMode, setExperienceMode] = useState<ExperienceMode>(initialData.experienceMode);
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(initialData.activeWorkspaceId);
   const [workspaces, setWorkspaces] = useState(initialData.workspaces);
@@ -82,6 +111,19 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
   const ackedEntrySerializations = useRef<Map<string, string>>(
     new Map(initialData.entries.map((entry) => [entry.id, serializeEntryForSync(entry)]))
   );
+  // Same acked pattern for the people/prompts/reminders sections: each is
+  // included in a sync POST only when it differs from what the server last
+  // acknowledged (bootstrap data is server state, so it starts acked).
+  const ackedSectionSerializations = useRef({
+    people: JSON.stringify(initialData.people.filter((person) => person.workspaceId === initialData.activeWorkspaceId)),
+    prompts: JSON.stringify(initialData.prompts.filter((prompt) => prompt.workspaceId === initialData.activeWorkspaceId)),
+    reminders: JSON.stringify(initialData.reminders)
+  });
+  // Out-of-band photo upload bookkeeping: ids currently uploading (dedupes
+  // across overlapping sync ticks) and failed-attempt counts (bounds the
+  // automatic retry nudges; later sync ticks keep retrying naturally).
+  const inflightPhotoUploads = useRef<Set<string>>(new Set());
+  const photoUploadAttempts = useRef<Map<string, number>>(new Map());
 
   const onboardingKey = useMemo(() => `${onboardingStorageKey}:${initialData.profile?.id ?? "demo"}`, [initialData.profile?.id]);
   const firstMemoryKey = useMemo(() => firstMemoryCelebrationStorageKey(activeWorkspaceId), [activeWorkspaceId]);
@@ -89,6 +131,15 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
     () => workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null,
     [workspaces, activeWorkspaceId]
   );
+
+  // Demo persistence for the experience mode: its own key, read once on
+  // mount and written only by updateExperienceMode (never by the state-blob
+  // effect below), so clearing demo data leaves the preference alone.
+  useEffect(() => {
+    if (initialData.mode !== "demo") return;
+    const stored = window.localStorage.getItem(modeStorageKey);
+    if (isExperienceMode(stored)) setExperienceMode(stored);
+  }, [initialData.mode]);
 
   useEffect(() => {
     if (initialData.mode !== "demo") return;
@@ -269,21 +320,97 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
     const controller = new AbortController();
     setSaveState("saving");
     setSaveError(null);
+    // Out-of-band photo upload, chained on the entry ack so the entry row
+    // exists before its photo row is written. Deterministic storage paths and
+    // the row upsert make retries idempotent; the fetch is deliberately not
+    // tied to the sync abort controller because a finished upload is useful
+    // even when a newer sync tick supersedes this one.
+    async function uploadPendingPhoto(entry: JournalEntry, photo: PhotoAttachment) {
+      if (inflightPhotoUploads.current.has(photo.id)) return;
+      inflightPhotoUploads.current.add(photo.id);
+      try {
+        const bytes = await (await fetch(photo.previewUrl)).blob();
+        const form = new FormData();
+        form.set("workspaceId", entry.workspaceId);
+        form.set("entryId", entry.id);
+        form.set("photoId", photo.id);
+        form.set("localDate", entry.localDate);
+        form.set("caption", photo.caption);
+        form.set("sortOrder", String(photo.sortOrder));
+        form.set("file", bytes, "photo");
+        const response = await fetch("/api/journal/photos", { method: "POST", body: form });
+        if (!response.ok) throw new Error(await responseErrorMessage(response, "The photo could not be uploaded yet"));
+        const stored = (await response.json()) as { storagePath: string; thumbnailPath: string; previewUrl: string; thumbnailUrl: string };
+        photoUploadAttempts.current.delete(photo.id);
+        // Force one reconciling delta sync: it writes the stored photo row
+        // through the transactional RPC (or deletes the row again if the photo
+        // was removed while uploading) and re-acks the entry.
+        ackedEntrySerializations.current.delete(entry.id);
+        setEntries((current) =>
+          current.map((candidate) =>
+            candidate.id === entry.id
+              ? {
+                  ...candidate,
+                  photos: candidate.photos.map((existing) =>
+                    existing.id === photo.id && isPendingUploadPhoto(existing)
+                      ? {
+                          ...existing,
+                          storagePath: stored.storagePath,
+                          thumbnailPath: stored.thumbnailPath,
+                          previewUrl: stored.previewUrl,
+                          thumbnailUrl: stored.thumbnailUrl
+                        }
+                      : existing
+                  )
+                }
+              : candidate
+          )
+        );
+      } catch (error) {
+        const attempts = (photoUploadAttempts.current.get(photo.id) ?? 0) + 1;
+        photoUploadAttempts.current.set(photo.id, attempts);
+        setSaveState(navigator.onLine ? "error" : "offline");
+        setSaveError(
+          error instanceof Error && error.message
+            ? `${error.message}. The photo stays on this device and retries with the next sync.`
+            : "The photo could not be uploaded yet. It stays on this device and retries with the next sync."
+        );
+        // The photo stays pending (its entry stays dirty), so any later sync
+        // tick retries; nudge the first retries automatically, mirroring the
+        // offline listener's retry token.
+        if (attempts <= 2 && navigator.onLine) {
+          window.setTimeout(() => setSyncRetryToken((current) => current + 1), 10_000);
+        }
+      } finally {
+        inflightPhotoUploads.current.delete(photo.id);
+      }
+    }
+
     const timeout = window.setTimeout(async () => {
       try {
         const dirtyEntries = selectDirtyEntries(workspaceEntries, ackedEntrySerializations.current);
-        const sentSerializations = new Map(dirtyEntries.map((entry) => [entry.id, serializeEntryForSync(entry)]));
+        // Photos waiting on their out-of-band upload never travel in the sync
+        // JSON. Recording the ack against the stripped serialization keeps
+        // their entries dirty until the upload (and its follow-up sync) lands.
+        const syncedEntries = dirtyEntries.map(stripPendingUploadPhotos);
+        const sentSerializations = new Map(syncedEntries.map((entry) => [entry.id, serializeEntryForSync(entry)]));
+        const ackedSections = ackedSectionSerializations.current;
+        const peopleJson = JSON.stringify(workspacePeople);
+        const promptsJson = JSON.stringify(workspacePrompts);
+        const remindersJson = JSON.stringify(reminders);
         const response = await fetch("/api/journal/sync", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           signal: controller.signal,
           body: JSON.stringify({
             workspaceId: activeWorkspaceId,
-            people: workspacePeople,
-            prompts: workspacePrompts,
-            reminders,
-            entries: dirtyEntries.map((entry) => ({
+            ...(peopleJson === ackedSections.people ? {} : { people: workspacePeople }),
+            ...(promptsJson === ackedSections.prompts ? {} : { prompts: workspacePrompts }),
+            ...(remindersJson === ackedSections.reminders ? {} : { reminders }),
+            entries: syncedEntries.map((entry) => ({
               ...entry,
+              // Derived presentation data; JSON.stringify drops the undefined.
+              photos: entry.photos.map((photo) => ({ ...photo, thumbnailUrl: undefined })),
               syncedAt: serverEntryBaselines.current.get(entry.id) ?? null
             }))
           })
@@ -291,10 +418,22 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
 
         if (!response.ok) throw new Error(await responseErrorMessage(response, "Sync failed"));
         const result = (await response.json()) as { ok?: boolean; applied?: Record<string, string>; stale?: string[] };
-        for (const [entryId, serverUpdatedAt] of Object.entries(result.applied ?? {})) {
+        ackedSections.people = peopleJson;
+        ackedSections.prompts = promptsJson;
+        ackedSections.reminders = remindersJson;
+        const applied = result.applied ?? {};
+        for (const [entryId, serverUpdatedAt] of Object.entries(applied)) {
           serverEntryBaselines.current.set(entryId, serverUpdatedAt);
           const sent = sentSerializations.get(entryId);
           if (sent) ackedEntrySerializations.current.set(entryId, sent);
+        }
+        // An applied ack guarantees the entry row exists server-side, so any
+        // photos still holding local base64 previews can upload out-of-band.
+        for (const entry of dirtyEntries) {
+          if (!applied[entry.id]) continue;
+          for (const photo of entry.photos) {
+            if (isPendingUploadPhoto(photo)) void uploadPendingPhoto(entry, photo);
+          }
         }
         if (latestSyncId.current === syncId) {
           setStaleEntryIds(result.stale ?? []);
@@ -379,6 +518,31 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
     });
   }
 
+  // Presentation-only preference (SPEC-7): allowed for every role — a viewer
+  // picks their own density. Persists through POST /api/profile in Supabase
+  // mode and the dedicated localStorage key in demo mode; the UI switches
+  // optimistically either way and a failed save only surfaces a message.
+  function updateExperienceMode(mode: ExperienceMode) {
+    setExperienceMode(mode);
+    setTab((current) => (visibleTabs(mode).some((visible) => visible === current) ? current : "today"));
+    if (initialData.mode !== "supabase") {
+      window.localStorage.setItem(modeStorageKey, mode);
+      return;
+    }
+    void (async () => {
+      try {
+        const response = await fetch("/api/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ experienceMode: mode })
+        });
+        if (!response.ok) throw new Error(await responseErrorMessage(response, "The experience choice could not be saved"));
+      } catch (error) {
+        setSaveError(error instanceof Error ? error.message : "The experience choice could not be saved");
+      }
+    })();
+  }
+
   const updateReminders: React.Dispatch<React.SetStateAction<ReminderPreferences>> = (value) => {
     if (blockReadOnlyMutation()) return;
     markPendingSave();
@@ -428,6 +592,22 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
       next.delete(workspaceId);
       return next;
     });
+  }
+
+  // Calendar backfill: tapping an empty past day opens a local entry shell for
+  // that date. Pre-acking its serialization keeps delta sync from creating an
+  // empty server row — the day only syncs once the user actually writes.
+  function startDayEntry(localDate: string) {
+    const existing = workspaceEntries.find((entry) => entry.localDate === localDate);
+    if (existing) {
+      setSelectedEntryId(existing.id);
+      return;
+    }
+    if (blockReadOnlyMutation()) return;
+    const entry = makeEntry(activeWorkspaceId, localDate, workspacePrompts, reminders.cadence, initialData.profile?.id ?? null);
+    ackedEntrySerializations.current.set(entry.id, serializeEntryForSync(entry));
+    setEntries((current) => [entry, ...current]);
+    setSelectedEntryId(entry.id);
   }
 
   function addRepositoryDetail({
@@ -598,7 +778,12 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
   function completeOnboarding(setup?: OnboardingSetup) {
     if (setup) {
       applyOnboardingSetup(setup);
-      if (setup.reminders) updateReminders(setup.reminders);
+      if (setup.reminders) {
+        // Stamp the device timezone the same way SettingsView does — without it
+        // the dispatcher schedules onboarding-enabled reminders on UTC.
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
+        updateReminders({ ...setup.reminders, timezone: timezone ?? setup.reminders.timezone ?? null });
+      }
     }
     window.localStorage.setItem(onboardingKey, "complete");
     window.localStorage.removeItem(`${onboardingKey}:starter-dismissed`);
@@ -644,6 +829,7 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
         <Sidebar
           activeTab={tab}
           setTab={setTab}
+          experienceMode={experienceMode}
           workspaces={workspaces}
           activeWorkspaceId={activeWorkspaceId}
           setActiveWorkspaceId={setActiveWorkspaceId}
@@ -687,6 +873,7 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
             <TodayView
               entry={todayEntry}
               entries={workspaceEntries}
+              experienceMode={experienceMode}
               people={workspacePeople}
               workspace={activeWorkspace}
               prompts={workspacePrompts}
@@ -713,6 +900,7 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
           {tab === "memories" ? (
             <MemoriesView
               entries={workspaceEntries}
+              experienceMode={experienceMode}
               people={workspacePeople}
               onOpenToday={() => setTab("today")}
               onOpenEntry={setSelectedEntryId}
@@ -725,7 +913,14 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
             />
           ) : null}
 
-          {tab === "calendar" ? <CalendarView entries={workspaceEntries} people={workspacePeople} onOpenEntry={setSelectedEntryId} /> : null}
+          {tab === "calendar" ? (
+            <CalendarView
+              entries={workspaceEntries}
+              people={workspacePeople}
+              onOpenEntry={setSelectedEntryId}
+              onStartDay={canEditActiveWorkspace ? startDayEntry : undefined}
+            />
+          ) : null}
 
           {tab === "insights" ? <InsightsView entries={workspaceEntries} /> : null}
 
@@ -733,6 +928,8 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
             <SettingsView
               profile={initialData.profile}
               mode={initialData.mode}
+              experienceMode={experienceMode}
+              onChangeExperienceMode={updateExperienceMode}
               workspaces={workspaces}
               activeWorkspaceId={activeWorkspaceId}
               workspaceMembers={activeWorkspaceMembers}
@@ -756,13 +953,25 @@ export function JournalApp({ initialData, appVersion }: { initialData: JournalBo
         </main>
       </div>
 
-      <MobileTabs activeTab={tab} setTab={setTab} />
-      {selectedEntry ? <EntryDetailModal entry={selectedEntry} people={workspacePeople} onClose={() => setSelectedEntryId(null)} /> : null}
+      <MobileTabs activeTab={tab} setTab={setTab} experienceMode={experienceMode} />
+      {selectedEntry ? (
+        <EntryDetailModal
+          entry={selectedEntry}
+          people={workspacePeople}
+          prompts={workspacePrompts}
+          memberNames={memberNames}
+          currentUserId={initialData.profile?.id ?? null}
+          canEdit={canEditActiveWorkspace}
+          onUpdateEntry={updateEntry}
+          onClose={() => setSelectedEntryId(null)}
+        />
+      ) : null}
       {showOnboarding ? (
         <OnboardingOverlay
           profile={initialData.profile}
           people={workspacePeople}
           mode={onboardingMode}
+          experienceMode={experienceMode}
           workspaceName={activeWorkspace?.name ?? "your journal"}
           reminders={reminders}
           onComplete={completeOnboarding}

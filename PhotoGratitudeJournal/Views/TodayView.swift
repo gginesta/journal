@@ -12,6 +12,8 @@ struct TodayView: View {
     @State private var photoImportMessage: String?
     @State private var entry: JournalEntry?
     @AppStorage("hasSeenBetaWelcome") private var hasSeenBetaWelcome = false
+    @AppStorage(FirstMemoryCelebration.dismissalStorageKey) private var hasDismissedFirstMemoryCelebration = false
+    @AppStorage(ExperienceMode.storageKey) private var experienceModeRawValue = ExperienceMode.defaultMode.rawValue
 
     var body: some View {
         ScrollView {
@@ -23,6 +25,13 @@ struct TodayView: View {
                             hasSeenBetaWelcome = true
                         }
                     }
+                    if FirstMemoryCelebration.shouldShow(entries: entries, dismissed: hasDismissedFirstMemoryCelebration) {
+                        FirstMemoryCelebrationCard(
+                            kind: FirstMemoryCelebration.kind(for: FirstMemoryCelebration.meaningfulEntries(entries).first)
+                        ) {
+                            hasDismissedFirstMemoryCelebration = true
+                        }
+                    }
                     PhotoStripView(
                         entry: entry,
                         selectedPhotos: $selectedPhotos,
@@ -31,11 +40,24 @@ struct TodayView: View {
                     ) { photo in
                         removePhoto(photo, from: entry)
                     }
-                    PeopleTagEditor(entry: entry, people: sortedPeople)
+                    // SPEC-7: Simple hides the metadata inputs. Their stored
+                    // data still renders in entry detail and stays searchable.
+                    if isVisible(.peopleTags) {
+                        PeopleTagEditor(entry: entry, people: sortedPeople)
+                    }
                     CompletionBanner(isComplete: entry.isComplete)
                     promptSections(entry: entry)
-                    LittleDetailsEditor(entry: entry, people: sortedPeople)
-                    MoodPicker(entry: entry)
+                    if isVisible(.littleDetailsPanel) {
+                        LittleDetailsEditor(entry: entry, people: sortedPeople)
+                    }
+                    if isVisible(.moodPicker) {
+                        MoodPicker(entry: entry)
+                    }
+                    if isVisible(.gratitudeGuide) {
+                        GratitudeGuideCard(guide: gratitudeGuide(for: entry)) { suggestion in
+                            useGuideSuggestion(suggestion, for: entry)
+                        }
+                    }
                     MemoryLaneView(entries: entries)
                 }
             }
@@ -44,7 +66,6 @@ struct TodayView: View {
         .background(Color(.systemGroupedBackground))
         .navigationTitle("Today")
         .task {
-            JournalStore.seedDefaultPersonTagsIfNeeded(in: modelContext)
             let todayEntry = JournalStore.entry(for: .now, in: modelContext)
             entry = todayEntry
         }
@@ -113,6 +134,26 @@ struct TodayView: View {
             return lhs.sortOrder < rhs.sortOrder
         }
     }
+
+    private func isVisible(_ feature: ExperienceFeature) -> Bool {
+        ExperienceModeMap.isVisible(feature, in: ExperienceMode.fromStoredValue(experienceModeRawValue))
+    }
+
+    private func gratitudeGuide(for entry: JournalEntry) -> GratitudeGuide {
+        GratitudeGuideService.guide(
+            localDate: GratitudeGuideService.localDateString(for: entry.day),
+            mood: entry.mood,
+            hasRelationships: !entry.sortedPersonTags.isEmpty || personTags.count > 1
+        )
+    }
+
+    private func useGuideSuggestion(_ suggestion: String, for entry: JournalEntry) {
+        guard let response = entry.sortedSessions.flatMap(\.sortedResponses).first else { return }
+
+        let nextText = GratitudeGuideService.addSuggestion(suggestion, to: response.text)
+        guard nextText != response.text else { return }
+        JournalStore.updateResponse(response, text: nextText, in: modelContext)
+    }
 }
 
 private struct BetaWelcomeCard: View {
@@ -166,6 +207,122 @@ private struct BetaWelcomeCard: View {
     }
 }
 
+private struct FirstMemoryCelebrationCard: View {
+    let kind: FirstMemoryCelebration.EntryKind
+    let dismiss: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label("First memory saved", systemImage: "sparkles")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.rose)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 34)
+                .background(Color.rose.opacity(0.12), in: Capsule())
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("This memory is now part of Memory Lane.")
+                    .font(.headline)
+                    .foregroundStyle(.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("\(kind.savedCopy) Soon it can return as a quiet look-back: tomorrow, next week, or one month from now.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(FirstMemoryCelebration.returnWindows) { window in
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "calendar.badge.clock")
+                            .font(.subheadline)
+                            .foregroundStyle(.leaf)
+                            .frame(width: 32, height: 32)
+                            .background(Color.leaf.opacity(0.12), in: Circle())
+                            .accessibilityHidden(true)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(window.label)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.ink)
+                            Text(window.message)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            }
+
+            Button(action: dismiss) {
+                Text("Got it")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 42)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.rose)
+            .accessibilityLabel("Dismiss first memory celebration")
+        }
+        .journalCard()
+        .accessibilityElement(children: .contain)
+    }
+}
+
+private struct GratitudeGuideCard: View {
+    let guide: GratitudeGuide
+    let onUseSuggestion: (String) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Gratitude Guide", systemImage: "sparkles")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.ink)
+                Text(guide.moodCopy)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(spacing: 8) {
+                ForEach(guide.suggestions, id: \.self) { suggestion in
+                    Button {
+                        onUseSuggestion(suggestion)
+                    } label: {
+                        HStack(spacing: 10) {
+                            Text(suggestion)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.softInk)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            Spacer(minLength: 4)
+
+                            Image(systemName: "plus")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(.rose)
+                        }
+                        .padding(12)
+                        .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                        .background(Color(.tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Use suggestion: \(suggestion)")
+                }
+            }
+
+            Text("\(guide.pack.title) pack")
+                .font(.caption.weight(.bold))
+                .textCase(.uppercase)
+                .foregroundStyle(.secondary)
+        }
+        .journalCard()
+        .accessibilityElement(children: .contain)
+    }
+}
+
 private struct TodayHeader: View {
     let entry: JournalEntry
     let entries: [JournalEntry]
@@ -191,7 +348,9 @@ private struct TodayHeader: View {
     }
 }
 
-private struct PromptListInput: View {
+// Shared with EntryDetailView so past days can be backfilled with the exact
+// Today editing behavior.
+struct PromptListInput: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var response: PromptResponse
 
@@ -268,7 +427,7 @@ private struct PromptListInput: View {
     }
 }
 
-private struct SecondaryPromptSection: View {
+struct SecondaryPromptSection: View {
     let responses: [PromptResponse]
 
     var body: some View {
@@ -310,7 +469,7 @@ private struct SecondaryPromptEditor: View {
     }
 }
 
-private struct MoodPicker: View {
+struct MoodPicker: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var entry: JournalEntry
 
@@ -499,6 +658,23 @@ private struct LittleDetailRow: View {
                     Persistence.save(modelContext, operation: "Update detail tags")
                 }
 
+            Menu {
+                Picker("Category", selection: categoryBinding) {
+                    ForEach(MemoryDetailCategory.allCases) { category in
+                        Text(category.title).tag(category)
+                    }
+                }
+            } label: {
+                Label(detail.detailCategory.title, systemImage: "tag")
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: 34)
+                    .background(Color.rose.opacity(0.12), in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.rose)
+            .accessibilityLabel("Detail category, \(detail.detailCategory.title)")
+
             PeopleChipRow(
                 people: people,
                 selectedPersonIDs: Set(detail.sortedPersonTags.map(\.id)),
@@ -518,6 +694,13 @@ private struct LittleDetailRow: View {
         }
         .padding(12)
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var categoryBinding: Binding<MemoryDetailCategory> {
+        Binding(
+            get: { detail.detailCategory },
+            set: { JournalStore.updateDetailCategory(detail, category: $0, in: modelContext) }
+        )
     }
 
     private func togglePerson(_ person: PersonTag) {

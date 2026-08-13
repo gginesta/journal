@@ -1,0 +1,30 @@
+name: Version check
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  match:
+    name: Web and iOS versions match
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare web/package.json to MARKETING_VERSION
+        run: |
+          web_version=$(node -p "require('./web/package.json').version")
+          ios_versions=$(grep -o 'MARKETING_VERSION = [^;]*' PhotoGratitudeJournal.xcodeproj/project.pbxproj | awk '{print $3}' | sort -u)
+          echo "web:  $web_version"
+          echo "ios:  $ios_versions"
+          if [ "$(echo "$ios_versions" | wc -l)" -ne 1 ]; then
+            echo "::error::iOS build configurations disagree on MARKETING_VERSION: $ios_versions"
+            exit 1
+          fi
+          if [ "$web_version" != "$ios_versions" ]; then
+            echo "::error::Version mismatch: web/package.json is $web_version but iOS MARKETING_VERSION is $ios_versions. Bump both together."
+            exit 1
+          fi

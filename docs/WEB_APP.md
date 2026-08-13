@@ -50,25 +50,29 @@ The app can run without Supabase credentials using:
 NEXT_PUBLIC_DEMO_MODE=true
 ```
 
-Demo mode stores changes in browser local storage. This is only for UX review and PC testing; production data should use Supabase. When Supabase mode is enabled, server data is treated as the source of truth and demo local storage is ignored.
+Demo mode is enabled only when `NEXT_PUBLIC_DEMO_MODE` is exactly `true`, or when the Supabase env vars are absent (env-less local dev). Any other value disables it — a typo'd flag runs the real app instead of silently serving fixture data. Demo mode stores changes in browser local storage. This is only for UX review and PC testing; production data should use Supabase. When Supabase mode is enabled, server data is treated as the source of truth and demo local storage is ignored.
 
 ## Supabase Sync Behavior
 
-- Authenticated users load journal data through server-side Supabase queries.
-- Edits to the active workspace are debounced and posted to `/api/journal/sync`.
-- The sync route upserts people tags, prompt templates, reminder preferences, entries, sessions, prompt responses, entry people links, Little Details, and per-detail people links.
-- Browser-selected photos are uploaded from compressed local previews into private Supabase Storage paths under `<workspace-id>/<local-date>/...`.
-- Photo metadata is written only after Storage upload succeeds, and future page loads use signed URLs for private photo previews.
+- Authenticated users load journal data through server-side Supabase queries. Bootstrap eagerly loads the last 12 months plus anniversary windows; older entries load on demand through `GET /api/journal/entries` paging.
+- Edits to the active workspace are debounced and posted to `/api/journal/sync`. The client sends only dirty entries (delta sync): an entry is included only when its content differs from what the server last acknowledged.
+- Each entry is written through the transactional `public.sync_journal_entry` RPC (`202606120001` migration), which replaces the old delete-then-reinsert sequence — a partial failure can no longer destroy entry data. The RPC is `SECURITY INVOKER`, so RLS still applies.
+- Concurrent-edit safety: each entry carries a `base_updated_at` baseline. If another member changed the entry since, the server returns it as stale instead of clobbering, and Today shows an inline "changed on another device" notice.
+- Per-person day sections (`202606130002`): each member's `journal_sessions` rows are owned via `created_by`; sync only deletes/rewrites the caller's own (or legacy unowned) sessions, and other members' sections render read-only.
+- Sync payloads are validated at runtime with size caps before any write.
+- Photos upload out-of-band from text sync: after the entry row is acked, the client posts the compressed image bytes as multipart form data to `POST /api/journal/photos`, which stores the original and its thumbnail under private Storage paths (`<workspace-id>/<local-date>/...`), upserts the `photo_attachments` row, and returns fresh signed URLs. Sync payloads never carry new photo bytes (photos still awaiting upload are stripped from the JSON), so a sync POST stays text-level small; the legacy base64-in-payload path is still accepted from older tabs.
+- A failed photo upload keeps the photo pending on-device and retries on later sync ticks; because both storage writes happen before the metadata upsert at deterministic paths, a failed attempt leaves at most an unreferenced object that the retry overwrites.
+- Photo metadata is written only after Storage upload succeeds, and page loads use batched signed URLs for private photo previews.
 - Workspace creation uses the secured `public.create_workspace` database function through `/api/workspaces`.
 - Delete workspace entries uses `/api/journal/delete-workspace-entries` and relies on RLS plus cascade deletes for child rows.
-- Household invitation/member-management lives in Settings. Owners can invite existing signed-in users by email, assign roles, change roles, and remove non-self members.
+- Household invitation/member-management lives in Settings. Owners can invite by email (registered or not — both return identical responses, closing the account-existence probe), assign roles, change roles, and remove non-self members. Invitees see an accept/decline banner (`202606130001` pending-invite consent flow) rather than being silently added.
 
 ## Sync Safety Rules
 
 - In Supabase mode, server data is authoritative. Demo localStorage must not restore over authenticated workspace data.
 - Test demo mode and Supabase mode in separate clean browser profiles when possible.
 - Before testing a production-like account, clear stale demo data or use a browser profile that has never run demo mode.
-- Two accepted members editing the same workspace should be treated as a beta risk area until conflict handling is more granular; record which account, role, entry date, and browser performed each edit.
+- Concurrent household edits are now guarded (stale-write baseline + per-person sessions), but when QA-testing simultaneous edits still record which account, role, entry date, and browser performed each edit so any conflict report is reproducible.
 - Photo metadata should appear only after the private Storage upload succeeds.
 - Signed photo URLs should be treated as temporary previews; do not copy them into product data or docs as stable assets.
 
@@ -102,16 +106,20 @@ Demo mode stores changes in browser local storage. This is only for UX review an
 - Settings:
   - Workspace switching, prompt editing, people tags, reminders, export, delete controls, and sign out remain understandable in both demo and Supabase modes.
   - Workspace copy reflects solo, partner, family, or custom journal contexts without making family use mandatory.
+- Experience mode (Simple/Full, SPEC-7 in `docs/SPEC.md`):
+  - The Experience section at the top of Settings switches between Simple (photo + three nice things + done, with Memory Lane and search kept) and Full (everything: moods, people tags, Little Details, Gratitude Guide, Calendar, Insights, prompt/people-tag editors, details repository).
+  - The toggle is presentation-only: switching never deletes data — anything added in Full still shows in entry detail and search while in Simple, and comes back editable in Full.
+  - New accounts start in Simple (`profiles.experience_mode`, migration `202608110002`); existing accounts are grandfathered into Full; demo mode starts in Full and keeps the choice in its own localStorage key so "delete workspace entries" never resets it. Authenticated changes persist through `POST /api/profile`, deliberately outside `/api/journal/sync`.
 
-## Windows Local Setup
+## Local Setup
 
-From PowerShell:
+From a shell (on Windows PowerShell, use `npm.cmd` and `copy` instead of `npm` and `cp`):
 
-```powershell
+```bash
 cd web
-copy .env.example .env.local
-npm.cmd install
-npm.cmd run dev
+cp .env.example .env.local
+npm install
+npm run dev
 ```
 
 For local UX review without a Supabase project, keep `NEXT_PUBLIC_DEMO_MODE=true` in `web/.env.local`.
@@ -132,9 +140,18 @@ Do not put `SUPABASE_SERVICE_ROLE_KEY` in browser-readable code. It can exist in
 ## Supabase Private Beta Setup
 
 1. Create a Supabase project for the private beta.
-2. Run `web/supabase/migrations/202605210001_initial_schema.sql` in the Supabase SQL editor or through the Supabase CLI.
-3. Run `web/supabase/migrations/202605230001_workspace_member_invites.sql` so owner-managed household invites can look up existing signed-in users safely.
-4. Confirm the migrations created private Storage buckets:
+2. Run **all** migrations from `web/supabase/migrations/` in filename order in the Supabase SQL editor or through the Supabase CLI. As of this writing that is:
+   1. `202605210001_initial_schema.sql`
+   2. `202605230001_workspace_member_invites.sql`
+   3. `202606070001_personalized_onboarding.sql`
+   4. `202606120001_transactional_entry_sync.sql` (required — the sync route calls its `sync_journal_entry` RPC)
+   5. `202606120002_invite_without_account_probe.sql`
+   6. `202606130001_pending_invites.sql`
+   7. `202606130002_per_person_sessions.sql`
+   8. `202608110001_push_subscriptions.sql` (required for working reminders — push subscriptions plus the `reminder_preferences.timezone` column)
+
+   The app will not sync entries against a database missing the later migrations. Check the directory for migrations newer than this list.
+3. Confirm the migrations created private Storage buckets:
    - `journal-photos`
    - `journal-thumbnails`
 4. In Authentication, enable email magic links.
@@ -173,6 +190,24 @@ SUPABASE_THUMBNAILS_BUCKET=journal-thumbnails
 6. Deploy from `main` after the web PR merges.
 7. After deployment, open the production root URL and confirm the homepage CTA reaches `/app`.
 8. Send one magic link through the production URL and confirm the callback returns to the app.
+
+## Reminders / Web Push
+
+Reminders are sent as Web Push notifications from `/api/push/dispatch`, which Vercel Cron calls every 15 minutes (`web/vercel.json`). The dispatcher reads `reminder_preferences` (with the stored IANA `timezone`; null is treated as UTC) and pushes to every subscription in workspaces whose evening/morning time falls in the current 15-minute window. Payloads are encrypted per RFC 8291 in `web/src/lib/web-push.ts` with no extra dependencies. Users who skip push can download a daily-repeating calendar file from Settings instead.
+
+Operator setup:
+
+1. Generate a VAPID key pair: `node scripts/generate-vapid-keys.mjs` (run in `web/`).
+2. Set `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (a `mailto:` contact), and `CRON_SECRET` (any long random string) in the Vercel project env vars. `SUPABASE_SERVICE_ROLE_KEY` must also be set — the dispatcher needs it to read subscriptions across workspaces.
+3. Apply `202608110001_push_subscriptions.sql` in the Supabase SQL editor.
+4. Deploy; Vercel picks up the cron entry from `web/vercel.json` and sends `Authorization: Bearer <CRON_SECRET>` on each invocation automatically.
+5. Smoke-test: enable reminders in Settings on a real account, accept the notification permission prompt, set the evening time a few minutes ahead, and either wait for the cron or call the route once yourself: `curl -H "Authorization: Bearer $CRON_SECRET" https://<production-url>/api/push/dispatch`.
+
+Notes:
+
+- On iOS Safari, push requires the app to be added to the Home Screen (iOS 16.4+); Settings says so next to the toggle.
+- Expired subscriptions (push service returns 404/410) are deleted automatically by the dispatcher.
+- In demo mode nothing subscribes and no push is sent; the calendar-file fallback still works.
 
 ## Migration Notes
 
@@ -225,15 +260,14 @@ SUPABASE_THUMBNAILS_BUCKET=journal-thumbnails
 
 ## Verification Commands
 
-From PowerShell:
+From `web/` (use `npm.cmd` on Windows PowerShell):
 
-```powershell
-cd web
-npm.cmd run lint
-npm.cmd run typecheck
-npm.cmd test
-npm.cmd run build
-npm.cmd run test:e2e
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+npm run test:e2e
 ```
 
-For Supabase, apply the migration to a fresh beta project first. Then test the owner/editor/viewer matrix with real authenticated users before reusing the migration in production.
+For Supabase, apply all migrations to a fresh beta project first. Then test the owner/editor/viewer matrix with real authenticated users before reusing the migrations in production. A local Postgres harness at `web/supabase/tests/run-local-validation.sh` applies every migration in order and exercises the sync RPC end to end.

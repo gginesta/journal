@@ -2,6 +2,7 @@ import clsx from "clsx";
 import { CalendarDays, Camera, Home, Lock, Settings, Sparkles } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { Workspace } from "@/types/journal";
+import { visibleTabs, type ExperienceMode } from "@/lib/experience-mode";
 import { type AppTab, type SaveState } from "@/components/journal/helpers";
 import { SaveStatePill } from "@/components/journal/shared";
 
@@ -13,9 +14,17 @@ const tabs: Array<{ id: AppTab; title: string; icon: LucideIcon }> = [
   { id: "settings", title: "Settings", icon: Settings }
 ];
 
+// Simple mode drops the analysis tabs (SPEC-7); Settings always stays so the
+// toggle remains reachable.
+function tabsForMode(experienceMode: ExperienceMode) {
+  const visible = visibleTabs(experienceMode);
+  return tabs.filter((item) => visible.some((tab) => tab === item.id));
+}
+
 export function Sidebar({
   activeTab,
   setTab,
+  experienceMode,
   workspaces,
   activeWorkspaceId,
   setActiveWorkspaceId,
@@ -25,6 +34,7 @@ export function Sidebar({
 }: {
   activeTab: AppTab;
   setTab: (tab: AppTab) => void;
+  experienceMode: ExperienceMode;
   workspaces: Workspace[];
   activeWorkspaceId: string;
   setActiveWorkspaceId: (id: string) => void;
@@ -61,7 +71,7 @@ export function Sidebar({
         </label>
 
         <nav aria-label="Journal sections" className="mt-7 grid gap-2">
-          {tabs.map((item) => (
+          {tabsForMode(experienceMode).map((item) => (
             <NavButton key={item.id} item={item} active={activeTab === item.id} onClick={() => setTab(item.id)} />
           ))}
         </nav>
@@ -106,10 +116,25 @@ function NavButton({
   );
 }
 
-export function MobileTabs({ activeTab, setTab }: { activeTab: AppTab; setTab: (tab: AppTab) => void }) {
+export function MobileTabs({
+  activeTab,
+  setTab,
+  experienceMode
+}: {
+  activeTab: AppTab;
+  setTab: (tab: AppTab) => void;
+  experienceMode: ExperienceMode;
+}) {
+  const visible = tabsForMode(experienceMode);
   return (
-    <nav aria-label="Journal tabs" className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-journal-line bg-journal-surface/95 px-2 py-2 backdrop-blur lg:hidden">
-      {tabs.map((item) => {
+    <nav
+      aria-label="Journal tabs"
+      className={clsx(
+        "fixed inset-x-0 bottom-0 z-20 grid border-t border-journal-line bg-journal-surface/95 px-2 py-2 backdrop-blur lg:hidden",
+        visible.length === 3 ? "grid-cols-3" : "grid-cols-5"
+      )}
+    >
+      {visible.map((item) => {
         const Icon = item.icon;
         const active = item.id === activeTab;
         return (

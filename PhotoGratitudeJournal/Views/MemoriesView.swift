@@ -2,13 +2,19 @@ import SwiftData
 import SwiftUI
 
 struct MemoriesView: View {
-    @Environment(\.modelContext) private var modelContext
     @Environment(RouterPath.self) private var router
     @Query(sort: \JournalEntry.day, order: .reverse) private var entries: [JournalEntry]
     @Query(sort: \PersonTag.sortOrder) private var personTags: [PersonTag]
     @State private var selectedPersonID: UUID?
     @State private var selectedContentFilter: MemoryContentFilter = .all
     @State private var searchText = ""
+    @AppStorage(ExperienceMode.storageKey) private var experienceModeRawValue = ExperienceMode.defaultMode.rawValue
+
+    // SPEC-7: person/content filters are a Full surface; search stays in both
+    // modes and still matches details and people text.
+    private var showsFilters: Bool {
+        ExperienceModeMap.isVisible(.memoriesFilters, in: ExperienceMode.fromStoredValue(experienceModeRawValue))
+    }
 
     private var photoEntries: [JournalEntry] {
         filteredEntries.filter { !$0.sortedPhotos.isEmpty }
@@ -20,8 +26,9 @@ struct MemoriesView: View {
 
     private var filteredEntries: [JournalEntry] {
         entries.filter { entry in
-            entryMatches(entry, personID: selectedPersonID) &&
-            selectedContentFilter.matches(entry) &&
+            // A lingering filter selection must not keep filtering invisibly
+            // once the filter bar is hidden in Simple.
+            (!showsFilters || (entryMatches(entry, personID: selectedPersonID) && selectedContentFilter.matches(entry))) &&
             entryMatchesSearch(entry)
         }
     }
@@ -46,14 +53,16 @@ struct MemoriesView: View {
                     )
                     .padding()
                 } else {
-                    PersonFilterBar(
-                        people: people,
-                        selectedPersonID: $selectedPersonID,
-                        selectedContentFilter: $selectedContentFilter,
-                        hasSearchText: !normalizedSearchText.isEmpty,
-                        resultCount: filteredEntries.count
-                    )
-                    .padding(.horizontal)
+                    if showsFilters {
+                        PersonFilterBar(
+                            people: people,
+                            selectedPersonID: $selectedPersonID,
+                            selectedContentFilter: $selectedContentFilter,
+                            hasSearchText: !normalizedSearchText.isEmpty,
+                            resultCount: filteredEntries.count
+                        )
+                        .padding(.horizontal)
+                    }
 
                     if filteredEntries.isEmpty {
                         EmptyStateView(
@@ -108,9 +117,6 @@ struct MemoriesView: View {
         .background(Color(.systemGroupedBackground))
         .navigationTitle("Memories")
         .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search memories")
-        .task {
-            JournalStore.seedDefaultPersonTagsIfNeeded(in: modelContext)
-        }
     }
 
     private var normalizedSearchText: String {
@@ -422,13 +428,26 @@ private struct MemoryMetadataSummary: View {
                 }
 
                 if !details.isEmpty {
-                    Label("\(details.count)", systemImage: "sparkles")
+                    Label(detailSummary, systemImage: "sparkles")
                 }
             }
             .font(.caption.weight(.semibold))
             .foregroundStyle(.secondary)
             .lineLimit(1)
         }
+    }
+
+    // "2 · Phrase, Milestone" when details carry categories; plain count when
+    // every detail is the default note category.
+    private var detailSummary: String {
+        var seenCategories = Set<MemoryDetailCategory>()
+        let categoryTitles = details
+            .map(\.detailCategory)
+            .filter { $0 != .note && seenCategories.insert($0).inserted }
+            .map(\.title)
+
+        guard !categoryTitles.isEmpty else { return "\(details.count)" }
+        return "\(details.count) · \(categoryTitles.joined(separator: ", "))"
     }
 }
 

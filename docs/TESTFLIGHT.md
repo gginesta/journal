@@ -9,18 +9,20 @@ Use this checklist to prepare the first private iPhone beta for the owner and sp
 - Minimum OS: iOS 17.0.
 - Bundle id: `com.guill.PhotoGratitudeJournal`.
 - iCloud container: `iCloud.com.guill.PhotoGratitudeJournal`.
-- Current Xcode values: `MARKETING_VERSION = 0.2.0`, `CURRENT_PROJECT_VERSION = 2`.
-- For each TestFlight upload, increment `CURRENT_PROJECT_VERSION`; change `MARKETING_VERSION` only for a named milestone.
+- Current Xcode values: `MARKETING_VERSION = 0.3.0`, `CURRENT_PROJECT_VERSION = 2`.
+- For each TestFlight upload, increment `CURRENT_PROJECT_VERSION`; change `MARKETING_VERSION` only for a named milestone, and keep it equal to the web `package.json` version (the Version check workflow enforces this).
 
 ## Apple Developer Setup
 
 - Confirm Apple Developer Program membership is active.
 - Create or verify the App Store Connect app record for `com.guill.PhotoGratitudeJournal`.
 - Assign the app to the correct team in Xcode Signing & Capabilities.
+- Fill in the Apple team id: `PhotoGratitudeJournal.xcodeproj/project.pbxproj` has four empty `DEVELOPMENT_TEAM = "";` entries (app target Debug + Release, test target Debug + Release) that must all be set to the owner's team id before archiving.
+- App icon: `Assets.xcassets/AppIcon.appiconset` ships a 1024 px PNG generated from the web PWA mark (`web/public/icon.svg`). If the mark changes, re-export a 1024×1024 opaque PNG from that SVG and replace `AppIcon.png`.
 - Enable iCloud with CloudKit for the app id.
 - Attach the private CloudKit container `iCloud.com.guill.PhotoGratitudeJournal`.
 - Confirm the entitlement file still references the same iCloud container.
-- Keep Push Notifications off unless a future remote-notification feature is added.
+- Keep Push Notifications off unless a future remote-notification feature is added. (The `UIBackgroundModes` `remote-notification` entry was removed from Info.plist accordingly; if look-back notifications ever ship, re-add it together with the `aps-environment` entitlement.)
 
 ## Signing And Archive
 
@@ -52,7 +54,7 @@ Use this checklist to prepare the first private iPhone beta for the owner and sp
 - There is no custom account backend and no shared public journal data.
 - Photos are imported into app-local storage; testers should still avoid using irreplaceable-only photos during the first beta.
 - People tags are private labels, not contacts or social profiles.
-- Premium and StoreKit surfaces are scaffolded; do not treat purchase behavior as production-ready in this beta.
+- Premium/paywall UI is hidden for the beta behind `EntitlementService.showPremiumUI` (nothing is gated and the paywall shows no StoreKit price — an App Review rejection risk). Re-enable it together with the `.storekit` configuration when gating actually lands.
 - App Store privacy labels and legal links are not final for App Store submission.
 
 ## Spouse Testing Flow

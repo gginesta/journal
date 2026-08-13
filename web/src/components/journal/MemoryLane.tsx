@@ -54,7 +54,7 @@ function MemoryLaneCard({ entry, label, onOpen }: { entry: JournalEntry; label: 
 
   return (
     <button type="button" onClick={() => onOpen(entry.id)} className="flex gap-3 rounded-2xl bg-journal-raised p-3 text-left transition hover:-translate-y-0.5 hover:bg-white hover:shadow-sm">
-      <JournalPhoto src={photo?.previewUrl} alt="" className="h-20 w-20 rounded-2xl object-cover" />
+      <JournalPhoto src={photo?.thumbnailUrl || photo?.previewUrl} alt="" className="h-20 w-20 rounded-2xl object-cover" />
       <div className="min-w-0">
         <p className="font-bold">{label}</p>
         <p className="text-sm text-warm-gray">{formatDisplayDate(entry.localDate, "short")}</p>

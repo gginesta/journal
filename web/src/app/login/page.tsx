@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { Camera, Mail, Sparkles } from "lucide-react";
+import packageJson from "../../../package.json";
 import { appUrl, isDemoMode } from "@/lib/supabase/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { magicLinkSentCopy } from "@/lib/auth-email-copy";
@@ -106,7 +107,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             ) : null}
 
             <p className="mt-8 text-xs leading-5 text-warm-gray">
-              Private beta: personal and household journals are visible only to invited members.
+              Private beta: personal and household journals are visible only to invited members. · v{packageJson.version}
             </p>
           </div>
         </div>

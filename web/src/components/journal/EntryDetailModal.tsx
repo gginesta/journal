@@ -1,23 +1,37 @@
 import { tagChipStyle } from "@/lib/tag-colors";
 import clsx from "clsx";
 import { Sparkles, X } from "lucide-react";
-import type { JournalEntry, PersonTag } from "@/types/journal";
+import type { JournalEntry, PersonTag, PromptTemplate } from "@/types/journal";
 import { formatDisplayDate } from "@/lib/dates";
 import { entryPeople, isEntryComplete } from "@/lib/journal-logic";
 import { JournalPhoto } from "@/components/journal/shared";
+import { PromptPanel } from "@/components/journal/TodayView";
 
 export function EntryDetailModal({
   entry,
   people,
+  prompts,
   memberNames = {},
+  currentUserId = null,
+  canEdit = false,
+  onUpdateEntry,
   onClose
 }: {
   entry: JournalEntry;
   people: PersonTag[];
+  // Editing wiring (all optional): with prompts + onUpdateEntry and edit
+  // rights, reflections render as the same editable panel Today uses, so a
+  // past day — including a calendar-started backfill shell — can be written
+  // right here. Without them the modal stays the read-only memory view.
+  prompts?: PromptTemplate[];
   memberNames?: Record<string, string>;
+  currentUserId?: string | null;
+  canEdit?: boolean;
+  onUpdateEntry?: (entryId: string, updater: (entry: JournalEntry) => JournalEntry) => void;
   onClose: () => void;
 }) {
   const tagged = entryPeople(entry, people);
+  const editor = canEdit && onUpdateEntry && prompts ? { onUpdateEntry, prompts } : null;
   const sections = entry.sessions
     .map((session) => ({
       session,
@@ -63,7 +77,18 @@ export function EntryDetailModal({
 
           <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_280px]">
             <div className="grid gap-4">
-              {responses.length > 0 ? (
+              {editor ? (
+                <PromptPanel
+                  entry={entry}
+                  prompts={editor.prompts}
+                  canEdit
+                  currentUserId={currentUserId}
+                  memberNames={memberNames}
+                  onUpdateEntry={editor.onUpdateEntry}
+                  primaryFieldId={null}
+                />
+              ) : null}
+              {!editor && responses.length > 0 ? (
                 <section className="rounded-journal border border-journal-line bg-white p-5">
                   <h3 className="text-lg font-bold">Reflections</h3>
                   <div className="mt-4 grid gap-4">

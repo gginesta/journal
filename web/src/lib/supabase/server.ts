@@ -9,6 +9,8 @@ type CookieToSet = {
   options: CookieOptions;
 };
 
+export type SupabaseServerClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
+
 export async function createSupabaseServerClient() {
   if (!hasSupabaseEnv()) return null;
 
@@ -27,7 +29,8 @@ export async function createSupabaseServerClient() {
               cookieStore.set(name, value, options);
             });
           } catch {
-            // Server components cannot set cookies; middleware handles refresh.
+            // Server components cannot set cookies; src/middleware.ts refreshes
+            // the session instead.
           }
         }
       }

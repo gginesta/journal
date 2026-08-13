@@ -106,15 +106,16 @@ final class JournalLogicTests: XCTestCase {
         XCTAssertTrue(entry.sortedPhotos.isEmpty)
     }
 
-    func testPersonTagSeederCreatesDefaultPeople() {
+    // SPEC-6: prompts are seeded, person tags are not — people exist only when
+    // the user adds them.
+    func testNoPersonTagsAreSeededAutomatically() {
         let container = AppModelContainer.make(inMemory: true)
         let context = container.mainContext
 
-        JournalStore.seedDefaultPersonTagsIfNeeded(in: context)
-        JournalStore.seedDefaultPersonTagsIfNeeded(in: context)
+        PromptSeeder.seedIfNeeded(in: context)
         let tags = JournalStore.allPersonTags(in: context)
 
-        XCTAssertEqual(tags.map(\.name), ["Me", "Kid 1", "Kid 2", "Partner", "Family"])
+        XCTAssertTrue(tags.isEmpty)
     }
 
     func testAddingAndFilteringPersonTags() throws {

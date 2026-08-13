@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import type { JournalEntry, PersonTag, PromptTemplate, ReminderPreferences } from "@/types/journal";
-import { canMutateWorkspaceRole, computePersonTagDeletions, isSafeWorkspaceStoragePath, parseImageDataUrl } from "@/lib/journal-sync-safety";
+import { computePersonTagDeletions, isSafeWorkspaceStoragePath, parseImageDataUrl } from "@/lib/journal-sync-safety";
 import { validateSyncPayload } from "@/lib/journal-sync-validation";
+import { getWorkspaceMutationAccess } from "@/lib/workspace-access";
 import { makePhotoThumbnail } from "@/lib/photo-thumbnails";
 import { logApiFailure } from "@/lib/server-log";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, type SupabaseServerClient } from "@/lib/supabase/server";
+
+const entrySyncConcurrency = 3;
 
 function fail(status: number, message: string, context: Record<string, string | undefined> = {}) {
   logApiFailure("journal/sync", status, message, context);
@@ -38,25 +41,28 @@ export async function POST(request: Request) {
   }
   const payload = validation.payload;
 
-  const access = await getWorkspaceMutationAccess(payload.workspaceId, user.id);
+  const access = await getWorkspaceMutationAccess(supabase, payload.workspaceId, user.id, "Editor access is required to sync this workspace");
   if (!access.ok) {
     return fail(access.status, access.message, { user: user.id, workspace: payload.workspaceId });
   }
 
-  const people = payload.people.filter((person) => person.workspaceId === payload.workspaceId);
-  const prompts = payload.prompts.filter((prompt) => prompt.workspaceId === payload.workspaceId);
+  // Delta-synced sections arrive only when they changed client-side; an
+  // omitted section skips its upserts (and, for people, the deletion
+  // reconciliation queries) entirely.
+  const people = payload.people?.filter((person) => person.workspaceId === payload.workspaceId);
+  const prompts = payload.prompts?.filter((prompt) => prompt.workspaceId === payload.workspaceId);
   const entries = payload.entries.filter((entry) => entry.workspaceId === payload.workspaceId);
 
   const firstError =
-    (await upsertPeople(payload.workspaceId, people)) ??
-    (await upsertPrompts(payload.workspaceId, prompts)) ??
-    (await upsertReminders(payload.workspaceId, payload.reminders));
+    (people ? await upsertPeople(supabase, payload.workspaceId, people) : null) ??
+    (prompts ? await upsertPrompts(supabase, payload.workspaceId, prompts) : null) ??
+    (payload.reminders ? await upsertReminders(supabase, payload.workspaceId, payload.reminders) : null);
 
   if (firstError) {
     return fail(500, firstError.message, { user: user.id, workspace: payload.workspaceId });
   }
 
-  const entryOutcome = await syncEntries(payload.workspaceId, user.id, entries);
+  const entryOutcome = await syncEntries(supabase, payload.workspaceId, user.id, entries);
   if (entryOutcome.error) {
     return fail(500, entryOutcome.error.message, { user: user.id, workspace: payload.workspaceId });
   }
@@ -64,30 +70,7 @@ export async function POST(request: Request) {
   return NextResponse.json({ ok: true, applied: entryOutcome.applied, stale: entryOutcome.stale });
 }
 
-async function getWorkspaceMutationAccess(workspaceId: string, userId: string): Promise<{ ok: true } | { ok: false; status: number; message: string }> {
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) return { ok: false, status: 503, message: "Supabase is not configured" };
-
-  const { data, error } = await supabase
-    .from("workspace_members")
-    .select("role")
-    .eq("workspace_id", workspaceId)
-    .eq("user_id", userId)
-    .eq("invitation_state", "accepted")
-    .maybeSingle();
-
-  if (error) return { ok: false, status: 500, message: error.message };
-  if (!canMutateWorkspaceRole(data?.role)) {
-    return { ok: false, status: 403, message: "Editor access is required to sync this workspace" };
-  }
-
-  return { ok: true };
-}
-
-async function upsertPeople(workspaceId: string, people: PersonTag[]) {
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) return null;
-
+async function upsertPeople(supabase: SupabaseServerClient, workspaceId: string, people: PersonTag[]) {
   // Upsert first so newly-created tags exist before entries reference them and so
   // they are not mistaken for "missing" during deletion reconciliation below.
   if (people.length > 0) {
@@ -105,15 +88,12 @@ async function upsertPeople(workspaceId: string, people: PersonTag[]) {
     if (error) return error;
   }
 
-  return reconcilePersonTagDeletions(workspaceId, people);
+  return reconcilePersonTagDeletions(supabase, workspaceId, people);
 }
 
 // Removing a person tag in the client must persist. Delete workspace tags that
 // are absent from the synced payload and not attached to any entry or detail.
-async function reconcilePersonTagDeletions(workspaceId: string, people: PersonTag[]) {
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) return null;
-
+async function reconcilePersonTagDeletions(supabase: SupabaseServerClient, workspaceId: string, people: PersonTag[]) {
   const { data: existing, error: existingError } = await supabase
     .from("person_tags")
     .select("id")
@@ -152,9 +132,8 @@ async function reconcilePersonTagDeletions(workspaceId: string, people: PersonTa
   return deleteError;
 }
 
-async function upsertPrompts(workspaceId: string, prompts: PromptTemplate[]) {
-  const supabase = await createSupabaseServerClient();
-  if (!supabase || prompts.length === 0) return null;
+async function upsertPrompts(supabase: SupabaseServerClient, workspaceId: string, prompts: PromptTemplate[]) {
+  if (prompts.length === 0) return null;
 
   const { error } = await supabase.from("prompt_templates").upsert(
     prompts.map((prompt) => ({
@@ -171,17 +150,17 @@ async function upsertPrompts(workspaceId: string, prompts: PromptTemplate[]) {
   return error;
 }
 
-async function upsertReminders(workspaceId: string, reminders: ReminderPreferences) {
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) return null;
-
+async function upsertReminders(supabase: SupabaseServerClient, workspaceId: string, reminders: ReminderPreferences) {
   const { error } = await supabase.from("reminder_preferences").upsert(
     {
       workspace_id: workspaceId,
       cadence: reminders.cadence,
       reminders_enabled: reminders.remindersEnabled,
       evening_time: reminders.eveningTime,
-      morning_time: reminders.morningTime
+      morning_time: reminders.morningTime,
+      // Older clients sync reminders without a timezone; leaving the column out
+      // of the payload preserves the stored value instead of nulling it to UTC.
+      ...(reminders.timezone ? { timezone: reminders.timezone } : {})
     },
     { onConflict: "workspace_id" }
   );
@@ -196,80 +175,116 @@ type EntrySyncOutcome = {
   stale: string[];
 };
 
-async function syncEntries(workspaceId: string, userId: string, entries: JournalEntry[]): Promise<EntrySyncOutcome> {
-  const supabase = await createSupabaseServerClient();
+type SingleEntryOutcome = {
+  entryId: string;
+  error: { message: string } | null;
+  stale: boolean;
+  serverUpdatedAt: string | null;
+};
+
+// Entries are independent rows, so their transactional RPCs can overlap; the
+// small cap keeps a large backlog from stampeding the database.
+async function mapWithConcurrency<T, R>(items: T[], limit: number, task: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex++;
+      results[index] = await task(items[index]);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+async function syncEntries(supabase: SupabaseServerClient, workspaceId: string, userId: string, entries: JournalEntry[]): Promise<EntrySyncOutcome> {
   const applied: Record<string, string> = {};
   const stale: string[] = [];
-  if (!supabase || entries.length === 0) return { error: null, applied, stale };
+  if (entries.length === 0) return { error: null, applied, stale };
 
-  for (const entry of entries) {
-    // Storage uploads are not transactional, so they happen before the entry
-    // rewrite; a failure after upload leaves an unreferenced object at worst.
-    const photoRows = [];
-    for (const photo of entry.photos) {
-      const uploaded = await ensurePhotoStored(workspaceId, entry.localDate, photo.id, photo.previewUrl, photo.storagePath, photo.thumbnailPath);
-      if (uploaded.error) return { error: uploaded.error, applied, stale };
-      photoRows.push({
-        id: photo.id,
-        storage_path: uploaded.storagePath,
-        thumbnail_path: uploaded.thumbnailPath,
-        caption: photo.caption,
-        sort_order: photo.sortOrder,
-        byte_size: uploaded.byteSize ?? null
-      });
-    }
+  const outcomes = await mapWithConcurrency(entries, entrySyncConcurrency, (entry) => syncOneEntry(supabase, workspaceId, userId, entry));
 
-    const { data, error } = await supabase.rpc("sync_journal_entry", {
-      entry: {
-        id: entry.id,
-        workspace_id: workspaceId,
-        local_date: entry.localDate,
-        mood: entry.mood,
-        note: entry.note,
-        created_at: entry.createdAt,
-        updated_at: entry.updatedAt,
-        base_updated_at: entry.syncedAt ?? null,
-        person_tag_ids: entry.personTagIds,
-        // Per-person sections: only the caller's own (or unowned legacy)
-        // sessions are written; other members' sections are untouched.
-        sessions: entry.sessions
-          .filter((session) => !session.createdBy || session.createdBy === userId)
-          .map((session) => ({
-            id: session.id,
-            kind: session.kind,
-            responses: session.responses.map((response) => ({
-              id: response.id,
-              prompt_id: response.promptId,
-              prompt_title: response.promptTitle,
-              prompt_text: response.promptText,
-              prompt_order: response.promptOrder,
-              text: response.text
-            }))
-          })),
-        details: entry.details.map((detail) => ({
-          id: detail.id,
-          text: detail.text,
-          category: detail.category,
-          sort_order: detail.sortOrder,
-          person_tag_ids: detail.personTagIds
-        })),
-        photos: photoRows
-      }
-    });
-    if (error) return { error, applied, stale };
-
-    const result = data as { status?: string; server_updated_at?: string } | null;
-    if (result?.status === "stale") {
-      stale.push(entry.id);
-    } else if (result?.server_updated_at) {
-      applied[entry.id] = result.server_updated_at;
+  let firstError: { message: string } | null = null;
+  for (const outcome of outcomes) {
+    if (outcome.error) {
+      firstError ??= outcome.error;
+    } else if (outcome.stale) {
+      stale.push(outcome.entryId);
+    } else if (outcome.serverUpdatedAt) {
+      applied[outcome.entryId] = outcome.serverUpdatedAt;
     }
   }
 
-  return { error: null, applied, stale };
+  return { error: firstError, applied, stale };
+}
+
+async function syncOneEntry(supabase: SupabaseServerClient, workspaceId: string, userId: string, entry: JournalEntry): Promise<SingleEntryOutcome> {
+  const outcome: SingleEntryOutcome = { entryId: entry.id, error: null, stale: false, serverUpdatedAt: null };
+
+  // Storage uploads are not transactional, so they happen before the entry
+  // rewrite; a failure after upload leaves an unreferenced object at worst.
+  const photoRows = [];
+  for (const photo of entry.photos) {
+    const uploaded = await ensurePhotoStored(supabase, workspaceId, entry.localDate, photo.id, photo.previewUrl, photo.storagePath, photo.thumbnailPath);
+    if (uploaded.error) return { ...outcome, error: uploaded.error };
+    photoRows.push({
+      id: photo.id,
+      storage_path: uploaded.storagePath,
+      thumbnail_path: uploaded.thumbnailPath,
+      caption: photo.caption,
+      sort_order: photo.sortOrder,
+      byte_size: uploaded.byteSize ?? null
+    });
+  }
+
+  const { data, error } = await supabase.rpc("sync_journal_entry", {
+    entry: {
+      id: entry.id,
+      workspace_id: workspaceId,
+      local_date: entry.localDate,
+      mood: entry.mood,
+      note: entry.note,
+      created_at: entry.createdAt,
+      updated_at: entry.updatedAt,
+      base_updated_at: entry.syncedAt ?? null,
+      person_tag_ids: entry.personTagIds,
+      // Per-person sections: only the caller's own (or unowned legacy)
+      // sessions are written; other members' sections are untouched.
+      sessions: entry.sessions
+        .filter((session) => !session.createdBy || session.createdBy === userId)
+        .map((session) => ({
+          id: session.id,
+          kind: session.kind,
+          responses: session.responses.map((response) => ({
+            id: response.id,
+            prompt_id: response.promptId,
+            prompt_title: response.promptTitle,
+            prompt_text: response.promptText,
+            prompt_order: response.promptOrder,
+            text: response.text
+          }))
+        })),
+      details: entry.details.map((detail) => ({
+        id: detail.id,
+        text: detail.text,
+        category: detail.category,
+        sort_order: detail.sortOrder,
+        person_tag_ids: detail.personTagIds
+      })),
+      photos: photoRows
+    }
+  });
+  if (error) return { ...outcome, error };
+
+  const result = data as { status?: string; server_updated_at?: string } | null;
+  if (result?.status === "stale") {
+    return { ...outcome, stale: true };
+  }
+  return { ...outcome, serverUpdatedAt: result?.server_updated_at ?? null };
 }
 
 async function ensurePhotoStored(
+  supabase: SupabaseServerClient,
   workspaceId: string,
   localDate: string,
   photoId: string,
@@ -277,9 +292,6 @@ async function ensurePhotoStored(
   storagePath: string,
   thumbnailPath: string
 ): Promise<{ storagePath: string; thumbnailPath: string; byteSize?: number; error?: { message: string } }> {
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) return { storagePath, thumbnailPath, error: { message: "Supabase is not configured" } };
-
   if (storagePath && thumbnailPath) {
     if (!isSafeWorkspaceStoragePath(storagePath, workspaceId) || !isSafeWorkspaceStoragePath(thumbnailPath, workspaceId)) {
       return { storagePath, thumbnailPath, error: { message: "Photo storage metadata does not belong to this workspace" } };

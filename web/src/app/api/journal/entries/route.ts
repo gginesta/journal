@@ -57,7 +57,7 @@ export async function GET(request: Request) {
   const rows = (data ?? []) as EntryRow[];
   const hasMore = rows.length > PAGE_SIZE;
   const page = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
-  const signedPhotoUrls = await createPhotoUrlMap(page);
+  const signedPhotoUrls = await createPhotoUrlMap(supabase, page);
 
   return NextResponse.json({
     entries: page.map((row) => mapEntry(row, signedPhotoUrls)),

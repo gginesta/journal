@@ -3,6 +3,7 @@ import clsx from "clsx";
 import { ArrowRight, CheckCircle2, ChevronDown, Heart, Plus, Sparkles, Trash2, Users } from "lucide-react";
 import type { JournalEntry, JournalSession, MemoryDetail, PersonTag, PromptTemplate, Workspace } from "@/types/journal";
 import { formatDisplayDate, toLocalDate } from "@/lib/dates";
+import { isFeatureVisible, type ExperienceMode } from "@/lib/experience-mode";
 import { firstResponseExcerpt, isEntryComplete, memoryLaneMatches, streakSummary } from "@/lib/journal-logic";
 import { addSuggestionToReflectionText, gratitudeGuideForEntry } from "@/lib/prompts";
 import { meaningfulFirstMemoryEntries } from "@/lib/first-memory-celebration";
@@ -17,11 +18,11 @@ import {
 } from "@/components/journal/helpers";
 import { MemoryLanePanel } from "@/components/journal/MemoryLane";
 import { PhotoHero } from "@/components/journal/PhotoHero";
-import { ReadOnlyNotice } from "@/components/journal/SettingsView";
 import {
   JournalPhoto,
   PersonChips,
   PromptSnapshot,
+  ReadOnlyNotice,
   SaveStatePill,
   SectionTitle
 } from "@/components/journal/shared";
@@ -29,6 +30,7 @@ import {
 export function TodayView({
   entry,
   entries,
+  experienceMode,
   people,
   workspace,
   prompts,
@@ -49,6 +51,7 @@ export function TodayView({
 }: {
   entry: JournalEntry;
   entries: JournalEntry[];
+  experienceMode: ExperienceMode;
   people: PersonTag[];
   workspace: Workspace | null;
   prompts: PromptTemplate[];
@@ -68,8 +71,12 @@ export function TodayView({
   memberNames?: Record<string, string>;
 }) {
   const [showMoreForToday, setShowMoreForToday] = useState(false);
-  const summary = streakSummary(entries);
-  const matches = memoryLaneMatches(entries).filter((match) => match.entryId !== entry.id);
+  const today = toLocalDate();
+  const summary = useMemo(() => streakSummary(entries, today), [entries, today]);
+  const matches = useMemo(
+    () => memoryLaneMatches(entries, today).filter((match) => match.entryId !== entry.id),
+    [entries, today, entry.id]
+  );
   const firstMeaningfulEntry = meaningfulFirstMemoryEntries(entries)[0] ?? entry;
   const guide = gratitudeGuideForEntry({
     localDate: entry.localDate,
@@ -161,9 +168,17 @@ export function TodayView({
         />
 
         <PromptPanel entry={entry} prompts={prompts} canEdit={canEdit} currentUserId={currentUserId} memberNames={memberNames} onUpdateEntry={onUpdateEntry} />
-        <PeoplePanel entry={entry} people={people} canEdit={canEdit} onUpdateEntry={onUpdateEntry} onAddPerson={onAddPerson} />
-        <LittleDetailsPanel entry={entry} people={people} workspace={workspace} canEdit={canEdit} onUpdateEntry={onUpdateEntry} />
-        <MoodPanel entry={entry} canEdit={canEdit} onUpdateEntry={onUpdateEntry} />
+        {/* SPEC-7: Simple hides the metadata inputs. Their stored data still
+            renders in the entry detail modal and stays searchable. */}
+        {isFeatureVisible(experienceMode, "peopleTags") ? (
+          <PeoplePanel entry={entry} people={people} canEdit={canEdit} onUpdateEntry={onUpdateEntry} onAddPerson={onAddPerson} />
+        ) : null}
+        {isFeatureVisible(experienceMode, "littleDetailsPanel") ? (
+          <LittleDetailsPanel entry={entry} people={people} workspace={workspace} canEdit={canEdit} onUpdateEntry={onUpdateEntry} />
+        ) : null}
+        {isFeatureVisible(experienceMode, "moodPicker") ? (
+          <MoodPanel entry={entry} canEdit={canEdit} onUpdateEntry={onUpdateEntry} />
+        ) : null}
       </section>
 
       <aside aria-label="More for today" className="grid content-start gap-5">
@@ -174,16 +189,26 @@ export function TodayView({
           aria-expanded={showMoreForToday}
           className="flex min-h-12 items-center justify-between rounded-journal border border-journal-line bg-journal-surface px-5 text-left text-sm font-bold text-soft-ink xl:hidden"
         >
-          More for today: a look back, gentle starters
+          {isFeatureVisible(experienceMode, "gratitudeGuide")
+            ? "More for today: a look back, gentle starters"
+            : "More for today: a look back"}
           <ChevronDown aria-hidden="true" size={18} className={clsx("transition", showMoreForToday ? "rotate-180" : "")} />
         </button>
         <div className={clsx("grid gap-5", showMoreForToday ? "" : "hidden xl:grid")}>
-          <PickMeUpMemoryCard entries={entries} onOpenEntry={onOpenEntry} />
-          <GratitudeGuideCard guide={guide} canEdit={canEdit} onUseSuggestion={useGuideSuggestion} />
+          {/* SPEC-7: Memory Lane is the one aside kept in Simple — the
+              read-only rediscovery payoff that makes the ritual worth it. */}
+          {isFeatureVisible(experienceMode, "pickMeUpMemory") ? (
+            <PickMeUpMemoryCard entries={entries} onOpenEntry={onOpenEntry} />
+          ) : null}
+          {isFeatureVisible(experienceMode, "gratitudeGuide") ? (
+            <GratitudeGuideCard guide={guide} canEdit={canEdit} onUseSuggestion={useGuideSuggestion} />
+          ) : null}
           <MemoryLanePanel matches={matches} entries={entries} onOpenEntry={onOpenEntry} />
-          <div className="hidden xl:block">
-            <PromptSnapshot prompts={prompts} />
-          </div>
+          {isFeatureVisible(experienceMode, "promptSnapshot") ? (
+            <div className="hidden xl:block">
+              <PromptSnapshot prompts={prompts} />
+            </div>
+          ) : null}
         </div>
       </aside>
     </div>
@@ -261,7 +286,7 @@ function PickMeUpMemoryCard({
         onClick={() => onOpenEntry(memory.id)}
         className="group overflow-hidden rounded-[22px] bg-journal-raised text-left transition hover:-translate-y-0.5 hover:bg-white hover:shadow-sm"
       >
-        <JournalPhoto src={photo?.previewUrl} alt={photo?.caption || ""} className="h-32 w-full object-cover" loading="lazy" />
+        <JournalPhoto src={photo?.thumbnailUrl || photo?.previewUrl} alt={photo?.caption || ""} className="h-32 w-full object-cover" loading="lazy" />
         <div className="p-4">
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-rose">{formatDisplayDate(memory.localDate, "short")}</p>
           <p className="mt-2 line-clamp-3 text-sm font-semibold leading-5 text-soft-ink">
@@ -347,13 +372,16 @@ function StarterGuideCard({
   );
 }
 
-function PromptPanel({
+// Also rendered inside EntryDetailModal so past days can be backfilled with
+// the exact Today editing behavior (own-session scoping included).
+export function PromptPanel({
   entry,
   prompts,
   canEdit,
   currentUserId,
   memberNames,
-  onUpdateEntry
+  onUpdateEntry,
+  primaryFieldId = "nice-thing-0"
 }: {
   entry: JournalEntry;
   prompts: PromptTemplate[];
@@ -361,6 +389,10 @@ function PromptPanel({
   currentUserId: string | null;
   memberNames: Record<string, string>;
   onUpdateEntry: (entryId: string, updater: (entry: JournalEntry) => JournalEntry) => void;
+  // The Today view anchors its "focus first reflection" affordance on this id;
+  // pass null anywhere a second PromptPanel could mount over Today (the entry
+  // modal) so the id stays unique in the document.
+  primaryFieldId?: string | null;
 }) {
   // Per-person sections: each member writes in their own session; unowned
   // legacy sessions belong to whoever edits them first.
@@ -428,7 +460,7 @@ function PromptPanel({
               {index + 1}
             </span>
             <textarea
-              id={index === 0 ? "nice-thing-0" : undefined}
+              id={index === 0 ? (primaryFieldId ?? undefined) : undefined}
               aria-label={`Nice thing ${index + 1}`}
               value={lines[index] ?? ""}
               onChange={(event) => {

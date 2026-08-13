@@ -1,5 +1,6 @@
 import type { JournalBootstrap, JournalEntry, PersonTag, PromptTemplate } from "@/types/journal";
 import { addMonths, addYears, toLocalDate } from "@/lib/dates";
+import { demoDefaultExperienceMode } from "@/lib/experience-mode";
 
 const workspaceId = "workspace-household";
 
@@ -168,6 +169,10 @@ export function makeDemoBootstrap(): JournalBootstrap {
       remindersEnabled: false,
       eveningTime: "21:00",
       morningTime: "08:30"
-    }
+    },
+    // The demo showcase starts in Full (its fixtures already carry people tags
+    // and Little Details); the client may override this from the demo's own
+    // localStorage mode key. Real new accounts start Simple via the migration.
+    experienceMode: demoDefaultExperienceMode
   };
 }

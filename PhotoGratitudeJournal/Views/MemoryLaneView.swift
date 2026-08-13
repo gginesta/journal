@@ -20,16 +20,16 @@ struct MemoryLaneView: View {
             }
 
             if matches.isEmpty {
+                EarlyMemoryLanePanel(completedEntryCount: entries.filter(\.isComplete).count)
+            } else if let fallback = matches.first, fallback.isFallback, let fallbackEntry = entry(for: fallback) {
                 VStack(alignment: .leading, spacing: 12) {
-                    Label(emptyMessage, systemImage: "sparkles")
+                    Label("No look-backs line up with today yet. Here is a recent saved memory instead.", systemImage: "sparkles")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                    if let fallbackEntry {
-                        RecentMemoryFallbackCard(entry: fallbackEntry) {
-                            router.navigate(to: .entry(fallbackEntry.id))
-                        }
+                    RecentMemoryFallbackCard(entry: fallbackEntry) {
+                        router.navigate(to: .entry(fallbackEntry.id))
                     }
                 }
                 .padding(14)
@@ -52,22 +52,68 @@ struct MemoryLaneView: View {
     private func entry(for match: MemoryMatch) -> JournalEntry? {
         entries.first { $0.id == match.entryID }
     }
+}
 
-    private var fallbackEntry: JournalEntry? {
-        entries
-            .filter { !Calendar.current.isDateInToday($0.day) }
-            .sorted { $0.day > $1.day }
-            .first
-    }
+// Early-state guidance shown before the SPEC-3 ladder has anything to return
+// (copy shared with web's EarlyMemoryLane component).
+private struct EarlyMemoryLanePanel: View {
+    let completedEntryCount: Int
 
-    private var emptyMessage: String {
-        if entries.isEmpty {
-            return "Once you have older entries, this space will bring back moments from 1 month, 1 year, 2 years, and 3 years ago."
+    var body: some View {
+        let summary = EarlyMemoryLane.summary(completedEntryCount: completedEntryCount)
+
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(summary.headline)
+                    .font(.headline)
+                    .foregroundStyle(.ink)
+                Text(summary.body)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Text(summary.progressLabel)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.softInk)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(summary.milestones) { milestone in
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: milestone.isReady ? "checkmark.circle.fill" : "calendar.badge.clock")
+                            .font(.subheadline)
+                            .foregroundStyle(milestone.isReady ? Color.leaf : Color.warmGray)
+                            .frame(width: 30, height: 30)
+                            .background((milestone.isReady ? Color.leaf : Color.warmGray).opacity(0.12), in: Circle())
+                            .accessibilityHidden(true)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 8) {
+                                Text(milestone.label)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.ink)
+                                Spacer(minLength: 4)
+                                Text(milestone.statusLabel)
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(milestone.isReady ? Color.leaf : Color.softInk)
+                            }
+                            Text(milestone.message)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            }
         }
-        if fallbackEntry == nil {
-            return "Save a few days and Memory Lane will have something older to bring back."
-        }
-        return "No look-backs line up with today yet. Here is a recent saved memory instead."
+        .padding(14)
+        .background(Color(.tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Early Memory Lane")
     }
 }
 

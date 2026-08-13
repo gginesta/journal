@@ -14,6 +14,14 @@ Read these in order when you need to understand the project quickly:
 6. `docs/ROADMAP.md` - current milestones and what comes next.
 7. `CHANGELOG.md` - shipped changes by version.
 
+## Audits And Execution Plan
+
+These are the most decision-dense documents in the repo — they record findings, owner decisions, and operator actions:
+
+- `AUDIT.md` - the 2026-06 repository audit: findings, milestone task plan, owner decisions, and execution logs (including operator actions required before deploying `main`).
+- `AUDIT_UX.md` - the 2026-06 evidence-based UX audit (Playwright walkthrough + axe scans) and its execution log.
+- `docs/IMPROVEMENT_PLAN.md` - the 2026-08 full-project audit and improvement plan: UX/functionality, performance, Simple/Full mode design, and the iPhone/TestFlight path, sequenced as waves W0-W5.
+
 ## Product And Strategy
 
 - `docs/PROJECT_CONTEXT.md` is the canonical long-form explanation of what we are building and why.

@@ -18,23 +18,27 @@ struct InsightsView: View {
 
                 InsightMetric(title: "Completed", value: "\(summary.completedDays)", subtitle: "journal days", systemImage: "checkmark.circle.fill")
 
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        SectionHeader(title: "Deeper reflections", systemImage: "sparkles")
-                        PremiumBadge()
+                // Hidden for the TestFlight beta: nothing is gated and the
+                // paywall shows no price (see EntitlementService.showPremiumUI).
+                if EntitlementService.showPremiumUI {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            SectionHeader(title: "Deeper reflections", systemImage: "sparkles")
+                            PremiumBadge()
+                        }
+                        Text("Premium unlocks mood trends, seasonal memory browsing, export, widgets, themes, and look-back notifications.")
+                            .foregroundStyle(.secondary)
+                        Button {
+                            router.navigate(to: .paywall)
+                        } label: {
+                            Label(entitlement.hasPremium ? "Premium active" : "See Premium", systemImage: "sparkles")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.rose)
                     }
-                    Text("Premium unlocks mood trends, seasonal memory browsing, export, widgets, themes, and look-back notifications.")
-                        .foregroundStyle(.secondary)
-                    Button {
-                        router.navigate(to: .paywall)
-                    } label: {
-                        Label(entitlement.hasPremium ? "Premium active" : "See Premium", systemImage: "sparkles")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.rose)
+                    .journalCard()
                 }
-                .journalCard()
             }
             .padding()
         }

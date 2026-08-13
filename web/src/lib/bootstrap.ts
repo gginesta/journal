@@ -1,16 +1,19 @@
 import type {
   JournalBootstrap,
   JournalEntry,
+  PendingWorkspaceInvite,
   PersonTag,
+  Profile,
   PromptTemplate,
   ReminderPreferences,
   Workspace,
   WorkspaceMember
 } from "@/types/journal";
 import { makeDemoBootstrap } from "@/data/demo";
+import { isExperienceMode, type ExperienceMode } from "@/lib/experience-mode";
 import { eagerEntryWindows } from "@/lib/journal-logic";
 import { isDemoMode } from "@/lib/supabase/env";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, type SupabaseServerClient } from "@/lib/supabase/server";
 
 type WorkspaceRow = {
   id: string;
@@ -32,6 +35,7 @@ type ProfileRow = {
   id: string;
   email: string;
   display_name: string;
+  experience_mode?: string;
 };
 
 type PersonRow = {
@@ -112,6 +116,7 @@ type ReminderRow = {
   reminders_enabled?: boolean;
   evening_time?: string;
   morning_time?: string;
+  timezone?: string | null;
 };
 
 export async function loadJournalBootstrap(): Promise<JournalBootstrap> {
@@ -120,7 +125,9 @@ export async function loadJournalBootstrap(): Promise<JournalBootstrap> {
   }
 
   const supabase = await createSupabaseServerClient();
-  if (!supabase) return makeDemoBootstrap();
+  // Unreachable while isDemoMode() covers missing Supabase env, but never
+  // fall back to demo fixtures outside demo mode.
+  if (!supabase) return makeUnavailableBootstrap(null);
 
   const {
     data: { user }
@@ -137,7 +144,7 @@ export async function loadJournalBootstrap(): Promise<JournalBootstrap> {
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id,email,display_name")
+      .select("id,email,display_name,experience_mode")
       .eq("id", user.id)
       .single(),
     supabase
@@ -171,9 +178,17 @@ export async function loadJournalBootstrap(): Promise<JournalBootstrap> {
     role: workspace.workspace_members[0]?.role ?? "viewer"
   }));
 
+  const profile: Profile = {
+    id: user.id,
+    email: user.email ?? profileResult.data?.email ?? "",
+    displayName: profileResult.data?.display_name ?? user.email ?? "Journal user"
+  };
+
   const activeWorkspaceId = workspaces[0]?.id;
   if (!activeWorkspaceId) {
-    return makeDemoBootstrap();
+    // An authenticated user must never see demo fixtures: signal the failure
+    // so /app renders a recovery screen instead.
+    return makeUnavailableBootstrap(profile, pendingInvites);
   }
 
   const workspaceIds = workspaces.map((workspace) => workspace.id);
@@ -209,33 +224,57 @@ export async function loadJournalBootstrap(): Promise<JournalBootstrap> {
   ]);
 
   const rawEntries = (entriesResult.data ?? []) as EntryRow[];
-  const signedPhotoUrls = await createPhotoUrlMap(rawEntries);
   const memberRows = (membersResult.data ?? []) as WorkspaceMemberRow[];
-  const memberProfiles = await loadMemberProfiles(memberRows.map((member) => member.user_id));
+  const [signedPhotoUrls, memberProfiles] = await Promise.all([
+    createPhotoUrlMap(supabase, rawEntries),
+    loadMemberProfiles(supabase, memberRows.map((member) => member.user_id))
+  ]);
 
   return {
     mode: "supabase",
     pendingInvites,
-    profile: {
-      id: user.id,
-      email: user.email ?? profileResult.data?.email ?? "",
-      displayName: profileResult.data?.display_name ?? user.email ?? "Journal user"
-    },
+    profile,
     workspaces,
     workspaceMembers: memberRows.map((member) => mapWorkspaceMember(member, memberProfiles, user.id)),
     activeWorkspaceId,
     people: ((peopleResult.data ?? []) as PersonRow[]).map(mapPerson),
     prompts: ((promptsResult.data ?? []) as PromptRow[]).map(mapPrompt),
     entries: rawEntries.map((entry) => mapEntry(entry, signedPhotoUrls)),
-    reminders: mapReminders(remindersResult.data as ReminderRow | null)
+    reminders: mapReminders(remindersResult.data as ReminderRow | null),
+    experienceMode: mapExperienceMode((profileResult.data as ProfileRow | null)?.experience_mode)
   };
 }
 
-async function loadMemberProfiles(userIds: string[]): Promise<Map<string, ProfileRow>> {
-  const supabase = await createSupabaseServerClient();
+// The 202608110002 migration defaults new profiles to 'simple' and backfills
+// existing ones to 'full', so a missing/unknown value only occurs before the
+// migration runs — where every user is a grandfathered Full user.
+function mapExperienceMode(value: string | undefined): ExperienceMode {
+  return isExperienceMode(value) ? value : "full";
+}
+
+function makeUnavailableBootstrap(profile: Profile | null, pendingInvites: PendingWorkspaceInvite[] = []): JournalBootstrap {
+  return {
+    mode: "supabase",
+    workspaceUnavailable: true,
+    profile,
+    pendingInvites,
+    workspaces: [],
+    workspaceMembers: [],
+    activeWorkspaceId: "",
+    people: [],
+    prompts: [],
+    entries: [],
+    reminders: mapReminders(null),
+    // The recovery screen renders instead of the journal, so the value is
+    // inert; 'full' matches the grandfathered default for existing accounts.
+    experienceMode: "full"
+  };
+}
+
+async function loadMemberProfiles(supabase: SupabaseServerClient, userIds: string[]): Promise<Map<string, ProfileRow>> {
   const uniqueIds = Array.from(new Set(userIds));
   const profiles = new Map<string, ProfileRow>();
-  if (!supabase || uniqueIds.length === 0) return profiles;
+  if (uniqueIds.length === 0) return profiles;
 
   const { data } = await supabase.from("profiles").select("id,email,display_name").in("id", uniqueIds);
   for (const profile of (data ?? []) as ProfileRow[]) {
@@ -283,17 +322,26 @@ function mapPrompt(row: PromptRow): PromptTemplate {
   };
 }
 
-export async function createPhotoUrlMap(entries: EntryRow[]): Promise<Map<string, string>> {
-  const supabase = await createSupabaseServerClient();
-  const paths = entries.flatMap((entry) => (entry.photo_attachments ?? []).map((photo) => photo.storage_path).filter(Boolean));
+// One map keyed by storage path, covering both the full-size photos and their
+// thumbnails (paths never collide: thumbnails carry a `-thumb` suffix).
+export async function createPhotoUrlMap(supabase: SupabaseServerClient, entries: EntryRow[]): Promise<Map<string, string>> {
+  const photos = entries.flatMap((entry) => entry.photo_attachments ?? []);
   const urls = new Map<string, string>();
-  if (!supabase || paths.length === 0) return urls;
 
-  const { data } = await supabase.storage.from("journal-photos").createSignedUrls(paths, 60 * 60 * 24 * 7);
-
-  for (const result of data ?? []) {
-    if (result.path && result.signedUrl && !result.error) urls.set(result.path, result.signedUrl);
+  async function signPaths(bucket: string, paths: string[]) {
+    if (paths.length === 0) return;
+    // 24 h: these quasi-bearer links land in server-rendered HTML, and both
+    // bootstrap and archive paging re-sign on every load anyway.
+    const { data } = await supabase.storage.from(bucket).createSignedUrls(paths, 60 * 60 * 24);
+    for (const result of data ?? []) {
+      if (result.path && result.signedUrl && !result.error) urls.set(result.path, result.signedUrl);
+    }
   }
+
+  await Promise.all([
+    signPaths("journal-photos", photos.map((photo) => photo.storage_path).filter(Boolean)),
+    signPaths("journal-thumbnails", photos.map((photo) => photo.thumbnail_path).filter(Boolean))
+  ]);
   return urls;
 }
 
@@ -307,16 +355,21 @@ export function mapEntry(row: EntryRow, signedPhotoUrls = new Map<string, string
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     personTagIds: (row.entry_person_tags ?? []).map((link) => link.person_tag_id),
-    photos: (row.photo_attachments ?? []).map((photo) => ({
-      id: photo.id,
-      entryId: photo.entry_id,
-      storagePath: photo.storage_path,
-      thumbnailPath: photo.thumbnail_path,
-      previewUrl: signedPhotoUrls.get(photo.storage_path) ?? "",
-      caption: photo.caption ?? "",
-      sortOrder: photo.sort_order,
-      createdAt: photo.created_at
-    })),
+    photos: (row.photo_attachments ?? []).map((photo) => {
+      const previewUrl = signedPhotoUrls.get(photo.storage_path) ?? "";
+      return {
+        id: photo.id,
+        entryId: photo.entry_id,
+        storagePath: photo.storage_path,
+        thumbnailPath: photo.thumbnail_path,
+        previewUrl,
+        // Photos from before thumbnail generation may have no thumbnail yet.
+        thumbnailUrl: signedPhotoUrls.get(photo.thumbnail_path) || previewUrl,
+        caption: photo.caption ?? "",
+        sortOrder: photo.sort_order,
+        createdAt: photo.created_at
+      };
+    }),
     sessions: (row.journal_sessions ?? []).map((session) => ({
       id: session.id,
       kind: session.kind,
@@ -346,6 +399,7 @@ function mapReminders(row: ReminderRow | null): ReminderPreferences {
     cadence: row?.cadence ?? "evening",
     remindersEnabled: row?.reminders_enabled ?? false,
     eveningTime: row?.evening_time ?? "21:00",
-    morningTime: row?.morning_time ?? "08:30"
+    morningTime: row?.morning_time ?? "08:30",
+    timezone: row?.timezone ?? null
   };
 }

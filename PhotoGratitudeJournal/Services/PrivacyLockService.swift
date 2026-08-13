@@ -4,9 +4,27 @@ import LocalAuthentication
 @MainActor
 @Observable
 final class PrivacyLockService {
-    var isEnabled = false
+    private static let isEnabledDefaultsKey = "privacyLockIsEnabled"
+
+    var isEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isEnabled, forKey: Self.isEnabledDefaultsKey)
+            if !isEnabled {
+                isLocked = false
+            }
+        }
+    }
+
     var isLocked = false
     var lastError: String?
+
+    init() {
+        let enabled = UserDefaults.standard.bool(forKey: Self.isEnabledDefaultsKey)
+        isEnabled = enabled
+        // Start locked whenever the lock is enabled so a relaunch never shows
+        // journal content before authentication.
+        isLocked = enabled
+    }
 
     func lockIfNeeded() async {
         if isEnabled {

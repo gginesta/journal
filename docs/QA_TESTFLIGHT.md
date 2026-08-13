@@ -137,7 +137,7 @@ Record before testing:
 - Update reminder time if controls are present.
 - Review reminder settings and request notification permission only if expected.
 - Confirm iCloud/private sync copy is understandable.
-- Review app lock, export, delete-all, and Premium surfaces without assuming production readiness.
+- Review app lock, export, and delete-all without assuming production readiness. Premium surfaces are hidden for the beta (`EntitlementService.showPremiumUI`); confirm no Premium/paywall UI is reachable.
 - On web, confirm workspace switching, prompt editing, people/theme tags, replay onboarding, export, delete workspace entries, and sign out are understandable.
 - On web, confirm workspace copy adapts to solo, partner, family, and custom contexts without implying public sharing.
 - Open Settings > Beta and confirm the build number is visible.

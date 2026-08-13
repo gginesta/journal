@@ -13,9 +13,47 @@ struct SettingsView: View {
     @Query(sort: \JournalEntry.day, order: .reverse) private var entries: [JournalEntry]
     @State private var exportURL: URL?
     @State private var showingDeleteConfirmation = false
+    @AppStorage(ExperienceMode.storageKey) private var experienceModeRawValue = ExperienceMode.defaultMode.rawValue
 
     var body: some View {
         Form {
+            // SPEC-7: the Simple/Full toggle. Presentation-only — switching
+            // never deletes anything.
+            Section("Experience") {
+                ForEach(ExperienceMode.allCases) { mode in
+                    Button {
+                        experienceModeRawValue = mode.rawValue
+                    } label: {
+                        HStack(alignment: .top, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(mode.title)
+                                    .font(.body.weight(.semibold))
+                                    .foregroundStyle(.ink)
+                                Text(mode.summary)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+
+                            Spacer(minLength: 0)
+
+                            if experienceMode == mode {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.rose)
+                                    .accessibilityHidden(true)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(mode.title) experience")
+                    .accessibilityAddTraits(experienceMode == mode ? .isSelected : [])
+                }
+
+                Text("Switching never deletes anything; what you added in Full stays saved and comes right back.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Ritual") {
                 if let config = reminderConfigs.first {
                     Picker("Cadence", selection: cadenceBinding(for: config)) {
@@ -64,24 +102,31 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Prompts") {
-                NavigationLink(value: Route.promptEditor) {
-                    Label("Edit daily prompts", systemImage: "list.bullet.rectangle")
+            // SPEC-7: the prompt editor is a Full customization surface.
+            if ExperienceModeMap.isVisible(.promptEditor, in: experienceMode) {
+                Section("Prompts") {
+                    NavigationLink(value: Route.promptEditor) {
+                        Label("Edit daily prompts", systemImage: "list.bullet.rectangle")
+                    }
                 }
             }
 
             Section("Privacy") {
                 Toggle("App lock", isOn: privacyLockBinding)
-                Text("App lock is a Premium feature in the final product. The switch is wired here so the privacy flow can be tested early.")
+                Text("App lock is free during the beta so the privacy flow can be tested early.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
 
-            Section("Premium") {
-                Button {
-                    router.navigate(to: .paywall)
-                } label: {
-                    Label(entitlement.hasPremium ? "Premium active" : "Yearly Premium", systemImage: "sparkles")
+            // Hidden for the TestFlight beta: nothing is gated and the paywall
+            // shows no price (see EntitlementService.showPremiumUI).
+            if EntitlementService.showPremiumUI {
+                Section("Premium") {
+                    Button {
+                        router.navigate(to: .paywall)
+                    } label: {
+                        Label(entitlement.hasPremium ? "Premium active" : "Yearly Premium", systemImage: "sparkles")
+                    }
                 }
             }
 
@@ -142,6 +187,10 @@ struct SettingsView: View {
             ensureReminderConfig()
             await reminderScheduler.refreshAuthorizationStatus()
         }
+    }
+
+    private var experienceMode: ExperienceMode {
+        ExperienceMode.fromStoredValue(experienceModeRawValue)
     }
 
     private func cadenceBinding(for config: ReminderConfig) -> Binding<RitualCadence> {

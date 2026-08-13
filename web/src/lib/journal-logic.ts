@@ -8,6 +8,27 @@ export function isEntryComplete(entry: JournalEntry): boolean {
   return hasText || entry.photos.length > 0;
 }
 
+// What tapping a calendar day does: days with an entry open it, empty days up
+// to today can start a backfill (when the caller may edit), and empty future
+// days stay inert. Local dates compare lexicographically.
+export type CalendarDayAction = "open" | "start" | "none";
+
+export function calendarDayAction({
+  date,
+  hasEntry,
+  canStart,
+  today = toLocalDate()
+}: {
+  date: string;
+  hasEntry: boolean;
+  canStart: boolean;
+  today?: string;
+}): CalendarDayAction {
+  if (hasEntry) return "open";
+  if (canStart && date <= today) return "start";
+  return "none";
+}
+
 export function entryPeople(entry: JournalEntry, people: PersonTag[]): PersonTag[] {
   const ids = new Set<string>(entry.personTagIds);
   for (const detail of entry.details) {
@@ -53,11 +74,14 @@ export function streakSummary(entries: JournalEntry[], today = toLocalDate()): {
   let current = 0;
   let cursor = today;
   const dateSet = new Set(completeDates);
+  // SPEC-2 grace rule: an unfinished today does not break the streak until
+  // the day actually ends — walk from yesterday instead.
+  if (!dateSet.has(cursor) && dateSet.has(addDays(today, -1))) {
+    cursor = addDays(today, -1);
+  }
   while (dateSet.has(cursor)) {
     current += 1;
-    const date = new Date(`${cursor}T00:00:00`);
-    date.setDate(date.getDate() - 1);
-    cursor = toLocalDate(date);
+    cursor = addDays(cursor, -1);
   }
 
   return { current, longest, completedDays: completeDates.length };

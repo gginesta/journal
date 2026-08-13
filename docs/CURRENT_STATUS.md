@@ -1,15 +1,17 @@
 # Current Status
 
-Last updated: 2026-06-07.
+Last updated: 2026-08-11.
 
 ## Summary
 
-Photo Gratitude Journal is in private web beta preparation. The current beta is functional, deployed, and ready for Stephanie to test after the final production magic-link email template is applied or accepted as a non-blocking follow-up.
+Photo Gratitude Journal is in private web beta preparation. The current beta is functional and ready for Stephanie to test, but **deploying current `main` to production requires applying the pending Supabase migrations first** (see Pending Operator Actions below) — the sync route now depends on the `sync_journal_entry` RPC created by those migrations.
+
+The June 2026 audit cycle (`AUDIT.md`, `AUDIT_UX.md`) landed transactional sync, stale-write conflict guards, a pending-invite consent flow, per-person day sections, delta sync, archive paging, and a full accessibility/UX overhaul. The 2026-08 audit produced `docs/IMPROVEMENT_PLAN.md`, whose execution waves 0-5 have all landed on branch `claude/project-audit-plan-gl1g72`: web hygiene/perf/trust/reminders, the Simple/Full experience toggle on web, and the iOS P0 foundations + P1 logic parity + P2 experience parity + P3 premium-hidden TestFlight prep. The iOS app is code-complete for the first TestFlight build; only owner-side steps remain (signing team, manual QA, archive/upload — see Pending Operator Actions).
 
 The active app version is:
 
 ```text
-0.2.11
+0.3.0
 ```
 
 The live URL is:
@@ -45,6 +47,14 @@ https://journal-gginestas-projects.vercel.app
 - App version visibility in Settings > Beta.
 - Mobile overflow regression checks.
 - Desktop/mobile Playwright E2E.
+- Transactional per-entry sync (`sync_journal_entry` RPC) with a stale-write conflict guard.
+- Per-person day sections for shared households (each member's reflections are their own).
+- Pending-invite consent flow (accept/decline banner, invites for emails without accounts).
+- Client delta sync and on-demand archive paging (12-month eager window + anniversary slices).
+- Sync payload runtime validation with size caps; batched signed photo URLs; structured server logging.
+- Accessibility pass: zero axe violations across 8 surfaces, WCAG AA chip colors, 44 px touch targets, ritual-first mobile Today.
+- Simple/Full experience toggle (SPEC-7) on web and iOS, driven by the shared `spec/fixtures/experience-mode.json` fixture with conformance tests on both platforms.
+- iOS experience parity (Wave 5): Gratitude Guide (deterministic mood-aware starters, wire-format parity with web), early Memory Lane milestone guidance, first-memory celebration, entry editing from `EntryDetailView` (photos, responses, people, details, mood), and Premium/paywall UI hidden for the beta behind `EntitlementService.showPremiumUI`.
 
 ## What Is Deployed
 
@@ -64,6 +74,17 @@ Routes:
 - `/auth/callback`: Supabase Auth callback
 
 ## What Was Recently Added
+
+Version `0.3.0` merged the five-wave improvement plan (see `docs/IMPROVEMENT_PLAN.md`): web performance and trust fixes, the Simple/Full experience mode on both platforms, iOS logic and experience parity with web, TestFlight prep, and pre-merge review fixes (reminder timezone handling, shared-device push subscriptions, iOS search parity). Web and iOS now share the version number, enforced by the Version check workflow.
+
+Version `0.2.12` added (the June audit-execution work, recorded late):
+
+- transactional entry sync with stale-write conflict handling
+- pending-invite consent flow and a fix for the invite function that failed for every registered user
+- per-person day sections in shared households
+- delta sync, 12-month eager window, and archive paging
+- the full accessibility/UX overhaul (see `AUDIT_UX.md`)
+- SwiftLint in iOS CI; Playwright E2E in web CI
 
 Version `0.2.11` added:
 
@@ -111,12 +132,45 @@ Latest expected test state:
 - E2E tests: desktop and mobile pass.
 - Vercel: green on `main`.
 
+## Pending Operator Actions
+
+These require the Supabase dashboard (owner access) and block deploying current `main`:
+
+1. Apply the pending migrations from `web/supabase/migrations/`, in order, in the SQL editor:
+   - `202606070001_personalized_onboarding.sql` (confirm — likely applied with the 0.2.11 deploy, but unrecorded)
+   - `202606120001_transactional_entry_sync.sql` (**required** — the sync route calls its `sync_journal_entry` RPC)
+   - `202606120002_invite_without_account_probe.sql` (**required** — fixes invites of registered users)
+   - `202606130001_pending_invites.sql`
+   - `202606130002_per_person_sessions.sql`
+   - `202608110001_push_subscriptions.sql` (**required for working reminders** — push subscriptions table plus `reminder_preferences.timezone`)
+   - `202608110002_experience_mode.sql` (**required for the Simple/Full toggle** — adds `profiles.experience_mode`, defaulting new users to Simple and backfilling existing users to Full)
+2. Apply the magic-link email template per `docs/SUPABASE_AUTH_EMAILS.md` if not already done.
+3. For Web Push reminders: generate VAPID keys (`node web/scripts/generate-vapid-keys.mjs`) and set `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET`, and `SUPABASE_SERVICE_ROLE_KEY` in Vercel (see docs/WEB_APP.md "Reminders / Web Push").
+4. Record completion here (move each item to "Applied and verified" below).
+
+For the iOS TestFlight build (needs the owner's Mac + Apple account; the code side of waves 4-5 is done):
+
+1. Set the Apple team id in the four empty `DEVELOPMENT_TEAM = "";` entries in `PhotoGratitudeJournal.xcodeproj/project.pbxproj` (see `docs/TESTFLIGHT.md`).
+2. Confirm iOS CI is green on this branch (`xcodebuild test` on macos-15 runs the SPEC conformance tests, including the new SPEC-7 experience-mode tests — this container cannot run Xcode).
+3. Run the manual QA pass per `docs/QA_TESTFLIGHT.md` (Premium surfaces should be unreachable; the beta ships with them hidden).
+4. Bump `CURRENT_PROJECT_VERSION`, archive, upload, and smoke-test per `docs/TESTFLIGHT.md`, then invite Stephanie.
+
 ## Supabase Status
 
 Applied and verified:
 
 - `202605210001_initial_schema.sql`
 - `202605230001_workspace_member_invites.sql`
+
+Written in the repo but **not yet recorded as applied** (see Pending Operator Actions):
+
+- `202606070001_personalized_onboarding.sql`
+- `202606120001_transactional_entry_sync.sql`
+- `202606120002_invite_without_account_probe.sql`
+- `202606130001_pending_invites.sql`
+- `202606130002_per_person_sessions.sql`
+- `202608110001_push_subscriptions.sql`
+- `202608110002_experience_mode.sql`
 
 Verified invite function state:
 
@@ -151,7 +205,8 @@ Storage:
 
 - Apply the polished Supabase Auth email template if not already done.
 - Add more formal tester feedback capture.
-- Improve conflict handling for simultaneous household edits.
+
+Resolved since last update: conflict handling for simultaneous household edits shipped twice over (stale-write guard + per-person day sections).
 
 ## Stephanie Test Script
 
@@ -166,7 +221,7 @@ Ask Stephanie to test on iPhone first.
 1. Open the URL.
 2. Confirm the homepage feels clear and trustworthy.
 3. Sign in with magic link.
-4. Confirm Settings > Beta shows `0.2.11`.
+4. Confirm Settings > Beta shows the current version from `web/package.json`.
 5. Complete onboarding as family/kids, partner, or whichever feels natural.
 6. Add one photo or one line in Today.
 7. Confirm the first-memory celebration appears.

@@ -4,7 +4,9 @@ import SwiftUI
 
 struct RootAppView: View {
     @Environment(PrivacyLockService.self) private var privacyLock
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("hasCompletedFirstLaunchOnboarding") private var hasCompletedFirstLaunchOnboarding = false
+    @AppStorage(ExperienceMode.storageKey) private var experienceModeRawValue = ExperienceMode.defaultMode.rawValue
     @State private var showingSaveFailureAlert = false
     @State private var selectedTab: AppTab = .today
     @State private var todayRouter = RouterPath()
@@ -16,8 +18,10 @@ struct RootAppView: View {
     var body: some View {
         ZStack {
             if hasCompletedFirstLaunchOnboarding {
+                // SPEC-7: Simple keeps Today/Memories/Settings; Calendar and
+                // Insights are Full-only analysis surfaces.
                 TabView(selection: $selectedTab) {
-                    ForEach(AppTab.allCases) { tab in
+                    ForEach(ExperienceModeMap.visibleTabs(in: experienceMode)) { tab in
                         NavigationStack(path: router(for: tab).pathBinding) {
                             tab.content
                                 .withAppRoutes()
@@ -49,6 +53,17 @@ struct RootAppView: View {
             guard isCompleted else { return }
             Task { await privacyLock.lockIfNeeded() }
         }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .background else { return }
+            Task { await privacyLock.lockIfNeeded() }
+        }
+        .onChange(of: experienceModeRawValue) { _, _ in
+            // If the active tab just became hidden (Full -> Simple while on
+            // Calendar or Insights), fall back to Today — same rule as web.
+            if !ExperienceModeMap.visibleTabs(in: experienceMode).contains(selectedTab) {
+                selectedTab = .today
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: Persistence.saveFailedNotification)) { _ in
             showingSaveFailureAlert = true
         }
@@ -57,6 +72,10 @@ struct RootAppView: View {
         } message: {
             Text("Something went wrong while saving. It is safe to try again — if this keeps happening, please send beta feedback from Settings.")
         }
+    }
+
+    private var experienceMode: ExperienceMode {
+        ExperienceMode.fromStoredValue(experienceModeRawValue)
     }
 
     private func router(for tab: AppTab) -> RouterPath {
@@ -119,6 +138,13 @@ private struct FirstLaunchOnboardingView: View {
                     cadenceSection
                     reminderSection
                     privacySection
+
+                    // SPEC-7: new users start in the Simple experience; one
+                    // sentence points at Full, mirroring web's onboarding.
+                    Text("You start with the Simple experience — one photo, three nice things, done. Want moods, people tags, and Little Details? Turn on the Full experience in Settings anytime.")
+                        .font(.footnote)
+                        .foregroundStyle(.warmGray)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     Button {
                         Task { await finish(wantsReminders: wantsReminders) }

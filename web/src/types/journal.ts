@@ -1,3 +1,5 @@
+import type { ExperienceMode } from "@/lib/experience-mode";
+
 export type WorkspaceKind = "personal" | "household";
 export type WorkspaceRole = "owner" | "editor" | "viewer";
 export type WorkspaceInvitationState = "invited" | "accepted";
@@ -72,6 +74,10 @@ export type PhotoAttachment = {
   storagePath: string;
   thumbnailPath: string;
   previewUrl: string;
+  // Signed thumbnail URL for small renditions. Derived presentation data like
+  // previewUrl — never serialized into the sync payload or dirty check. Absent
+  // for just-added photos and demo fixtures; renderers fall back to previewUrl.
+  thumbnailUrl?: string;
   caption: string;
   sortOrder: number;
   createdAt: string;
@@ -108,6 +114,9 @@ export type ReminderPreferences = {
   remindersEnabled: boolean;
   eveningTime: string;
   morningTime: string;
+  // IANA zone the times were chosen in (saved when reminder settings are
+  // edited). Null/absent means the dispatcher treats the times as UTC.
+  timezone?: string | null;
 };
 
 export type PendingWorkspaceInvite = {
@@ -118,6 +127,10 @@ export type PendingWorkspaceInvite = {
 
 export type JournalBootstrap = {
   mode: "demo" | "supabase";
+  // Set when an authenticated user's workspaces could not be loaded. /app
+  // renders an explicit recovery screen instead of the journal — never demo
+  // fixtures.
+  workspaceUnavailable?: boolean;
   profile: Profile | null;
   pendingInvites: PendingWorkspaceInvite[];
   workspaces: Workspace[];
@@ -127,6 +140,9 @@ export type JournalBootstrap = {
   prompts: PromptTemplate[];
   entries: JournalEntry[];
   reminders: ReminderPreferences;
+  // Per-user Simple/Full presentation preference (SPEC-7). Presentation-only:
+  // it never changes data or the sync protocol.
+  experienceMode: ExperienceMode;
 };
 
 export type MemoryMatch = {

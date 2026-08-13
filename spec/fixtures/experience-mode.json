@@ -1,0 +1,49 @@
+{
+  "spec": "SPEC-7",
+  "featureKeys": [
+    "todayTab",
+    "memoriesTab",
+    "settingsTab",
+    "calendarTab",
+    "insightsTab",
+    "photoHero",
+    "threeNiceThings",
+    "completionCard",
+    "streakPill",
+    "moodPicker",
+    "peopleTags",
+    "littleDetailsPanel",
+    "gratitudeGuide",
+    "pickMeUpMemory",
+    "promptSnapshot",
+    "memoryLanePanel",
+    "memoriesSearch",
+    "memoriesFilters",
+    "detailsRepository",
+    "promptEditor",
+    "peopleTagEditor",
+    "remindersSection",
+    "workspacesSection",
+    "dataExport",
+    "experienceToggle"
+  ],
+  "simpleFeatures": [
+    "todayTab",
+    "memoriesTab",
+    "settingsTab",
+    "photoHero",
+    "threeNiceThings",
+    "completionCard",
+    "streakPill",
+    "memoryLanePanel",
+    "memoriesSearch",
+    "remindersSection",
+    "workspacesSection",
+    "dataExport",
+    "experienceToggle"
+  ],
+  "tabs": {
+    "simple": ["today", "memories", "settings"],
+    "full": ["today", "memories", "calendar", "insights", "settings"]
+  }
+}

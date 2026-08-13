@@ -3,7 +3,10 @@ export function hasSupabaseEnv(): boolean {
 }
 
 export function isDemoMode(): boolean {
-  return process.env.NEXT_PUBLIC_DEMO_MODE !== "false" || !hasSupabaseEnv();
+  // Demo requires an explicit opt-in ("true") or a missing Supabase config
+  // (keeps env-less local dev working). Any other value runs the real app, so
+  // a typo'd flag can never silently serve fixture data.
+  return process.env.NEXT_PUBLIC_DEMO_MODE === "true" || !hasSupabaseEnv();
 }
 
 export function appUrl(): string {
