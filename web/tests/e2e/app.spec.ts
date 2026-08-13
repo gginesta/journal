@@ -44,19 +44,19 @@ async function openFreshApp(page: Page) {
 }
 
 async function continueFromWelcome(page: Page) {
-  await expect(page.getByRole("heading", { name: "This is a quiet place to keep one good moment from today." })).toBeVisible();
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("heading", { name: "Let's make this yours." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "A photo journal for noticing good moments" })).toBeVisible();
+  await page.getByRole("button", { name: "Begin" }).click();
+  await expect(page.getByRole("heading", { name: "Who’s in your story?" })).toBeVisible();
 }
 
-// Call this while on the "Let's make this yours." (people) step to advance
-// through the reminders step and finish onboarding.
+// Call this while on the "Who’s in your story?" (people) step to advance
+// through the rhythm and mode steps and finish onboarding.
 async function startToday(page: Page) {
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("heading", { name: "Want a quiet reminder?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "When’s your moment?" })).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("heading", { name: "Memory Lane starts sooner than you think." })).toBeVisible();
-  await page.getByRole("button", { name: "Add your first memory" }).click();
+  await expect(page.getByRole("heading", { name: "How much journal do you want?" })).toBeVisible();
+  await page.getByRole("button", { name: "Start with tonight" }).click();
   await expect(page.getByRole("heading", { name: "What felt good today?" })).toBeVisible();
 }
 
@@ -68,13 +68,12 @@ test("demo user can complete family onboarding, edit today, and find the saved m
   await openFreshApp(page);
   await continueFromWelcome(page);
   await expect(page.getByRole("button", { name: "Just me", pressed: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Me and my partner" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Other people or themes" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Me + partner" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "My own mix" })).toBeVisible();
   await expect(page.getByLabel("Partner")).toHaveCount(0);
-  await page.getByRole("button", { name: "Family / kids" }).click();
+  await page.getByRole("button", { name: "Family", exact: true }).click();
   await page.getByLabel("Child", { exact: true }).fill("Leo Test");
   await page.getByLabel("Partner").fill("Steph Test");
-  await expect(page.getByText("Still says 'lellow'")).toBeVisible();
   await startToday(page);
 
   await expect(page.getByRole("heading", { name: "Keep the first memory in under a minute." })).toBeVisible();
@@ -106,8 +105,8 @@ test("welcome tour fits on a phone viewport without horizontal overflow", async 
   await page.setViewportSize({ width: 390, height: 844 });
   await openFreshApp(page);
 
-  await expect(page.getByRole("heading", { name: "This is a quiet place to keep one good moment from today." })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Continue" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "A photo journal for noticing good moments" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Begin" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Skip tour" })).toBeVisible();
 
   const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
@@ -119,8 +118,8 @@ test("demo user can choose just me and other onboarding shapes without family-on
   await continueFromWelcome(page);
 
   await expect(page.getByRole("button", { name: "Just me", pressed: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Family / kids" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Other people or themes" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Family", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "My own mix" })).toBeVisible();
   await expect(page.getByLabel("Partner")).toHaveCount(0);
 
   await page.getByLabel("You", { exact: true }).fill("Solo Tester");
@@ -132,28 +131,30 @@ test("demo user can choose just me and other onboarding shapes without family-on
   await expect(page.getByText(`App version ${packageJson.version}`)).toBeVisible();
   await page.getByRole("button", { name: "Replay welcome" }).click();
   await continueFromWelcome(page);
-  await page.getByRole("button", { name: "Other people or themes" }).click();
+  await page.getByRole("button", { name: "My own mix" }).click();
   await expect(page.getByLabel("You", { exact: true })).toHaveCount(0);
   await page.getByLabel("Person or theme", { exact: true }).fill("Travel Wins, Work Wins");
   await startToday(page);
   await expect(page.getByRole("button", { name: "Travel Wins" }).first()).toBeVisible();
 });
 
-test("onboarding reminder step lets a demo user opt into a cadence", async ({ page }) => {
+test("onboarding rhythm step lets a demo user opt into a cadence", async ({ page }) => {
   await openFreshApp(page);
   await continueFromWelcome(page);
   await page.getByLabel("You", { exact: true }).fill("Cadence Tester");
 
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("heading", { name: "Want a quiet reminder?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "When’s your moment?" })).toBeVisible();
+  await page.getByRole("radio", { name: "Mornings and evenings" }).click();
+  await expect(page.getByRole("radio", { name: "Mornings and evenings" })).toBeChecked();
   await page.getByRole("switch", { name: "Enable reminders" }).click();
-  await page.getByLabel("Rhythm").selectOption("morning_evening");
   await expect(page.getByLabel("Morning", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Evening", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("heading", { name: "Memory Lane starts sooner than you think." })).toBeVisible();
-  await page.getByRole("button", { name: "Add your first memory" }).click();
+  await expect(page.getByRole("heading", { name: "How much journal do you want?" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: /^Full/ })).toBeChecked();
+  await page.getByRole("button", { name: "Start with tonight" }).click();
   await expect(page.getByRole("heading", { name: "What felt good today?" })).toBeVisible();
 });
 
@@ -186,7 +187,7 @@ test("details repository can find tagged little details when the repository UI i
 
   await openFreshApp(page);
   await continueFromWelcome(page);
-  await page.getByRole("button", { name: "Other people or themes" }).click();
+  await page.getByRole("button", { name: "My own mix" }).click();
   await page.getByLabel("Person or theme", { exact: true }).fill(tag);
   await startToday(page);
 
@@ -264,8 +265,8 @@ test("experience toggle switches Simple and Full without losing data", async ({ 
   await expect(page.locator("article").filter({ hasText: detail })).toBeVisible();
 
   await page.getByRole("button", { name: "Settings" }).first().click();
-  await expect(page.getByRole("heading", { name: "Experience" })).toBeVisible();
-  await expect(page.getByText("Switching never deletes anything; what you added in Full stays saved and comes right back.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "How much journal do you want?" })).toBeVisible();
+  await expect(page.getByText("Two ways to keep the same journal. Switch anytime — nothing is ever deleted, and everything you added stays saved and searchable.")).toBeVisible();
   await page.getByRole("radio", { name: /^Simple/ }).click();
   await expect(page.getByRole("radio", { name: /^Simple/ })).toBeChecked();
 

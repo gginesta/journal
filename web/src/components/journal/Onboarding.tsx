@@ -244,7 +244,6 @@ function PeopleStep({
               )}
             >
               {option.title}
-              <span className="sr-only">. {option.text}</span>
             </button>
           );
         })}

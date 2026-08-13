@@ -82,3 +82,120 @@ textarea {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Warm Album Today micro-interactions (appended block — do not fold into the
+   rules above). Keyframes for the completion "quiet exhale", the Memory Lane
+   reveal, the photo "develops" arrival, and the days-kept cross-fade.
+   Easing voice: slow-out cubic-bezier(.3,0,.2,1); only the check circle and
+   saved band overshoot with cubic-bezier(.34,1.4,.5,1). Nothing loops, and the
+   prefers-reduced-motion rule above collapses every sequence to an instant
+   cross-fade with the same end state ("both"/"forwards" fills). */
+
+@keyframes wa-rise-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes wa-fade-up-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-6px); }
+}
+
+@keyframes wa-exhale {
+  0% { transform: scale(1); }
+  45% { transform: scale(0.985); }
+  100% { transform: scale(1); }
+}
+
+@keyframes wa-band-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes wa-check-pop {
+  from { transform: scale(0.4); }
+  to { transform: scale(1); }
+}
+
+@keyframes wa-check-draw {
+  from { stroke-dashoffset: 26; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes wa-glow-breath {
+  0% { opacity: 0; }
+  35% { opacity: 0.9; }
+  100% { opacity: 0; }
+}
+
+@keyframes wa-develop {
+  from { opacity: 0.6; filter: blur(8px); transform: scale(0.96); }
+  to { opacity: 1; filter: blur(0); transform: scale(1); }
+}
+
+@keyframes wa-slide-left {
+  from { transform: translateX(6%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes wa-hairline {
+  0% { transform: scaleX(0); }
+  80% { transform: scaleX(0.85); }
+  100% { transform: scaleX(0.92); }
+}
+
+/* Days-kept number cross-fades n -> n+1 with a 4px rise on first save. */
+.wa-streak-in {
+  animation: wa-rise-in 0.35s cubic-bezier(0.3, 0, 0.2, 1) both;
+}
+
+/* Completion sequence: button 0-250ms, card exhale 0-900ms (out and back),
+   band + check circle 150-700ms with soft overshoot, check draw 400-900ms,
+   one leaf glow breath ~700-2300ms. */
+.wa-keep-button-out {
+  animation: wa-fade-up-out 0.25s ease both;
+  pointer-events: none;
+}
+
+.wa-exhale {
+  animation: wa-exhale 0.9s cubic-bezier(0.3, 0, 0.2, 1) both;
+}
+
+.wa-band-in {
+  animation: wa-band-rise 0.55s cubic-bezier(0.34, 1.4, 0.5, 1) 0.15s both;
+}
+
+.wa-check-pop {
+  animation: wa-check-pop 0.5s cubic-bezier(0.34, 1.4, 0.5, 1) 0.2s both;
+}
+
+.wa-check-draw {
+  stroke-dasharray: 26;
+  animation: wa-check-draw 0.5s cubic-bezier(0.3, 0, 0.2, 1) 0.4s both;
+}
+
+.wa-glow {
+  animation: wa-glow-breath 1.6s ease 0.7s both;
+}
+
+/* Photo "develops": low-res thumb settles from 8px blur / 96% scale over
+   500ms; the leaf hairline creeps while the real file is still processing
+   (single run — it parks at 92% until the slot resolves). */
+.wa-develop {
+  animation: wa-develop 0.5s cubic-bezier(0.3, 0, 0.2, 1) both;
+}
+
+.wa-slide-left {
+  animation: wa-slide-left 0.35s cubic-bezier(0.3, 0, 0.2, 1) both;
+}
+
+.wa-hairline {
+  transform-origin: left;
+  animation: wa-hairline 1.4s cubic-bezier(0.3, 0, 0.2, 1) both;
+}
+
+/* Memory Lane caption/date/open-row rise (350-950ms after the tap). */
+.wa-lane-text-in {
+  animation: wa-band-rise 0.6s cubic-bezier(0.2, 0.7, 0.3, 1) 0.35s both;
+}
